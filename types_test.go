@@ -2,6 +2,7 @@ package efi_test
 
 import (
 	"bytes"
+	"crypto"
 	"fmt"
 	"io"
 	"os"
@@ -9,6 +10,8 @@ import (
 	. "github.com/chrisccoulson/go-efilib"
 
 	. "gopkg.in/check.v1"
+
+	"go.mozilla.org/pkcs7"
 )
 
 type typesSuite struct{}
@@ -394,4 +397,54 @@ func (s *typesSuite) TestEncodeSignatureWithWrongSize(c *C) {
 	}
 	var b bytes.Buffer
 	c.Check(db.Encode(&b), ErrorMatches, "cannot encode signature list 0: signature 1 contains the wrong size")
+}
+
+func (s *typesSuite) TestDecodeWinCertificateGUID(c *C) {
+	f, err := os.Open("testdata/sigs/cert-type-guid.sig")
+	c.Assert(err, IsNil)
+	defer f.Close()
+
+	cert, err := DecodeWinCertificate(f)
+	c.Assert(err, IsNil)
+	guidCert, ok := cert.(*WinCertificateGUID)
+	c.Assert(ok, Equals, true)
+	c.Check(guidCert.Type, Equals, CertTypePKCS7Guid)
+}
+
+func (s *typesSuite) TestDecodeWinCertificateAuthenticode(c *C) {
+	f, err := os.Open("testdata/sigs/cert-type-authenticode.sig")
+	c.Assert(err, IsNil)
+	defer f.Close()
+
+	cert, err := DecodeWinCertificate(f)
+	c.Assert(err, IsNil)
+	authenticodeCert, ok := cert.(WinCertificateAuthenticode)
+	c.Check(ok, Equals, true)
+
+	p7, err := pkcs7.Parse(authenticodeCert)
+	c.Assert(err, IsNil)
+	signer := p7.GetOnlySigner()
+	c.Assert(signer, NotNil)
+
+	h := crypto.SHA256.New()
+	h.Write(signer.RawTBSCertificate)
+	c.Check(h.Sum(nil), DeepEquals, decodeHexString(c, "08954ce3da028da0128a81435159f543d70ccd789ee86ea55630dab9a765644e"))
+}
+
+func (s *typesSuite) TestDecodeWinCertificateInvalidRevision(c *C) {
+	f, err := os.Open("testdata/sigs/cert-invalid-revision.sig")
+	c.Assert(err, IsNil)
+	defer f.Close()
+
+	_, err = DecodeWinCertificate(f)
+	c.Assert(err, ErrorMatches, "unexpected revision")
+}
+
+func (s *typesSuite) TestDecodeWinCertificateInvalidType(c *C) {
+	f, err := os.Open("testdata/sigs/cert-invalid-type.sig")
+	c.Assert(err, IsNil)
+	defer f.Close()
+
+	_, err = DecodeWinCertificate(f)
+	c.Assert(err, ErrorMatches, "unexpected type")
 }

@@ -3,6 +3,7 @@ package efi
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"unicode/utf16"
@@ -295,4 +296,92 @@ func DecodeSignatureDatabase(r io.Reader) (SignatureDatabase, error) {
 	}
 
 	return db, nil
+}
+
+var (
+	HashAlgorithmSHA1Guid   = MakeGUID(0x2ae9d80f, 0x3fb2, 0x4095, 0xb7b1, [...]uint8{0xe9, 0x31, 0x57, 0xb9, 0x46, 0xb6})
+	HashAlgorithmSHA256Guid = MakeGUID(0x51aa59de, 0xfdf2, 0x4ea3, 0xbc63, [...]uint8{0x87, 0x5f, 0xb7, 0x84, 0x2e, 0xe9})
+	HashAlgorithmSHA224Guid = MakeGUID(0x8df01a06, 0x9bd5, 0x4bf7, 0xb021, [...]uint8{0xdb, 0x4f, 0xd9, 0xcc, 0xf4, 0x5b})
+	HashAlgorithmSHA384Guid = MakeGUID(0xefa96432, 0xde33, 0x4dd2, 0xaee6, [...]uint8{0x32, 0x8c, 0x33, 0xdf, 0x77, 0x7a})
+	HashAlgorithmSHA512Guid = MakeGUID(0xcaa4381e, 0x750c, 0x4770, 0xb870, [...]uint8{0x7a, 0x23, 0xb4, 0xe4, 0x21, 0x30})
+
+	// CertTypeRSA2048SHA256Guid corresponds to EFI_CERT_TYPE_RSA2048_SHA256_GUID
+	CertTypeRSA2048SHA256Guid = MakeGUID(0xa7717414, 0xc616, 0x4977, 0x9420, [...]uint8{0x84, 0x47, 0x12, 0xa7, 0x35, 0xbf})
+	// CertTypePKCS7Guid corresponds to EFI_CERT_TYPE_PKCS7_GUID
+	CertTypePKCS7Guid = MakeGUID(0x4aafd29d, 0x68df, 0x49ee, 0x8aa9, [...]uint8{0x34, 0x7d, 0x37, 0x56, 0x65, 0xa7})
+)
+
+// WinCertificate is an interface type corresponding to implementations of WIN_CERTIFICATE.
+type WinCertificate interface{}
+
+// WinCertificatePKCS1_15 corresponds to the WIN_CERTIFICATE_EFI_PKCS1_15 type.
+type WinCertificatePKCS1_15 struct {
+	HashAlgorithm GUID
+	Signature     []byte
+}
+
+// WinCertificateGUID corresponds to the WIN_CERTIFICATE_UEFI_GUID type.
+type WinCertificateGUID struct {
+	Type GUID
+	Data []byte
+}
+
+// WinCertificateAuthenticode corresponds to an Authenticode signature.
+type WinCertificateAuthenticode []byte
+
+const (
+	winCertTypePKCSSignedData = 0x0002
+	winCertTypePKCS115        = 0x0ef0
+	winCertTypeGUID           = 0x0ef1
+)
+
+// DecodeWinCertificate decodes a signature (something that is confusingly represented by types with "certificate" in the name in both
+// the UEFI and PE/COFF specifications) from the supplied io.Reader and returns a WinCertificate of the appropriate type.
+func DecodeWinCertificate(r io.Reader) (WinCertificate, error) {
+	var hdr struct {
+		Length   uint32
+		Revision uint16
+		Type     uint16
+	}
+	if err := binary.Read(r, binary.LittleEndian, &hdr); err != nil {
+		return nil, xerrors.Errorf("cannot read WIN_CERTIFICATE header: %w", err)
+	}
+	if hdr.Revision != 0x0200 {
+		return nil, errors.New("unexpected revision")
+	}
+
+	switch hdr.Type {
+	case winCertTypePKCSSignedData:
+		cert := make(WinCertificateAuthenticode, int(hdr.Length)-binary.Size(hdr))
+		if _, err := io.ReadFull(r, cert); err != nil {
+			return nil, xerrors.Errorf("cannot read Authenticode data: %w", err)
+		}
+		return cert, nil
+	case winCertTypePKCS115:
+		cert := &WinCertificatePKCS1_15{}
+		h, err := ReadGUID(r)
+		if err != nil {
+			return nil, xerrors.Errorf("cannot read WIN_CERTIFICATE_EFI_PKCS1_15.HashAlgorithm: %w", err)
+		}
+		cert.HashAlgorithm = h
+		cert.Signature = make([]byte, int(hdr.Length)-binary.Size(hdr)-binary.Size(cert.HashAlgorithm))
+		if _, err := io.ReadFull(r, cert.Signature); err != nil {
+			return nil, xerrors.Errorf("cannot read WIN_CERTIFICATE_EFI_PKCS1_15.Signature: %w", err)
+		}
+		return cert, nil
+	case winCertTypeGUID:
+		cert := &WinCertificateGUID{}
+		t, err := ReadGUID(r)
+		if err != nil {
+			return nil, xerrors.Errorf("cannot read WIN_CERTIFICATE_UEFI_GUID.CertType: %w", err)
+		}
+		cert.Type = t
+		cert.Data = make([]byte, int(hdr.Length)-binary.Size(hdr)-binary.Size(cert.Type))
+		if _, err := io.ReadFull(r, cert.Data); err != nil {
+			return nil, xerrors.Errorf("cannot read WIN_CERTIFICATE_UEFI_GUID.CertData: %w", err)
+		}
+		return cert, nil
+	default:
+		return nil, errors.New("unexpected type")
+	}
 }
