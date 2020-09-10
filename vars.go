@@ -54,8 +54,8 @@ func isAvailable() (bool, error) {
 	return true, nil
 }
 
-// OpenVar opens the EFI variable with the specified name and GUID for reading. On success, it returns a io.ReadCloser for reading
-// the variable value, and the variable's attributes.
+// OpenVar opens the EFI variable with the specified name and GUID for reading. On success, it returns the variable's attributes,
+// and a io.ReadCloser for reading the variable value.
 func OpenVar(name string, guid GUID) (io.ReadCloser, VariableAttributes, error) {
 	if available, err := isAvailable(); err != nil {
 		return nil, 0, err
