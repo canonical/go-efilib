@@ -73,7 +73,10 @@ type devicePathNodeData interface {
 // DevicePathNode represents a single node in a device path.
 type DevicePathNode struct {
 	Parent *DevicePathNode // The parent node
-	Data   interface{}     // Information about this node
+
+	// Data provides additional information about this node. The concrete type is dependent on the type of this device path node,
+	// and will be a pointer to one of the DevicePathData types.
+	Data interface{}
 }
 
 // BaseName returns the string representation of this node.

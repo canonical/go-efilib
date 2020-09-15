@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 	"unicode/utf16"
 
 	"golang.org/x/xerrors"
@@ -144,35 +145,6 @@ func (e PartitionEntryRaw) String() string {
 	return decoded.String()
 }
 
-var (
-	// CertSHA1Guid corresponds to EFI_CERT_SHA1_GUID
-	CertSHA1Guid = MakeGUID(0x826ca512, 0xcf10, 0x4ac9, 0xb187, [...]uint8{0xbe, 0x01, 0x49, 0x66, 0x31, 0xbd})
-	// CertSHA256Guid corresponds to EFI_CERT_SHA256_GUID
-	CertSHA256Guid = MakeGUID(0xc1c41626, 0x504c, 0x4092, 0xaca9, [...]uint8{0x41, 0xf9, 0x36, 0x93, 0x43, 0x28})
-	// CertSHA224Guid corresponds to EFI_CERT_SHA224_GUID
-	CertSHA224Guid = MakeGUID(0xb6e5233, 0xa65c, 0x44c9, 0x9407, [...]uint8{0xd9, 0xab, 0x83, 0xbf, 0xc8, 0xbd})
-	// CertSHA384Guid corresponds to EFI_CERT_SHA384_GUID
-	CertSHA384Guid = MakeGUID(0xff3e5307, 0x9fd0, 0x48c9, 0x85f1, [...]uint8{0x8a, 0xd5, 0x6c, 0x70, 0x1e, 0x01})
-	// CertSHA512Guid corresponds to EFI_CERT_SHA512_GUID
-	CertSHA512Guid = MakeGUID(0x093e0fae, 0xa6c4, 0x4f50, 0x9f1b, [...]uint8{0xd4, 0x1e, 0x2b, 0x89, 0xc1, 0x9a})
-
-	// CertRSA2048Guid corresponds to EFI_CERT_RSA2048_GUID
-	CertRSA2048Guid = MakeGUID(0x3c5766e8, 0x269c, 0x4e34, 0xaa14, [...]uint8{0xed, 0x77, 0x6e, 0x85, 0xb3, 0xb6})
-	// CertRSA2048SHA1Guid corresponds to EFI_CERT_RSA2048_SHA1_GUID
-	CertRSA2048SHA1Guid = MakeGUID(0x67f8444f, 0x8743, 0x48f1, 0xa328, [...]uint8{0x1e, 0xaa, 0xb8, 0x73, 0x60, 0x80})
-	// CertRSA2048SHA256Guid corresponds to EFI_CERT_RSA2048_SHA256_GUID
-	CertRSA2048SHA256Guid = MakeGUID(0xe2b36190, 0x879b, 0x4a3d, 0xad8d, [...]uint8{0xf2, 0xe7, 0xbb, 0xa3, 0x27, 0x84})
-
-	// CertX509Guid corresponds to EFI_CERT_X509_GUID
-	CertX509Guid = MakeGUID(0xa5c059a1, 0x94e4, 0x4aa7, 0x87b5, [...]uint8{0xab, 0x15, 0x5c, 0x2b, 0xf0, 0x72})
-	// CertX509SHA256Guid corresponds to EFI_CERT_X509_SHA256_GUID
-	CertX509SHA256Guid = MakeGUID(0x3bd2a492, 0x96c0, 0x4079, 0xb420, [...]uint8{0xfc, 0xf9, 0x8e, 0xf1, 0x03, 0xed})
-	// CertX509SHA384Guid corresponds to EFI_CERT_X509_SHA384_GUID
-	CertX509SHA384Guid = MakeGUID(0x7076876e, 0x80c2, 0x4ee6, 0xaad2, [...]uint8{0x28, 0xb3, 0x49, 0xa6, 0x86, 0x5b})
-	// CertX509SHA512Guid corresponds to EFI_CERT_X509_SHA512_GUID
-	CertX509SHA512Guid = MakeGUID(0x446dbf63, 0x2502, 0x4cda, 0xbcfa, [...]uint8{0x24, 0x65, 0xd2, 0xb0, 0xfe, 0x9d})
-)
-
 type signatureListHdr struct {
 	Type          GUID
 	ListSize      uint32
@@ -298,26 +270,44 @@ func DecodeSignatureDatabase(r io.Reader) (SignatureDatabase, error) {
 	return db, nil
 }
 
-var (
-	HashAlgorithmSHA1Guid   = MakeGUID(0x2ae9d80f, 0x3fb2, 0x4095, 0xb7b1, [...]uint8{0xe9, 0x31, 0x57, 0xb9, 0x46, 0xb6})
-	HashAlgorithmSHA256Guid = MakeGUID(0x51aa59de, 0xfdf2, 0x4ea3, 0xbc63, [...]uint8{0x87, 0x5f, 0xb7, 0x84, 0x2e, 0xe9})
-	HashAlgorithmSHA224Guid = MakeGUID(0x8df01a06, 0x9bd5, 0x4bf7, 0xb021, [...]uint8{0xdb, 0x4f, 0xd9, 0xcc, 0xf4, 0x5b})
-	HashAlgorithmSHA384Guid = MakeGUID(0xefa96432, 0xde33, 0x4dd2, 0xaee6, [...]uint8{0x32, 0x8c, 0x33, 0xdf, 0x77, 0x7a})
-	HashAlgorithmSHA512Guid = MakeGUID(0xcaa4381e, 0x750c, 0x4770, 0xb870, [...]uint8{0x7a, 0x23, 0xb4, 0xe4, 0x21, 0x30})
-
-	// CertTypeRSA2048SHA256Guid corresponds to EFI_CERT_TYPE_RSA2048_SHA256_GUID
-	CertTypeRSA2048SHA256Guid = MakeGUID(0xa7717414, 0xc616, 0x4977, 0x9420, [...]uint8{0x84, 0x47, 0x12, 0xa7, 0x35, 0xbf})
-	// CertTypePKCS7Guid corresponds to EFI_CERT_TYPE_PKCS7_GUID
-	CertTypePKCS7Guid = MakeGUID(0x4aafd29d, 0x68df, 0x49ee, 0x8aa9, [...]uint8{0x34, 0x7d, 0x37, 0x56, 0x65, 0xa7})
+const (
+	winCertTypePKCSSignedData = 0x0002
+	winCertTypePKCS115        = 0x0ef0
+	winCertTypeGUID           = 0x0ef1
 )
 
+type winCertificate struct {
+	Length   uint32
+	Revision uint16
+	Type     uint16
+}
+
 // WinCertificate is an interface type corresponding to implementations of WIN_CERTIFICATE.
-type WinCertificate interface{}
+type WinCertificate interface {
+	Encode(w io.Writer) error // Encode this certificate to the supplied io.Writer
+}
 
 // WinCertificatePKCS1_15 corresponds to the WIN_CERTIFICATE_EFI_PKCS1_15 type.
 type WinCertificatePKCS1_15 struct {
 	HashAlgorithm GUID
 	Signature     []byte
+}
+
+func (c *WinCertificatePKCS1_15) Encode(w io.Writer) error {
+	var buf bytes.Buffer
+	if _, err := buf.Write(c.HashAlgorithm[:]); err != nil {
+		return err
+	}
+	if _, err := buf.Write(c.Signature); err != nil {
+		return err
+	}
+	hdr := winCertificate{Revision: 0x0200, Type: winCertTypePKCS115}
+	hdr.Length = uint32(binary.Size(hdr) + buf.Len())
+	if err := binary.Write(w, binary.LittleEndian, hdr); err != nil {
+		return err
+	}
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 // WinCertificateGUID corresponds to the WIN_CERTIFICATE_UEFI_GUID type.
@@ -326,23 +316,41 @@ type WinCertificateGUID struct {
 	Data []byte
 }
 
+func (c *WinCertificateGUID) Encode(w io.Writer) error {
+	var buf bytes.Buffer
+	if _, err := buf.Write(c.Type[:]); err != nil {
+		return err
+	}
+	if _, err := buf.Write(c.Data); err != nil {
+		return err
+	}
+	hdr := winCertificate{Revision: 0x0200, Type: winCertTypeGUID}
+	hdr.Length = uint32(binary.Size(hdr) + buf.Len())
+	if err := binary.Write(w, binary.LittleEndian, hdr); err != nil {
+		return err
+	}
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // WinCertificateAuthenticode corresponds to an Authenticode signature.
 type WinCertificateAuthenticode []byte
 
-const (
-	winCertTypePKCSSignedData = 0x0002
-	winCertTypePKCS115        = 0x0ef0
-	winCertTypeGUID           = 0x0ef1
-)
+func (c WinCertificateAuthenticode) Encode(w io.Writer) error {
+	hdr := winCertificate{Revision: 0x0200, Type: winCertTypePKCSSignedData}
+	hdr.Length = uint32(binary.Size(hdr) + len(c))
+	if err := binary.Write(w, binary.LittleEndian, hdr); err != nil {
+		return err
+	}
+	_, err := w.Write(c)
+	return err
+}
 
 // DecodeWinCertificate decodes a signature (something that is confusingly represented by types with "certificate" in the name in both
-// the UEFI and PE/COFF specifications) from the supplied io.Reader and returns a WinCertificate of the appropriate type.
+// the UEFI and PE/COFF specifications) from the supplied io.Reader and returns a WinCertificate of the appropriate type. The type
+// returned is dependent on the data, and will be one of *WinCertificateAuthenticode, *WinCertificatePKCS1_15 or *WinCertificateGUID.
 func DecodeWinCertificate(r io.Reader) (WinCertificate, error) {
-	var hdr struct {
-		Length   uint32
-		Revision uint16
-		Type     uint16
-	}
+	var hdr winCertificate
 	if err := binary.Read(r, binary.LittleEndian, &hdr); err != nil {
 		return nil, xerrors.Errorf("cannot read WIN_CERTIFICATE header: %w", err)
 	}
@@ -381,6 +389,365 @@ func DecodeWinCertificate(r io.Reader) (WinCertificate, error) {
 			return nil, xerrors.Errorf("cannot read WIN_CERTIFICATE_UEFI_GUID.CertData: %w", err)
 		}
 		return cert, nil
+	default:
+		return nil, errors.New("unexpected type")
+	}
+}
+
+type efiTime struct {
+	Year       uint16
+	Month      uint8
+	Day        uint8
+	Hour       uint8
+	Minute     uint8
+	Second     uint8
+	Pad1       uint8
+	Nanosecond uint32
+	Timezone   int16
+	Daylight   uint8
+	Pad2       uint8
+}
+
+func (t *efiTime) toGoTime() time.Time {
+	return time.Date(int(t.Year), time.Month(t.Month), int(t.Day), int(t.Hour), int(t.Minute), int(t.Second), int(t.Nanosecond), time.FixedZone("", -int(t.Timezone)*60))
+}
+
+func goTimeToEfiTime(t time.Time) *efiTime {
+	_, offset := t.Zone()
+	return &efiTime{
+		Year:       uint16(t.Year()),
+		Month:      uint8(t.Month()),
+		Day:        uint8(t.Day()),
+		Hour:       uint8(t.Hour()),
+		Minute:     uint8(t.Minute()),
+		Second:     uint8(t.Second()),
+		Nanosecond: uint32(t.Nanosecond()),
+		Timezone:   -int16(offset / 60)}
+}
+
+// VariableAuthentication correspond to the EFI_VARIABLE_AUTHENTICATION type and is provided as a header when updating a variable with
+// the EFI_VARIABLE_AUTHENTICATED_WRITE_ACCESS attribute set.
+type VariableAuthentication struct {
+	MonotonicCount uint64
+	AuthInfo       WinCertificateGUID
+}
+
+func (a *VariableAuthentication) Encode(w io.Writer) error {
+	if err := binary.Write(w, binary.LittleEndian, a.MonotonicCount); err != nil {
+		return err
+	}
+	return a.AuthInfo.Encode(w)
+}
+
+// DecodeVariableAuthentication decodes a header for updating a variable with the EFI_VARIABLE_AUTHENTICATED_WRITE_ACCESS attribute
+// set.
+func DecodeVariableAuthentication(r io.Reader) (*VariableAuthentication, error) {
+	var monotonicCount uint64
+	if err := binary.Read(r, binary.LittleEndian, &monotonicCount); err != nil {
+		return nil, err
+	}
+	cert, err := DecodeWinCertificate(r)
+	if err != nil {
+		return nil, xerrors.Errorf("cannot decode AuthInfo: %w", err)
+	}
+	certGuid, ok := cert.(*WinCertificateGUID)
+	if !ok {
+		return nil, errors.New("AuthInfo has the wrong type")
+	}
+	return &VariableAuthentication{MonotonicCount: monotonicCount, AuthInfo: *certGuid}, nil
+}
+
+// VariableAuthentication2 correspond to the EFI_VARIABLE_AUTHENTICATION_2 type and is provided as a header when updating a variable
+// with the EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS attribute set.
+type VariableAuthentication2 struct {
+	TimeStamp time.Time
+	AuthInfo  WinCertificateGUID
+}
+
+func (a *VariableAuthentication2) Encode(w io.Writer) error {
+	if err := binary.Write(w, binary.LittleEndian, goTimeToEfiTime(a.TimeStamp)); err != nil {
+		return err
+	}
+	return a.AuthInfo.Encode(w)
+}
+
+// DecodeTimeBasedVariableAuthentication decodes the header for updating a variable with the
+// EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS attribute set.
+func DecodeTimeBasedVariableAuthentication(r io.Reader) (*VariableAuthentication2, error) {
+	var t efiTime
+	if err := binary.Read(r, binary.LittleEndian, &t); err != nil {
+		return nil, err
+	}
+	cert, err := DecodeWinCertificate(r)
+	if err != nil {
+		return nil, xerrors.Errorf("cannot decode AuthInfo: %w", err)
+	}
+	certGuid, ok := cert.(*WinCertificateGUID)
+	if !ok {
+		return nil, errors.New("AuthInfo has the wrong type")
+	}
+	return &VariableAuthentication2{TimeStamp: t.toGoTime(), AuthInfo: *certGuid}, nil
+}
+
+const (
+	variableAuthentication3TimestampType = 1
+	variableAuthentication3NonceType     = 2
+)
+
+type variableAuthentication3 struct {
+	Version      uint8
+	Type         uint8
+	MetadataSize uint32
+	Flags        uint32
+}
+
+// VariableAuthentication3 represents the header for updating a variable with the EFI_VARIABLE_ENHANCED_AUTHENTICATED_ACCESS
+// attribute set.
+type VariableAuthentication3 interface{}
+
+// VariableAuthentication3Timestamp corresponds to the header for updating a variable with the
+// EFI_VARIABLE_ENHANCED_AUTHENTICATED_ACCESS attribute set, and a type of EFI_VARIABLE_AUTHENTICATION_3_TIMESTAMP_TYPE.
+type VariableAuthentication3Timestamp struct {
+	TimeStamp   time.Time
+	NewCert     *WinCertificateGUID
+	SigningCert WinCertificateGUID
+}
+
+func (a *VariableAuthentication3Timestamp) Encode(w io.Writer) error {
+	hdr := variableAuthentication3{
+		Version: 1,
+		Type:    variableAuthentication3TimestampType}
+
+	var buf bytes.Buffer
+	if err := binary.Write(&buf, binary.LittleEndian, goTimeToEfiTime(a.TimeStamp)); err != nil {
+		return err
+	}
+	if a.NewCert != nil {
+		hdr.Flags = 1
+		if err := a.NewCert.Encode(&buf); err != nil {
+			return err
+		}
+	}
+	if err := a.SigningCert.Encode(&buf); err != nil {
+		return err
+	}
+
+	hdr.MetadataSize = uint32(binary.Size(hdr) + buf.Len())
+	if err := binary.Write(w, binary.LittleEndian, hdr); err != nil {
+		return err
+	}
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+// VariableAuthentication3Nonce corresponds to the header for updating a variable with the
+// EFI_VARIABLE_ENHANCED_AUTHENTICATED_ACCESS attribute set, and a type of EFI_VARIABLE_AUTHENTICATION_3_NONCE_TYPE.
+type VariableAuthentication3Nonce struct {
+	Nonce       []byte
+	NewCert     *WinCertificateGUID
+	SigningCert WinCertificateGUID
+}
+
+func (a *VariableAuthentication3Nonce) Encode(w io.Writer) error {
+	hdr := variableAuthentication3{
+		Version: 1,
+		Type:    variableAuthentication3NonceType}
+
+	var buf bytes.Buffer
+	if err := binary.Write(&buf, binary.LittleEndian, uint32(len(a.Nonce))); err != nil {
+		return err
+	}
+	if _, err := buf.Write(a.Nonce); err != nil {
+		return err
+	}
+	if a.NewCert != nil {
+		hdr.Flags = 1
+		if err := a.NewCert.Encode(&buf); err != nil {
+			return err
+		}
+	}
+	if err := a.SigningCert.Encode(&buf); err != nil {
+		return err
+	}
+
+	hdr.MetadataSize = uint32(binary.Size(hdr) + buf.Len())
+	if err := binary.Write(w, binary.LittleEndian, hdr); err != nil {
+		return err
+	}
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+// DecodeEnhancedVariableAuthentication decodes the header for updating a variable with the
+// EFI_VARIABLE_ENHANCED_AUTHENTICATED_ACCESS attribute set.
+func DecodeEnhancedVariableAuthentication(r io.Reader) (VariableAuthentication3, error) {
+	var hdr variableAuthentication3
+	if err := binary.Read(r, binary.LittleEndian, &hdr); err != nil {
+		return nil, err
+	}
+	if hdr.Version != 1 {
+		return nil, errors.New("unexpected version")
+	}
+
+	lr := io.LimitReader(r, int64(hdr.MetadataSize)-int64(binary.Size(hdr)))
+
+	switch hdr.Type {
+	case variableAuthentication3TimestampType:
+		var t efiTime
+		if err := binary.Read(lr, binary.LittleEndian, &t); err != nil {
+			return nil, err
+		}
+
+		var newCert *WinCertificateGUID
+		if hdr.Flags&1 > 0 {
+			cert, err := DecodeWinCertificate(lr)
+			if err != nil {
+				return nil, xerrors.Errorf("cannot decode new cert: %w", err)
+			}
+			var ok bool
+			newCert, ok = cert.(*WinCertificateGUID)
+			if !ok {
+				return nil, errors.New("new cert has the wrong type")
+			}
+		}
+
+		cert, err := DecodeWinCertificate(lr)
+		if err != nil {
+			return nil, xerrors.Errorf("cannot decode signing cert: %w", err)
+		}
+		signingCert, ok := cert.(*WinCertificateGUID)
+		if !ok {
+			return nil, errors.New("signing cert has the wrong type")
+		}
+
+		return &VariableAuthentication3Timestamp{TimeStamp: t.toGoTime(), NewCert: newCert, SigningCert: *signingCert}, nil
+	case variableAuthentication3NonceType:
+		var nonceSize uint32
+		if err := binary.Read(lr, binary.LittleEndian, &nonceSize); err != nil {
+			return nil, err
+		}
+		nonce := make([]byte, nonceSize)
+		if _, err := io.ReadFull(lr, nonce); err != nil {
+			return nil, err
+		}
+
+		var newCert *WinCertificateGUID
+		if hdr.Flags&1 > 0 {
+			cert, err := DecodeWinCertificate(lr)
+			if err != nil {
+				return nil, xerrors.Errorf("cannot decode new cert: %w", err)
+			}
+			var ok bool
+			newCert, ok = cert.(*WinCertificateGUID)
+			if !ok {
+				return nil, errors.New("new cert has the wrong type")
+			}
+		}
+
+		cert, err := DecodeWinCertificate(lr)
+		if err != nil {
+			return nil, xerrors.Errorf("cannot decode signing cert: %w", err)
+		}
+		signingCert, ok := cert.(*WinCertificateGUID)
+		if !ok {
+			return nil, errors.New("signing cert has the wrong type")
+		}
+
+		return &VariableAuthentication3Nonce{Nonce: nonce, NewCert: newCert, SigningCert: *signingCert}, nil
+	default:
+		return nil, errors.New("unexpected type")
+	}
+}
+
+// VariableAuthentication3Descriptor corresponds to the authentication descriptor provided when reading the payload of a variable
+// with the EFI_VARIABLE_ENHANCED_AUTHENTICATED_ACCESS attribute set.
+type VariableAuthentication3Descriptor interface{}
+
+const (
+	VariableAuthentication3DescriptorCertIDSHA256 = 1
+)
+
+type VariableAuthentication3DescriptorCertId struct {
+	Type uint8
+	Id   []byte
+}
+
+func decodeVariableAuthentication3DescriptorCertId(r io.Reader) (*VariableAuthentication3DescriptorCertId, error) {
+	var h struct {
+		Type   uint8
+		IdSize uint32
+	}
+	if err := binary.Read(r, binary.LittleEndian, &h); err != nil {
+		return nil, err
+	}
+	id := make([]byte, int(h.IdSize))
+	if _, err := io.ReadFull(r, id); err != nil {
+		return nil, err
+	}
+
+	return &VariableAuthentication3DescriptorCertId{Type: h.Type, Id: id}, nil
+}
+
+// VariableAuthentication3TimestampDescriptor corresponds to the authentication descriptor provided when reading the payload of a
+// variable with the EFI_VARIABLE_ENHANCED_AUTHENTICATED_ACCESS attribute set, and a type of
+// EFI_VARIABLE_AUTHENTICATION_3_TIMESTAMP_TYPE.
+type VariableAuthentication3TimestampDescriptor struct {
+	TimeStamp time.Time
+	VariableAuthentication3DescriptorCertId
+}
+
+// VariableAuthentication3NonceDescriptor corresponds to the authentication descriptor provided when reading the payload of a
+// variable with the EFI_VARIABLE_ENHANCED_AUTHENTICATED_ACCESS attribute set, and a type of
+// EFI_VARIABLE_AUTHENTICATION_3_NONCE_TYPE.
+type VariableAuthentication3NonceDescriptor struct {
+	Nonce []byte
+	VariableAuthentication3DescriptorCertId
+}
+
+// DecodeEnhancedAuthenticationDescriptor decodes the enhanced authentication descriptor from the supplied io.Reader. The supplied
+// reader will typically read from the payload area of a variable with the EFI_VARIABLE_ENHANCED_AUTHENTICATION_ACCESS attribute set,
+// returned from a call to OpenVar. Alternatively, for reading variables that you know have this attribute set, use
+// ReadEnhancedAuthenticatedVar or OpenEnhancedAuthenticatedVar instead.
+func DecodeEnhancedAuthenticationDescriptor(r io.Reader) (VariableAuthentication3Descriptor, error) {
+	var hdr variableAuthentication3
+	if err := binary.Read(r, binary.LittleEndian, &hdr); err != nil {
+		return nil, err
+	}
+	if hdr.Version != 1 {
+		return nil, errors.New("unexpected version")
+	}
+
+	lr := io.LimitReader(r, int64(hdr.MetadataSize)-int64(binary.Size(hdr)))
+
+	switch hdr.Type {
+	case variableAuthentication3TimestampType:
+		var t efiTime
+		if err := binary.Read(lr, binary.LittleEndian, &t); err != nil {
+			return nil, err
+		}
+		id, err := decodeVariableAuthentication3DescriptorCertId(lr)
+		if err != nil {
+			return nil, err
+		}
+		return &VariableAuthentication3TimestampDescriptor{
+			TimeStamp:                               t.toGoTime(),
+			VariableAuthentication3DescriptorCertId: *id}, nil
+	case variableAuthentication3NonceType:
+		var nonceSize uint32
+		if err := binary.Read(lr, binary.LittleEndian, &nonceSize); err != nil {
+			return nil, err
+		}
+		nonce := make([]byte, nonceSize)
+		if _, err := io.ReadFull(lr, nonce); err != nil {
+			return nil, err
+		}
+		id, err := decodeVariableAuthentication3DescriptorCertId(lr)
+		if err != nil {
+			return nil, err
+		}
+		return &VariableAuthentication3NonceDescriptor{
+			Nonce:                                   nonce,
+			VariableAuthentication3DescriptorCertId: *id}, nil
 	default:
 		return nil, errors.New("unexpected type")
 	}

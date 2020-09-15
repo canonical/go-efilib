@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 
 	"golang.org/x/sys/unix"
+	"golang.org/x/xerrors"
 )
 
 var (
@@ -125,4 +126,40 @@ func WriteVar(name string, guid GUID, attrs VariableAttributes, data []byte) err
 
 	_, err = buf.WriteTo(f)
 	return err
+}
+
+func OpenEnhancedAuthenticatedVar(name string, guid GUID) (io.ReadCloser, VariableAuthentication3Descriptor, VariableAttributes, error) {
+	r, attrs, err := OpenVar(name, guid)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+	defer r.Close()
+	if attrs&AttributeEnhancedAuthenticatedAccess == 0 {
+		return nil, nil, 0, errors.New("variable does not have the EFI_VARIABLE_ENHANCED_AUTHENTICATED_ACCESS attribute set")
+	}
+
+	auth, err := DecodeEnhancedAuthenticationDescriptor(r)
+	if err != nil {
+		return nil, nil, 0, xerrors.Errorf("cannot decode authentication descriptor: %w", err)
+	}
+
+	return r, auth, attrs, nil
+}
+
+// ReadEnhancedAuthenticatedVar returns the value, attributes and authentication descriptor of the EFI variable with the specified
+// name and GUID. This will return an error if the variable doesn't have the EFI_VARIABLE_ENHANCED_AUTHENTICATED_ACCESS attribute
+// set.
+func ReadEnhancedAuthenticatedVar(name string, guid GUID) ([]byte, VariableAuthentication3Descriptor, VariableAttributes, error) {
+	r, auth, attrs, err := OpenEnhancedAuthenticatedVar(name, guid)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+	defer r.Close()
+
+	val, err := ioutil.ReadAll(r)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+
+	return val, auth, attrs, nil
 }
