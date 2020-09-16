@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	. "github.com/chrisccoulson/go-efilib"
 
@@ -447,4 +448,17 @@ func (s *typesSuite) TestDecodeWinCertificateInvalidType(c *C) {
 
 	_, err = DecodeWinCertificate(f)
 	c.Assert(err, ErrorMatches, "unexpected type")
+}
+
+func (s *typesSuite) TestDecodeTimeBasedVariableAuthentication(c *C) {
+	f, err := os.Open("testdata/authenticated-var-payloads/MS-2016-08-08.bin")
+	c.Assert(err, IsNil)
+	defer f.Close()
+
+	auth, err := DecodeTimeBasedVariableAuthentication(f)
+	c.Assert(err, IsNil)
+	c.Check(auth.TimeStamp, DeepEquals, time.Date(2010, 3, 6, 19, 17, 21, 0, time.FixedZone("", 0)))
+	c.Check(auth.AuthInfo.Type, Equals, CertTypePKCS7Guid)
+	_, err = DecodeSignatureDatabase(f)
+	c.Check(err, IsNil)
 }
