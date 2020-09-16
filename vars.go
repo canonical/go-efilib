@@ -15,8 +15,7 @@ import (
 )
 
 var (
-	varsRoot   = ""
-	varsStatfs = unix.Statfs
+	varsRoot = "/"
 )
 
 type VariableAttributes uint32
@@ -43,7 +42,7 @@ func varsPath() string {
 
 func isAvailable() (bool, error) {
 	var st unix.Statfs_t
-	if err := varsStatfs(varsPath(), &st); err != nil {
+	if err := unixStatfs(varsPath(), &st); err != nil {
 		if os.IsNotExist(err) {
 			return false, nil
 		}

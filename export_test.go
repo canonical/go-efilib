@@ -6,9 +6,9 @@ import (
 
 func MockVarsRoot(path string, fstype int64) (restore func()) {
 	origRoot := varsRoot
-	origStatfs := varsStatfs
+	origStatfs := unixStatfs
 	varsRoot = path
-	varsStatfs = func(path string, st *unix.Statfs_t) error {
+	unixStatfs = func(path string, st *unix.Statfs_t) error {
 		if err := unix.Statfs(path, st); err != nil {
 			return err
 		}
@@ -18,6 +18,6 @@ func MockVarsRoot(path string, fstype int64) (restore func()) {
 
 	return func() {
 		varsRoot = origRoot
-		varsStatfs = origStatfs
+		unixStatfs = origStatfs
 	}
 }
