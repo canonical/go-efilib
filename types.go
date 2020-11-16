@@ -2,6 +2,8 @@ package efi
 
 import (
 	"bytes"
+	"crypto"
+	"crypto/x509"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -174,6 +176,31 @@ type SignatureList struct {
 	Signatures []*SignatureData
 }
 
+func (l *SignatureList) String() string {
+	var b bytes.Buffer
+	fmt.Fprintf(&b, "EFI_SIGNATURE_LIST{ SignatureType: %v, SignatureHeader: %x, Signatures: [", l.Type, l.Header)
+	for _, d := range l.Signatures {
+		fmt.Fprintf(&b, "\n\tEFI_SIGNATURE_DATA{ SignatureOwner: %v, Details: {", d.Owner)
+		switch l.Type {
+		case CertSHA1Guid, CertSHA256Guid, CertSHA224Guid, CertSHA384Guid, CertSHA512Guid:
+			fmt.Fprintf(&b, "\n\t\tHash: %x", d.Data)
+		case CertX509Guid:
+			cert, err := x509.ParseCertificate(d.Data)
+			if err != nil {
+				fmt.Fprintf(&b, "%v", err)
+			}
+			h := crypto.SHA256.New()
+			h.Write(cert.RawTBSCertificate)
+			fmt.Fprintf(&b, "\n\t\tSubject: %v\n\t\tIssuer: %v\n\t\tSHA256 fingerprint: %x", cert.Subject, cert.Issuer, h.Sum(nil))
+		default:
+			fmt.Fprintf(&b, "<unrecognized type>")
+		}
+		fmt.Fprintf(&b, "}}")
+	}
+	fmt.Fprintf(&b, "]")
+	return b.String()
+}
+
 // Encode serializes this signature list to w.
 func (l *SignatureList) Encode(w io.Writer) error {
 	lh := signatureListHdr{Type: l.Type, HeaderSize: uint32(len(l.Header))}
@@ -211,6 +238,14 @@ func (l *SignatureList) Encode(w io.Writer) error {
 
 // SignatureDatabase corresponds to a list of EFI_SIGNATURE_LIST structures.
 type SignatureDatabase []*SignatureList
+
+func (db SignatureDatabase) String() string {
+	var s string
+	for _, l := range db {
+		s = s + "\n" + l.String() + "\n"
+	}
+	return s
+}
 
 // Encode serializes this signature database to w.
 func (db SignatureDatabase) Encode(w io.Writer) error {
@@ -730,7 +765,7 @@ func DecodeEnhancedAuthenticationDescriptor(r io.Reader) (VariableAuthentication
 			return nil, err
 		}
 		return &VariableAuthentication3TimestampDescriptor{
-			TimeStamp:                               t.toGoTime(),
+			TimeStamp: t.toGoTime(),
 			VariableAuthentication3DescriptorCertId: *id}, nil
 	case variableAuthentication3NonceType:
 		var nonceSize uint32
@@ -746,7 +781,7 @@ func DecodeEnhancedAuthenticationDescriptor(r io.Reader) (VariableAuthentication
 			return nil, err
 		}
 		return &VariableAuthentication3NonceDescriptor{
-			Nonce:                                   nonce,
+			Nonce: nonce,
 			VariableAuthentication3DescriptorCertId: *id}, nil
 	default:
 		return nil, errors.New("unexpected type")
