@@ -9,7 +9,7 @@ import (
 	"io"
 	"sort"
 
-	"github.com/chrisccoulson/go-efilib/internal/pe1.14"
+	"github.com/canonical/go-efilib/internal/pe1.14"
 	"golang.org/x/xerrors"
 )
 

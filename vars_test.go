@@ -1,7 +1,7 @@
 package efi_test
 
 import (
-	. "github.com/chrisccoulson/go-efilib"
+	. "github.com/canonical/go-efilib"
 
 	"golang.org/x/sys/unix"
 

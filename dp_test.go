@@ -3,7 +3,7 @@ package efi_test
 import (
 	"bytes"
 
-	. "github.com/chrisccoulson/go-efilib"
+	. "github.com/canonical/go-efilib"
 
 	. "gopkg.in/check.v1"
 )

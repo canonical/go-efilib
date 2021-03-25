@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	. "github.com/chrisccoulson/go-efilib"
+	. "github.com/canonical/go-efilib"
 
 	. "gopkg.in/check.v1"
 
