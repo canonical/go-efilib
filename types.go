@@ -93,58 +93,47 @@ func (e *PartitionEntry) String() string {
 	return fmt.Sprintf("PartitionTypeGUID: %s, UniquePartitionGUID: %s, PartitionName: \"%s\"", e.PartitionTypeGUID, e.UniquePartitionGUID, e.PartitionName)
 }
 
-// PartitionEntryRaw corresponds to the EFI_PARTITION_ENTRY type in raw byte form. This type exists because the partition table
-// header can specify a partition entry size of greather than the size of EFI_PARTITION_ENTRY (128 bytes).
-type PartitionEntryRaw []byte
+// ReadPartitionEntries reads EFI_PARTITION_ENTRIES of the specified size from the supplied
+// io.Reader
+func ReadPartitionEntries(r io.Reader, num, sz uint32) (out []*PartitionEntry, err error) {
+	b := new(bytes.Buffer)
+	for i := uint32(0); i < num; i++ {
+		b.Reset()
 
-// ReadPartitionEntry reads a EFI_PARTITION_ENTRY of the specified size from the supplied io.Reader.
-func ReadPartitionEntry(r io.Reader, sz uint32) (out PartitionEntryRaw, err error) {
-	out = make(PartitionEntryRaw, sz)
-	if _, err := io.ReadFull(r, out); err != nil {
-		return nil, err
-	}
-	return
-}
-
-// Decode decodes the raw EFI_PARTITION_ENTRY and returns the decoded PartitionEntry.
-func (er PartitionEntryRaw) Decode() (*PartitionEntry, error) {
-	r := bytes.NewReader(er)
-
-	var e struct {
-		PartitionTypeGUID   GUID
-		UniquePartitionGUID GUID
-		StartingLBA         LBA
-		EndingLBA           LBA
-		Attributes          uint64
-		PartitionName       [36]uint16
-	}
-	if err := binary.Read(r, binary.LittleEndian, &e); err != nil {
-		return nil, err
-	}
-
-	var name bytes.Buffer
-	for _, c := range utf16.Decode(e.PartitionName[:]) {
-		if c == rune(0) {
-			break
+		if _, err := io.CopyN(b, r, int64(sz)); err != nil {
+			return nil, err
 		}
-		name.WriteRune(c)
+
+		var e struct {
+			PartitionTypeGUID   GUID
+			UniquePartitionGUID GUID
+			StartingLBA         LBA
+			EndingLBA           LBA
+			Attributes          uint64
+			PartitionName       [36]uint16
+		}
+		if err := binary.Read(b, binary.LittleEndian, &e); err != nil {
+			return nil, err
+		}
+
+		var name bytes.Buffer
+		for _, c := range utf16.Decode(e.PartitionName[:]) {
+			if c == rune(0) {
+				break
+			}
+			name.WriteRune(c)
+		}
+
+		out = append(out, &PartitionEntry{
+			PartitionTypeGUID:   e.PartitionTypeGUID,
+			UniquePartitionGUID: e.UniquePartitionGUID,
+			StartingLBA:         e.StartingLBA,
+			EndingLBA:           e.EndingLBA,
+			Attributes:          e.Attributes,
+			PartitionName:       name.String()})
 	}
 
-	return &PartitionEntry{
-		PartitionTypeGUID:   e.PartitionTypeGUID,
-		UniquePartitionGUID: e.UniquePartitionGUID,
-		StartingLBA:         e.StartingLBA,
-		EndingLBA:           e.EndingLBA,
-		Attributes:          e.Attributes,
-		PartitionName:       name.String()}, nil
-}
-
-func (e PartitionEntryRaw) String() string {
-	decoded, err := e.Decode()
-	if err != nil {
-		return fmt.Sprintf("invalid entry: %v", err)
-	}
-	return decoded.String()
+	return out, nil
 }
 
 type signatureListHdr struct {
@@ -765,7 +754,7 @@ func DecodeEnhancedAuthenticationDescriptor(r io.Reader) (VariableAuthentication
 			return nil, err
 		}
 		return &VariableAuthentication3TimestampDescriptor{
-			TimeStamp: t.toGoTime(),
+			TimeStamp:                               t.toGoTime(),
 			VariableAuthentication3DescriptorCertId: *id}, nil
 	case variableAuthentication3NonceType:
 		var nonceSize uint32
@@ -781,7 +770,7 @@ func DecodeEnhancedAuthenticationDescriptor(r io.Reader) (VariableAuthentication
 			return nil, err
 		}
 		return &VariableAuthentication3NonceDescriptor{
-			Nonce: nonce,
+			Nonce:                                   nonce,
 			VariableAuthentication3DescriptorCertId: *id}, nil
 	default:
 		return nil, errors.New("unexpected type")
