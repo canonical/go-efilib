@@ -15,6 +15,36 @@ type dbSuite struct{}
 
 var _ = Suite(&dbSuite{})
 
+var microsoftOwnerGuid = MakeGUID(0x77fa9abd, 0x0359, 0x4d32, 0xbd60, [...]uint8{0x28, 0xf4, 0xe7, 0x8f, 0x78, 0x4b})
+var dellOwnerGuid = MakeGUID(0x70564dce, 0x9afc, 0x4ee3, 0x85fc, [...]uint8{0x94, 0x96, 0x49, 0xd7, 0xe4, 0x5c})
+
+func (s *dbSuite) TestSignatureDataEqual(c *C) {
+	d := SignatureData{
+		Owner: microsoftOwnerGuid,
+		Data:  []byte("foo")}
+	c.Check(d.Equal(&d), Equals, true)
+}
+
+func (s *dbSuite) TestSignatureDataNotEqual1(c *C) {
+	x := SignatureData{
+		Owner: microsoftOwnerGuid,
+		Data:  []byte("foo")}
+	y := SignatureData{
+		Owner: dellOwnerGuid,
+		Data:  []byte("foo")}
+	c.Check(x.Equal(&y), Equals, false)
+}
+
+func (s *dbSuite) TestSignatureDataNotEqual2(c *C) {
+	x := SignatureData{
+		Owner: microsoftOwnerGuid,
+		Data:  []byte("foo")}
+	y := SignatureData{
+		Owner: microsoftOwnerGuid,
+		Data:  []byte("bar")}
+	c.Check(x.Equal(&y), Equals, false)
+}
+
 type testDecodeSignatureDatabaseData struct {
 	path string
 	db   SignatureDatabase
@@ -29,9 +59,6 @@ func (s *dbSuite) testDecodeSignatureDatabase(c *C, data *testDecodeSignatureDat
 	c.Check(err, IsNil)
 	c.Check(db, DeepEquals, data.db)
 }
-
-var microsoftOwnerGuid = MakeGUID(0x77fa9abd, 0x0359, 0x4d32, 0xbd60, [...]uint8{0x28, 0xf4, 0xe7, 0x8f, 0x78, 0x4b})
-var dellOwnerGuid = MakeGUID(0x70564dce, 0x9afc, 0x4ee3, 0x85fc, [...]uint8{0x94, 0x96, 0x49, 0xd7, 0xe4, 0x5c})
 
 func (s *dbSuite) TestDecodeSignatureDatabase1(c *C) {
 	s.testDecodeSignatureDatabase(c, &testDecodeSignatureDatabaseData{

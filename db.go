@@ -33,6 +33,14 @@ func (d *SignatureData) Encode(w io.Writer) error {
 	return err
 }
 
+// Equal determines whether other is equal to this SignatureData
+func (d *SignatureData) Equal(other *SignatureData) bool {
+	if d.Owner != other.Owner {
+		return false
+	}
+	return bytes.Equal(d.Data, other.Data)
+}
+
 // SignatureList corresponds to the EFI_SIGNATURE_LIST type.
 type SignatureList struct {
 	Type       GUID
