@@ -38,7 +38,7 @@ func (d *SignatureData) toUefiType() *uefi.EFI_SIGNATURE_DATA {
 
 // Write serializes this signature data to w.
 func (d *SignatureData) Write(w io.Writer) error {
-	return binary.Write(w, binary.LittleEndian, d.toUefiType())
+	return d.toUefiType().Write(w)
 }
 
 // Equal determines whether other is equal to this SignatureData

@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 
 	. "github.com/canonical/go-efilib"
@@ -238,4 +239,22 @@ func (s *dbSuite) TestWriteSignatureWithWrongSize(c *C) {
 	}
 	var b bytes.Buffer
 	c.Check(db.Write(&b), ErrorMatches, "cannot encode signature list 0: signature 1 contains the wrong size")
+}
+
+func (s *dbSuite) TestWriteSignatureData(c *C) {
+	d := SignatureData{
+		Owner: dellOwnerGuid,
+		Data:  readFile(c, "testdata/sigdbs/1/cert-0.der")}
+
+	var b bytes.Buffer
+	c.Check(d.Write(&b), IsNil)
+
+	var owner GUID
+	_, err := b.Read(owner[:])
+	c.Check(err, IsNil)
+	c.Check(owner, Equals, d.Owner)
+
+	data, err := ioutil.ReadAll(&b)
+	c.Check(err, IsNil)
+	c.Check(data, DeepEquals, d.Data)
 }
