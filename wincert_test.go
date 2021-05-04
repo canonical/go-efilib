@@ -20,24 +20,24 @@ type wincertSuite struct{}
 
 var _ = Suite(&wincertSuite{})
 
-func (s *wincertSuite) TestDecodeWinCertificateGUID(c *C) {
+func (s *wincertSuite) TestReadWinCertificateGUID(c *C) {
 	f, err := os.Open("testdata/sigs/cert-type-guid.sig")
 	c.Assert(err, IsNil)
 	defer f.Close()
 
-	cert, err := DecodeWinCertificate(f)
+	cert, err := ReadWinCertificate(f)
 	c.Assert(err, IsNil)
 	guidCert, ok := cert.(*WinCertificateGUID)
 	c.Assert(ok, Equals, true)
 	c.Check(guidCert.Type, Equals, CertTypePKCS7Guid)
 }
 
-func (s *wincertSuite) TestDecodeWinCertificateAuthenticode(c *C) {
+func (s *wincertSuite) TestReadWinCertificateAuthenticode(c *C) {
 	f, err := os.Open("testdata/sigs/cert-type-authenticode.sig")
 	c.Assert(err, IsNil)
 	defer f.Close()
 
-	cert, err := DecodeWinCertificate(f)
+	cert, err := ReadWinCertificate(f)
 	c.Assert(err, IsNil)
 	authenticodeCert, ok := cert.(WinCertificateAuthenticode)
 	c.Check(ok, Equals, true)
@@ -52,33 +52,33 @@ func (s *wincertSuite) TestDecodeWinCertificateAuthenticode(c *C) {
 	c.Check(h.Sum(nil), DeepEquals, decodeHexString(c, "08954ce3da028da0128a81435159f543d70ccd789ee86ea55630dab9a765644e"))
 }
 
-func (s *wincertSuite) TestDecodeWinCertificateInvalidRevision(c *C) {
+func (s *wincertSuite) TestReadWinCertificateInvalidRevision(c *C) {
 	f, err := os.Open("testdata/sigs/cert-invalid-revision.sig")
 	c.Assert(err, IsNil)
 	defer f.Close()
 
-	_, err = DecodeWinCertificate(f)
+	_, err = ReadWinCertificate(f)
 	c.Assert(err, ErrorMatches, "unexpected revision")
 }
 
-func (s *wincertSuite) TestDecodeWinCertificateInvalidType(c *C) {
+func (s *wincertSuite) TestReadWinCertificateInvalidType(c *C) {
 	f, err := os.Open("testdata/sigs/cert-invalid-type.sig")
 	c.Assert(err, IsNil)
 	defer f.Close()
 
-	_, err = DecodeWinCertificate(f)
+	_, err = ReadWinCertificate(f)
 	c.Assert(err, ErrorMatches, "unexpected type")
 }
 
-func (s *wincertSuite) TestDecodeTimeBasedVariableAuthentication(c *C) {
+func (s *wincertSuite) TestReadTimeBasedVariableAuthentication(c *C) {
 	f, err := os.Open("testdata/authenticated-var-payloads/MS-2016-08-08.bin")
 	c.Assert(err, IsNil)
 	defer f.Close()
 
-	auth, err := DecodeTimeBasedVariableAuthentication(f)
+	auth, err := ReadTimeBasedVariableAuthentication(f)
 	c.Assert(err, IsNil)
 	c.Check(auth.TimeStamp, DeepEquals, time.Date(2010, 3, 6, 19, 17, 21, 0, time.FixedZone("", 0)))
 	c.Check(auth.AuthInfo.Type, Equals, CertTypePKCS7Guid)
-	_, err = DecodeSignatureDatabase(f)
+	_, err = ReadSignatureDatabase(f)
 	c.Check(err, IsNil)
 }

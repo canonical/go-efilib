@@ -22,7 +22,7 @@ type EFI_SIGNATURE_DATA struct {
 	SignatureData  []byte
 }
 
-func (d *EFI_SIGNATURE_DATA) Encode(w io.Writer) error {
+func (d *EFI_SIGNATURE_DATA) Write(w io.Writer) error {
 	if _, err := w.Write(d.SignatureOwner[:]); err != nil {
 		return xerrors.Errorf("cannot write SignatureOwner: %w", err)
 	}
@@ -42,7 +42,7 @@ type EFI_SIGNATURE_LIST struct {
 	Signatures      []EFI_SIGNATURE_DATA
 }
 
-func (l *EFI_SIGNATURE_LIST) Encode(w io.Writer) error {
+func (l *EFI_SIGNATURE_LIST) Write(w io.Writer) error {
 	if _, err := w.Write(l.SignatureType[:]); err != nil {
 		return xerrors.Errorf("cannot write SignatureType: %w", err)
 	}
@@ -61,7 +61,7 @@ func (l *EFI_SIGNATURE_LIST) Encode(w io.Writer) error {
 	}
 
 	for i, s := range l.Signatures {
-		if err := s.Encode(w); err != nil {
+		if err := s.Write(w); err != nil {
 			return xerrors.Errorf("cannot write signature %d: %w", i, err)
 		}
 	}

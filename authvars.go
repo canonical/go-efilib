@@ -24,16 +24,16 @@ type VariableAuthentication struct {
 	AuthInfo       WinCertificateGUID
 }
 
-func (a *VariableAuthentication) Encode(w io.Writer) error {
+func (a *VariableAuthentication) Write(w io.Writer) error {
 	desc := uefi.EFI_VARIABLE_AUTHENTICATION{
 		MonotonicCount: a.MonotonicCount,
 		AuthInfo:       *a.AuthInfo.toUefiType()}
 	return binary.Write(w, binary.LittleEndian, desc)
 }
 
-// DecodeVariableAuthentication decodes a header for updating a variable with the EFI_VARIABLE_AUTHENTICATED_WRITE_ACCESS attribute
+// ReadVariableAuthentication decodes a header for updating a variable with the EFI_VARIABLE_AUTHENTICATED_WRITE_ACCESS attribute
 // set.
-func DecodeVariableAuthentication(r io.Reader) (*VariableAuthentication, error) {
+func ReadVariableAuthentication(r io.Reader) (*VariableAuthentication, error) {
 	desc, err := uefi.Read_EFI_VARIABLE_AUTHENTICATION(r)
 	if err != nil {
 		return nil, err
@@ -51,16 +51,16 @@ type VariableAuthentication2 struct {
 	AuthInfo  WinCertificateGUID
 }
 
-func (a *VariableAuthentication2) Encode(w io.Writer) error {
+func (a *VariableAuthentication2) Write(w io.Writer) error {
 	desc := uefi.EFI_VARIABLE_AUTHENTICATION_2{
 		TimeStamp: *uefi.New_EFI_TIME(a.TimeStamp),
 		AuthInfo:  *a.AuthInfo.toUefiType()}
 	return binary.Write(w, binary.LittleEndian, desc)
 }
 
-// DecodeTimeBasedVariableAuthentication decodes the header for updating a variable with the
+// ReadTimeBasedVariableAuthentication decodes the header for updating a variable with the
 // EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS attribute set.
-func DecodeTimeBasedVariableAuthentication(r io.Reader) (*VariableAuthentication2, error) {
+func ReadTimeBasedVariableAuthentication(r io.Reader) (*VariableAuthentication2, error) {
 	desc, err := uefi.Read_EFI_VARIABLE_AUTHENTICATION_2(r)
 	if err != nil {
 		return nil, err
@@ -83,7 +83,7 @@ type VariableAuthentication3Timestamp struct {
 	SigningCert WinCertificateGUID
 }
 
-func (a *VariableAuthentication3Timestamp) Encode(w io.Writer) error {
+func (a *VariableAuthentication3Timestamp) Write(w io.Writer) error {
 	var buf bytes.Buffer
 
 	t := uefi.New_EFI_TIME(a.TimeStamp)
@@ -127,7 +127,7 @@ type VariableAuthentication3Nonce struct {
 	SigningCert WinCertificateGUID
 }
 
-func (a *VariableAuthentication3Nonce) Encode(w io.Writer) error {
+func (a *VariableAuthentication3Nonce) Write(w io.Writer) error {
 	var buf bytes.Buffer
 
 	n := uefi.EFI_VARIABLE_AUTHENTICATION_3_NONCE{
@@ -165,9 +165,9 @@ func (a *VariableAuthentication3Nonce) Encode(w io.Writer) error {
 	return nil
 }
 
-// DecodeEnhancedVariableAuthentication decodes the header for updating a variable with the
+// ReadEnhancedVariableAuthentication decodes the header for updating a variable with the
 // EFI_VARIABLE_ENHANCED_AUTHENTICATED_ACCESS attribute set.
-func DecodeEnhancedVariableAuthentication(r io.Reader) (VariableAuthentication3, error) {
+func ReadEnhancedVariableAuthentication(r io.Reader) (VariableAuthentication3, error) {
 	var hdr uefi.EFI_VARIABLE_AUTHENTICATION_3
 	if err := binary.Read(r, binary.LittleEndian, &hdr); err != nil {
 		return nil, ioerr.PassEOF("cannot read header", err)

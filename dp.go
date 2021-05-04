@@ -479,8 +479,8 @@ func decodeDevicePathNodeData(r io.Reader) (interface{}, error) {
 	return &RawDevicePathData{Type: DevicePathType(h.Type), SubType: DevicePathSubType(h.SubType), Data: buf.Bytes()[binary.Size(h):]}, nil
 }
 
-// DecodeDevicePath decodes a device path from the supplied io.Reader.
-func DecodeDevicePath(r io.Reader) (*DevicePathNode, error) {
+// ReadDevicePath decodes a device path from the supplied io.Reader.
+func ReadDevicePath(r io.Reader) (*DevicePathNode, error) {
 	var nodeData []interface{}
 	for i := 0; ; i++ {
 		d, err := decodeDevicePathNodeData(r)

@@ -36,8 +36,8 @@ func (d *SignatureData) toUefiType() *uefi.EFI_SIGNATURE_DATA {
 		SignatureData:  d.Data}
 }
 
-// Encode serializes this signature data to w.
-func (d *SignatureData) Encode(w io.Writer) error {
+// Write serializes this signature data to w.
+func (d *SignatureData) Write(w io.Writer) error {
 	return binary.Write(w, binary.LittleEndian, d.toUefiType())
 }
 
@@ -107,13 +107,13 @@ func (l *SignatureList) String() string {
 	return b.String()
 }
 
-// Encode serializes this signature list to w.
-func (l *SignatureList) Encode(w io.Writer) error {
+// Write serializes this signature list to w.
+func (l *SignatureList) Write(w io.Writer) error {
 	list, err := l.toUefiType()
 	if err != nil {
 		return err
 	}
-	return list.Encode(w)
+	return list.Write(w)
 }
 
 // SignatureDatabase corresponds to a list of EFI_SIGNATURE_LIST structures.
@@ -127,18 +127,18 @@ func (db SignatureDatabase) String() string {
 	return s
 }
 
-// Encode serializes this signature database to w.
-func (db SignatureDatabase) Encode(w io.Writer) error {
+// Write serializes this signature database to w.
+func (db SignatureDatabase) Write(w io.Writer) error {
 	for i, l := range db {
-		if err := l.Encode(w); err != nil {
+		if err := l.Write(w); err != nil {
 			return xerrors.Errorf("cannot encode signature list %d: %w", i, err)
 		}
 	}
 	return nil
 }
 
-// DecodeSignatureDatabase decodes a list of EFI_SIGNATURE_DATABASE structures from r.
-func DecodeSignatureDatabase(r io.Reader) (SignatureDatabase, error) {
+// ReadSignatureDatabase decodes a list of EFI_SIGNATURE_DATABASE structures from r.
+func ReadSignatureDatabase(r io.Reader) (SignatureDatabase, error) {
 	var db SignatureDatabase
 	for i := 0; ; i++ {
 		l, err := uefi.Read_EFI_SIGNATURE_LIST(r)

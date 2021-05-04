@@ -49,23 +49,23 @@ func (s *dbSuite) TestSignatureDataNotEqual2(c *C) {
 	c.Check(x.Equal(&y), Equals, false)
 }
 
-type testDecodeSignatureDatabaseData struct {
+type testReadSignatureDatabaseData struct {
 	path string
 	db   SignatureDatabase
 }
 
-func (s *dbSuite) testDecodeSignatureDatabase(c *C, data *testDecodeSignatureDatabaseData) {
+func (s *dbSuite) testReadSignatureDatabase(c *C, data *testReadSignatureDatabaseData) {
 	f, err := os.Open(data.path)
 	c.Assert(err, IsNil)
 	defer f.Close()
 
-	db, err := DecodeSignatureDatabase(f)
+	db, err := ReadSignatureDatabase(f)
 	c.Check(err, IsNil)
 	c.Check(db, DeepEquals, data.db)
 }
 
-func (s *dbSuite) TestDecodeSignatureDatabase1(c *C) {
-	s.testDecodeSignatureDatabase(c, &testDecodeSignatureDatabaseData{
+func (s *dbSuite) TestReadSignatureDatabase1(c *C) {
+	s.testReadSignatureDatabase(c, &testReadSignatureDatabaseData{
 		path: "testdata/sigdbs/1.siglist",
 		db: SignatureDatabase{
 			{
@@ -82,8 +82,8 @@ func (s *dbSuite) TestDecodeSignatureDatabase1(c *C) {
 	})
 }
 
-func (s *dbSuite) TestDecodeSignatureDatabase2(c *C) {
-	s.testDecodeSignatureDatabase(c, &testDecodeSignatureDatabaseData{
+func (s *dbSuite) TestReadSignatureDatabase2(c *C) {
+	s.testReadSignatureDatabase(c, &testReadSignatureDatabaseData{
 		path: "testdata/sigdbs/2.siglist",
 		db: SignatureDatabase{
 			{
@@ -110,8 +110,8 @@ func (s *dbSuite) TestDecodeSignatureDatabase2(c *C) {
 	})
 }
 
-func (s *dbSuite) TestDecodeSignatureDatabase3(c *C) {
-	s.testDecodeSignatureDatabase(c, &testDecodeSignatureDatabaseData{
+func (s *dbSuite) TestReadSignatureDatabase3(c *C) {
+	s.testReadSignatureDatabase(c, &testReadSignatureDatabaseData{
 		path: "testdata/sigdbs/3.siglist",
 		db: SignatureDatabase{
 			{
@@ -148,7 +148,7 @@ func (s *dbSuite) TestDecodeSignatureDatabase3(c *C) {
 	})
 }
 
-func (s *dbSuite) TestDecodeSignatureDatabase4(c *C) {
+func (s *dbSuite) TestReadSignatureDatabase4(c *C) {
 	var db SignatureDatabase
 	db = append(db, &SignatureList{
 		Type:   CertX509Guid,
@@ -169,60 +169,60 @@ func (s *dbSuite) TestDecodeSignatureDatabase4(c *C) {
 	}
 	db = append(db, &hashes)
 
-	s.testDecodeSignatureDatabase(c, &testDecodeSignatureDatabaseData{
+	s.testReadSignatureDatabase(c, &testReadSignatureDatabaseData{
 		path: "testdata/sigdbs/4.siglist",
 		db:   db})
 }
 
-func (s *dbSuite) TestDecodeSignatureListWithInconsistentSizeFields(c *C) {
+func (s *dbSuite) TestReadSignatureListWithInconsistentSizeFields(c *C) {
 	f, err := os.Open("testdata/sigdbs/inconsistent-sizes.siglist")
 	c.Assert(err, IsNil)
 	defer f.Close()
 
-	_, err = DecodeSignatureDatabase(f)
+	_, err = ReadSignatureDatabase(f)
 	c.Check(err, ErrorMatches, "cannot read EFI_SIGNATURE_LIST 1: inconsistent size fields")
 }
 
-func (s *dbSuite) TestDecodeSignatureListWithInvalidSignatureSize(c *C) {
+func (s *dbSuite) TestReadSignatureListWithInvalidSignatureSize(c *C) {
 	f, err := os.Open("testdata/sigdbs/invalid-signature-size.siglist")
 	c.Assert(err, IsNil)
 	defer f.Close()
 
-	_, err = DecodeSignatureDatabase(f)
+	_, err = ReadSignatureDatabase(f)
 	c.Check(err, ErrorMatches, "cannot read EFI_SIGNATURE_LIST 0: invalid SignatureSize")
 }
 
-func (s *dbSuite) testEncodeSignatureDatabase(c *C, path string) {
+func (s *dbSuite) testWriteSignatureDatabase(c *C, path string) {
 	f, err := os.Open(path)
 	c.Assert(err, IsNil)
 	defer f.Close()
 
 	var b bytes.Buffer
-	db, err := DecodeSignatureDatabase(io.TeeReader(f, &b))
+	db, err := ReadSignatureDatabase(io.TeeReader(f, &b))
 	c.Check(err, IsNil)
 
 	var e bytes.Buffer
-	c.Check(db.Encode(&e), IsNil)
+	c.Check(db.Write(&e), IsNil)
 	c.Check(e.Bytes(), DeepEquals, b.Bytes())
 }
 
-func (s *dbSuite) TestEncodeSignatureDatabase1(c *C) {
-	s.testEncodeSignatureDatabase(c, "testdata/sigdbs/1.siglist")
+func (s *dbSuite) TestWriteSignatureDatabase1(c *C) {
+	s.testWriteSignatureDatabase(c, "testdata/sigdbs/1.siglist")
 }
 
-func (s *dbSuite) TestEncodeSignatureDatabase2(c *C) {
-	s.testEncodeSignatureDatabase(c, "testdata/sigdbs/2.siglist")
+func (s *dbSuite) TestWriteSignatureDatabase2(c *C) {
+	s.testWriteSignatureDatabase(c, "testdata/sigdbs/2.siglist")
 }
 
-func (s *dbSuite) TestEncodeSignatureDatabase3(c *C) {
-	s.testEncodeSignatureDatabase(c, "testdata/sigdbs/3.siglist")
+func (s *dbSuite) TestWriteSignatureDatabase3(c *C) {
+	s.testWriteSignatureDatabase(c, "testdata/sigdbs/3.siglist")
 }
 
-func (s *dbSuite) TestEncodeSignatureDatabase4(c *C) {
-	s.testEncodeSignatureDatabase(c, "testdata/sigdbs/4.siglist")
+func (s *dbSuite) TestWriteSignatureDatabase4(c *C) {
+	s.testWriteSignatureDatabase(c, "testdata/sigdbs/4.siglist")
 }
 
-func (s *dbSuite) TestEncodeSignatureWithWrongSize(c *C) {
+func (s *dbSuite) TestWriteSignatureWithWrongSize(c *C) {
 	db := SignatureDatabase{
 		{
 			Type: CertX509Guid,
@@ -237,5 +237,5 @@ func (s *dbSuite) TestEncodeSignatureWithWrongSize(c *C) {
 		},
 	}
 	var b bytes.Buffer
-	c.Check(db.Encode(&b), ErrorMatches, "cannot encode signature list 0: signature 1 contains the wrong size")
+	c.Check(db.Write(&b), ErrorMatches, "cannot encode signature list 0: signature 1 contains the wrong size")
 }

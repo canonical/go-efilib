@@ -15,7 +15,7 @@ import (
 
 // WinCertificate is an interface type corresponding to implementations of WIN_CERTIFICATE.
 type WinCertificate interface {
-	Encode(w io.Writer) error // Encode this certificate to the supplied io.Writer
+	Write(w io.Writer) error // Encode this certificate to the supplied io.Writer
 }
 
 // WinCertificatePKCS1_15 corresponds to the WIN_CERTIFICATE_EFI_PKCS1_15 type.
@@ -24,7 +24,7 @@ type WinCertificatePKCS1_15 struct {
 	Signature     []byte
 }
 
-func (c *WinCertificatePKCS1_15) Encode(w io.Writer) error {
+func (c *WinCertificatePKCS1_15) Write(w io.Writer) error {
 	cert := uefi.WIN_CERTIFICATE_EFI_PKCS1_15{
 		HashAlgorithm: uefi.EFI_GUID(c.HashAlgorithm),
 		Signature:     c.Signature}
@@ -41,7 +41,7 @@ type WinCertificateGUID struct {
 	Data []byte
 }
 
-func (c *WinCertificateGUID) Encode(w io.Writer) error {
+func (c *WinCertificateGUID) Write(w io.Writer) error {
 	return binary.Write(w, binary.LittleEndian, c.toUefiType())
 }
 
@@ -63,7 +63,7 @@ func newWinCertificateGUID(cert *uefi.WIN_CERTIFICATE_UEFI_GUID) *WinCertificate
 // WinCertificateAuthenticode corresponds to an Authenticode signature.
 type WinCertificateAuthenticode []byte
 
-func (c WinCertificateAuthenticode) Encode(w io.Writer) error {
+func (c WinCertificateAuthenticode) Write(w io.Writer) error {
 	cert := uefi.WIN_CERTIFICATE_EFI_PKCS{CertData: c}
 	cert.Hdr = uefi.WIN_CERTIFICATE{
 		Length:          uint32(binary.Size(cert.Hdr) + len(c)),
@@ -72,10 +72,10 @@ func (c WinCertificateAuthenticode) Encode(w io.Writer) error {
 	return binary.Write(w, binary.LittleEndian, &cert)
 }
 
-// DecodeWinCertificate decodes a signature (something that is confusingly represented by types with "certificate" in the name in both
+// ReadWinCertificate decodes a signature (something that is confusingly represented by types with "certificate" in the name in both
 // the UEFI and PE/COFF specifications) from the supplied io.Reader and returns a WinCertificate of the appropriate type. The type
 // returned is dependent on the data, and will be one of *WinCertificateAuthenticode, *WinCertificatePKCS1_15 or *WinCertificateGUID.
-func DecodeWinCertificate(r io.Reader) (WinCertificate, error) {
+func ReadWinCertificate(r io.Reader) (WinCertificate, error) {
 	var hdr uefi.WIN_CERTIFICATE
 	if err := binary.Read(r, binary.LittleEndian, &hdr); err != nil {
 		return nil, ioerr.PassEOF("cannot read WIN_CERTIFICATE header", err)
