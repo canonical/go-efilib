@@ -180,7 +180,7 @@ func (s *dbSuite) TestDecodeSignatureListWithInconsistentSizeFields(c *C) {
 	defer f.Close()
 
 	_, err = DecodeSignatureDatabase(f)
-	c.Check(err, ErrorMatches, "EFI_SIGNATURE_LIST 1 has inconsistent size fields")
+	c.Check(err, ErrorMatches, "cannot read EFI_SIGNATURE_LIST 1: inconsistent size fields")
 }
 
 func (s *dbSuite) TestDecodeSignatureListWithInvalidSignatureSize(c *C) {
@@ -189,7 +189,7 @@ func (s *dbSuite) TestDecodeSignatureListWithInvalidSignatureSize(c *C) {
 	defer f.Close()
 
 	_, err = DecodeSignatureDatabase(f)
-	c.Check(err, ErrorMatches, "EFI_SIGNATURE_LIST 0 has an invalid SignatureSize field")
+	c.Check(err, ErrorMatches, "cannot read EFI_SIGNATURE_LIST 0: invalid SignatureSize")
 }
 
 func (s *dbSuite) testEncodeSignatureDatabase(c *C, path string) {

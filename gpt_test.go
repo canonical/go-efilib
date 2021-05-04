@@ -34,12 +34,6 @@ func (s *gptSuite) TestReadPartitionTableHeader1(c *C) {
 		r: bytes.NewReader(decodeHexString(c, "4546492050415254000001005c000000edeb4e64000000000100000000000000af5277ee000000002200000000"+
 			"0000008e5277ee00000000c273aea42f0e1345bd3c456da7f7f0fd02000000000000008000000080000000f628450b")),
 		expected: &PartitionTableHeader{
-			TableHeader: TableHeader{
-				Signature:  0x5452415020494645,
-				Revision:   0x10000,
-				HeaderSize: 92,
-				CRC:        0x644eebed,
-				Reserved:   0},
 			MyLBA:                    1,
 			AlternateLBA:             4000797359,
 			FirstUsableLBA:           34,
@@ -47,8 +41,7 @@ func (s *gptSuite) TestReadPartitionTableHeader1(c *C) {
 			DiskGUID:                 MakeGUID(0xa4ae73c2, 0x0e2f, 0x4513, 0xbd3c, [...]uint8{0x45, 0x6d, 0xa7, 0xf7, 0xf0, 0xfd}),
 			PartitionEntryLBA:        2,
 			NumberOfPartitionEntries: 128,
-			SizeOfPartitionEntry:     128,
-			PartitionEntryArrayCRC32: 0x0b4528f6}})
+			SizeOfPartitionEntry:     128}})
 }
 
 func (s *gptSuite) TestReadPartitionTableHeader2(c *C) {
@@ -56,12 +49,6 @@ func (s *gptSuite) TestReadPartitionTableHeader2(c *C) {
 		r: bytes.NewReader(decodeHexString(c, "4546492050415254000001005c000000edeb4e64000000000100000000000000af5277ee000000002200000000"+
 			"0000008e5277ee00000000c273aea42f0e1345bd3c456da7f7f0fd02000000000000008000000080000000f628450ba5a5a5a5a5a5a5a5")),
 		expected: &PartitionTableHeader{
-			TableHeader: TableHeader{
-				Signature:  0x5452415020494645,
-				Revision:   0x10000,
-				HeaderSize: 92,
-				CRC:        0x644eebed,
-				Reserved:   0},
 			MyLBA:                    1,
 			AlternateLBA:             4000797359,
 			FirstUsableLBA:           34,
@@ -69,8 +56,7 @@ func (s *gptSuite) TestReadPartitionTableHeader2(c *C) {
 			DiskGUID:                 MakeGUID(0xa4ae73c2, 0x0e2f, 0x4513, 0xbd3c, [...]uint8{0x45, 0x6d, 0xa7, 0xf7, 0xf0, 0xfd}),
 			PartitionEntryLBA:        2,
 			NumberOfPartitionEntries: 128,
-			SizeOfPartitionEntry:     128,
-			PartitionEntryArrayCRC32: 0x0b4528f6}})
+			SizeOfPartitionEntry:     128}})
 }
 
 type testDecodePartitionEntriesData struct {

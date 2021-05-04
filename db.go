@@ -12,6 +12,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/canonical/go-efilib/internal/uefi"
+
 	"golang.org/x/xerrors"
 )
 
@@ -28,13 +30,15 @@ type SignatureData struct {
 	Data  []byte
 }
 
+func (d *SignatureData) toUefiType() *uefi.EFI_SIGNATURE_DATA {
+	return &uefi.EFI_SIGNATURE_DATA{
+		SignatureOwner: uefi.EFI_GUID(d.Owner),
+		SignatureData:  d.Data}
+}
+
 // Encode serializes this signature data to w.
 func (d *SignatureData) Encode(w io.Writer) error {
-	if _, err := w.Write(d.Owner[:]); err != nil {
-		return err
-	}
-	_, err := w.Write(d.Data)
-	return err
+	return binary.Write(w, binary.LittleEndian, d.toUefiType())
 }
 
 // Equal determines whether other is equal to this SignatureData
@@ -50,6 +54,32 @@ type SignatureList struct {
 	Type       GUID
 	Header     []byte
 	Signatures []*SignatureData
+}
+
+func (l *SignatureList) toUefiType() (out *uefi.EFI_SIGNATURE_LIST, err error) {
+	out = &uefi.EFI_SIGNATURE_LIST{
+		SignatureType:       uefi.EFI_GUID(l.Type),
+		SignatureHeaderSize: uint32(len(l.Header)),
+		SignatureHeader:     l.Header}
+
+	for i, s := range l.Signatures {
+		sig := s.toUefiType()
+
+		sz := uint32(binary.Size(sig.SignatureOwner) + len(sig.SignatureData))
+		if i == 0 {
+			out.SignatureSize = sz
+		}
+		if sz != out.SignatureSize {
+			// EFI_SIGNATURE_LIST cannot contain EFI_SIGNATURE_DATA entries with different
+			// sizes - they must go in their own list.
+			return nil, fmt.Errorf("signature %d contains the wrong size", i)
+		}
+
+		out.Signatures = append(out.Signatures, *sig)
+	}
+
+	out.SignatureListSize = uefi.ESLHeaderSize + out.SignatureHeaderSize + (out.SignatureSize * uint32(len(out.Signatures)))
+	return out, nil
 }
 
 func (l *SignatureList) String() string {
@@ -79,37 +109,11 @@ func (l *SignatureList) String() string {
 
 // Encode serializes this signature list to w.
 func (l *SignatureList) Encode(w io.Writer) error {
-	lh := signatureListHdr{Type: l.Type, HeaderSize: uint32(len(l.Header))}
-
-	var signatures bytes.Buffer
-	for i, s := range l.Signatures {
-		var sig bytes.Buffer
-		if err := s.Encode(&sig); err != nil {
-			return xerrors.Errorf("cannot encode signature %d: %w", i, err)
-		}
-		if i == 0 {
-			lh.SignatureSize = uint32(sig.Len())
-		}
-		if uint32(sig.Len()) != lh.SignatureSize {
-			// EFI_SIGNATURE_LIST cannot contain EFI_SIGNATURE_DATA entries with different
-			// sizes - they must go in their own list.
-			return fmt.Errorf("signature %d contains the wrong size", i)
-		}
-		if _, err := sig.WriteTo(&signatures); err != nil {
-			return err
-		}
-	}
-
-	lh.ListSize = uint32(binary.Size(lh)) + lh.HeaderSize + uint32(signatures.Len())
-
-	if err := binary.Write(w, binary.LittleEndian, lh); err != nil {
+	list, err := l.toUefiType()
+	if err != nil {
 		return err
 	}
-	if _, err := w.Write(l.Header); err != nil {
-		return err
-	}
-	_, err := signatures.WriteTo(w)
-	return err
+	return list.Encode(w)
 }
 
 // SignatureDatabase corresponds to a list of EFI_SIGNATURE_LIST structures.
@@ -137,45 +141,21 @@ func (db SignatureDatabase) Encode(w io.Writer) error {
 func DecodeSignatureDatabase(r io.Reader) (SignatureDatabase, error) {
 	var db SignatureDatabase
 	for i := 0; ; i++ {
-		var lh signatureListHdr
-		if err := binary.Read(r, binary.LittleEndian, &lh); err != nil {
+		l, err := uefi.Read_EFI_SIGNATURE_LIST(r)
+		if err != nil {
 			if err == io.EOF {
 				break
 			}
 			return nil, xerrors.Errorf("cannot read EFI_SIGNATURE_LIST %d: %w", i, err)
 		}
 
-		signatureDataSize := lh.ListSize - lh.HeaderSize - uint32(binary.Size(lh))
-		if signatureDataSize%lh.SignatureSize != 0 {
-			return nil, fmt.Errorf("EFI_SIGNATURE_LIST %d has inconsistent size fields", i)
-		}
-		if lh.SignatureSize < uint32(binary.Size(GUID{})) {
-			return nil, fmt.Errorf("EFI_SIGNATURE_LIST %d has an invalid SignatureSize field", i)
-		}
-		numOfSignatures := int(signatureDataSize / lh.SignatureSize)
+		list := &SignatureList{Type: GUID(l.SignatureType), Header: l.SignatureHeader}
 
-		l := &SignatureList{Type: lh.Type, Header: make([]byte, lh.HeaderSize)}
-
-		if _, err := io.ReadFull(r, l.Header); err != nil {
-			return nil, xerrors.Errorf("cannot read EFI_SIGNATURE_LIST.SignatureHeader at index %d: %w", i, err)
+		for _, s := range l.Signatures {
+			list.Signatures = append(list.Signatures, &SignatureData{Owner: GUID(s.SignatureOwner), Data: s.SignatureData})
 		}
 
-		for j := 0; j < numOfSignatures; j++ {
-			var d SignatureData
-			owner, err := ReadGUID(r)
-			if err != nil {
-				return nil, xerrors.Errorf("cannot read EFI_SIGNATURE_DATA.SignatureOwner at index %d in EFI_SIGNATURE_LIST %d: %w", j, i, err)
-			}
-			d.Owner = owner
-			d.Data = make([]byte, int(lh.SignatureSize)-binary.Size(owner))
-			if _, err := io.ReadFull(r, d.Data); err != nil {
-				return nil, xerrors.Errorf("cannot read EFI_SIGNATURE_DATA.SignatureData at index %d in EFI_SIGNATURE_LIST %d: %w", j, i, err)
-			}
-
-			l.Signatures = append(l.Signatures, &d)
-		}
-
-		db = append(db, l)
+		db = append(db, list)
 	}
 
 	return db, nil

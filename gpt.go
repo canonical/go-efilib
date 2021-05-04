@@ -10,11 +10,12 @@ import (
 	"fmt"
 	"io"
 	"unicode/utf16"
+
+	"github.com/canonical/go-efilib/internal/uefi"
 )
 
 // PartitionTableHeader correponds to the EFI_PARTITION_TABLE_HEADER type.
 type PartitionTableHeader struct {
-	TableHeader
 	MyLBA                    LBA
 	AlternateLBA             LBA
 	FirstUsableLBA           LBA
@@ -23,17 +24,24 @@ type PartitionTableHeader struct {
 	PartitionEntryLBA        LBA
 	NumberOfPartitionEntries uint32
 	SizeOfPartitionEntry     uint32
-	PartitionEntryArrayCRC32 uint32
 }
 
 // ReadPartitionTableHeader reads a EFI_PARTITION_TABLE_HEADER from the supplied io.Reader.
 // It doesn't check that the header is valid.
-func ReadPartitionTableHeader(r io.Reader) (out *PartitionTableHeader, err error) {
-	out = &PartitionTableHeader{}
-	if err := binary.Read(r, binary.LittleEndian, out); err != nil {
+func ReadPartitionTableHeader(r io.Reader) (*PartitionTableHeader, error) {
+	hdr, err := uefi.Read_EFI_PARTITION_TABLE_HEADER(r)
+	if err != nil {
 		return nil, err
 	}
-	return out, nil
+	return &PartitionTableHeader{
+		MyLBA:                    LBA(hdr.MyLBA),
+		AlternateLBA:             LBA(hdr.AlternateLBA),
+		FirstUsableLBA:           LBA(hdr.FirstUsableLBA),
+		LastUsableLBA:            LBA(hdr.LastUsableLBA),
+		DiskGUID:                 GUID(hdr.DiskGUID),
+		PartitionEntryLBA:        LBA(hdr.PartitionEntryLBA),
+		NumberOfPartitionEntries: hdr.NumberOfPartitionEntries,
+		SizeOfPartitionEntry:     hdr.SizeOfPartitionEntry}, nil
 }
 
 // PartitionEntry corresponds to the EFI_PARTITION_ENTRY type.
@@ -61,14 +69,7 @@ func ReadPartitionEntries(r io.Reader, num, sz uint32) (out []*PartitionEntry, e
 			return nil, err
 		}
 
-		var e struct {
-			PartitionTypeGUID   GUID
-			UniquePartitionGUID GUID
-			StartingLBA         LBA
-			EndingLBA           LBA
-			Attributes          uint64
-			PartitionName       [36]uint16
-		}
+		var e uefi.EFI_PARTITION_ENTRY
 		if err := binary.Read(b, binary.LittleEndian, &e); err != nil {
 			return nil, err
 		}
@@ -82,10 +83,10 @@ func ReadPartitionEntries(r io.Reader, num, sz uint32) (out []*PartitionEntry, e
 		}
 
 		out = append(out, &PartitionEntry{
-			PartitionTypeGUID:   e.PartitionTypeGUID,
-			UniquePartitionGUID: e.UniquePartitionGUID,
-			StartingLBA:         e.StartingLBA,
-			EndingLBA:           e.EndingLBA,
+			PartitionTypeGUID:   GUID(e.PartitionTypeGUID),
+			UniquePartitionGUID: GUID(e.UniquePartitionGUID),
+			StartingLBA:         LBA(e.StartingLBA),
+			EndingLBA:           LBA(e.EndingLBA),
 			Attributes:          e.Attributes,
 			PartitionName:       name.String()})
 	}

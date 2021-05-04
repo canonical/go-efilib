@@ -10,9 +10,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"strings"
 	"unicode/utf16"
+
+	"github.com/canonical/go-efilib/internal/ioerr"
+	"github.com/canonical/go-efilib/internal/uefi"
 
 	"golang.org/x/xerrors"
 )
@@ -38,37 +40,15 @@ func (t DevicePathType) String() string {
 }
 
 const (
-	HardwareDevicePath  DevicePathType = 0x01
-	ACPIDevicePath      DevicePathType = 0x02
-	MessagingDevicePath DevicePathType = 0x03
-	MediaDevicePath     DevicePathType = 0x04
-	BBSDevicePath       DevicePathType = 0x05
-	endDevicePathType   DevicePathType = 0x7f
+	HardwareDevicePath  DevicePathType = uefi.HARDWARE_DEVICE_PATH
+	ACPIDevicePath      DevicePathType = uefi.ACPI_DEVICE_PATH
+	MessagingDevicePath DevicePathType = uefi.MESSAGING_DEVICE_PATH
+	MediaDevicePath     DevicePathType = uefi.MEDIA_DEVICE_PATH
+	BBSDevicePath       DevicePathType = uefi.BBS_DEVICE_PATH
 )
 
 // DevicePathSubType is the sub-type of a device path node.
 type DevicePathSubType uint8
-
-const (
-	hardwarePCIDevicePath DevicePathSubType = 0x01
-
-	acpiNormalDevicePath DevicePathSubType = 0x01
-
-	messagingSCSIDevicePath              DevicePathSubType = 0x02
-	messagingUSBDevicePath               DevicePathSubType = 0x05
-	messagingUSBClassDevicePath          DevicePathSubType = 0x0f
-	messagingUSBWWIDDevicePath           DevicePathSubType = 0x10
-	messagingDeviceLogicalUnitDevicePath DevicePathSubType = 0x11
-	messagingSATADevicePath              DevicePathSubType = 0x12
-	messagingNVMENamespaceDevicePath     DevicePathSubType = 0x17
-
-	mediaHardDriveDevicePath      DevicePathSubType = 0x01
-	mediaCDROMDevicePath          DevicePathSubType = 0x02
-	mediaFilePathDevicePath       DevicePathSubType = 0x04
-	mediaFvFileDevicePath         DevicePathSubType = 0x06
-	mediaFvDevicePath             DevicePathSubType = 0x07
-	mediaRelOffsetRangeDevicePath DevicePathSubType = 0x08
-)
 
 type devicePathNodeData interface {
 	baseName() string
@@ -322,7 +302,6 @@ func (d *MediaFvDevicePathData) baseName() string {
 }
 
 type MediaRelOffsetRangeDevicePathData struct {
-	Reserved       uint32
 	StartingOffset uint64
 	EndingOffset   uint64
 }
@@ -332,182 +311,172 @@ func (d *MediaRelOffsetRangeDevicePathData) baseName() string {
 }
 
 func decodeDevicePathNodeData(r io.Reader) (interface{}, error) {
-	var h struct {
-		Type    DevicePathType
-		SubType DevicePathSubType
-		Length  uint16
-	}
-	if err := binary.Read(r, binary.LittleEndian, &h); err != nil {
-		return nil, xerrors.Errorf("cannot read header: %w", err)
+	buf := new(bytes.Buffer)
+	r2 := io.TeeReader(r, buf)
+
+	var h uefi.EFI_DEVICE_PATH_PROTOCOL
+	if err := binary.Read(r2, binary.LittleEndian, &h); err != nil {
+		return nil, ioerr.PassEOF("cannot read header", err)
 	}
 
 	if h.Length < 4 {
 		return nil, errors.New("invalid length")
 	}
 
-	d := make([]byte, int(h.Length-4))
-	if _, err := io.ReadFull(r, d); err != nil {
-		return nil, xerrors.Errorf("cannot read data: %w", err)
+	if _, err := io.CopyN(buf, r, int64(h.Length-4)); err != nil {
+		return nil, ioerr.EOFUnexpected("cannot read data", err)
 	}
-	dr := bytes.NewReader(d)
 
 	switch h.Type {
-	case HardwareDevicePath:
+	case uefi.HARDWARE_DEVICE_PATH:
 		switch h.SubType {
-		case hardwarePCIDevicePath:
-			var n PCIDevicePathData
-			if err := binary.Read(dr, binary.LittleEndian, &n); err != nil {
+		case uefi.HW_PCI_DP:
+			var n uefi.PCI_DEVICE_PATH
+			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
-			return &n, nil
+			return &PCIDevicePathData{Function: n.Function, Device: n.Device}, nil
 		}
-	case ACPIDevicePath:
+	case uefi.ACPI_DEVICE_PATH:
 		switch h.SubType {
-		case acpiNormalDevicePath:
-			var n ACPIDevicePathData
-			if err := binary.Read(dr, binary.LittleEndian, &n); err != nil {
+		case uefi.ACPI_DP:
+			var n uefi.ACPI_HID_DEVICE_PATH
+			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
-			return &n, nil
+			return &ACPIDevicePathData{HID: n.HID, UID: n.UID}, nil
 		}
-	case MessagingDevicePath:
+	case uefi.MESSAGING_DEVICE_PATH:
 		switch h.SubType {
-		case messagingSCSIDevicePath:
-			var n SCSIDevicePathData
-			if err := binary.Read(dr, binary.LittleEndian, &n); err != nil {
+		case uefi.MSG_SCSI_DP:
+			var n uefi.SCSI_DEVICE_PATH
+			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
-			return &n, nil
-		case messagingUSBDevicePath:
-			var n USBDevicePathData
-			if err := binary.Read(dr, binary.LittleEndian, &n); err != nil {
+			return &SCSIDevicePathData{PUN: n.Pun, LUN: n.Lun}, nil
+		case uefi.MSG_USB_DP:
+			var n uefi.USB_DEVICE_PATH
+			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
-			return &n, nil
-		case messagingUSBClassDevicePath:
-			var n USBClassDevicePathData
-			if err := binary.Read(dr, binary.LittleEndian, &n); err != nil {
+			return &USBDevicePathData{ParentPortNumber: n.ParentPortNumber, InterfaceNumber: n.InterfaceNumber}, nil
+		case uefi.MSG_USB_CLASS_DP:
+			var n uefi.USB_CLASS_DEVICE_PATH
+			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
-			return &n, nil
-		case messagingUSBWWIDDevicePath:
-			var s struct {
-				InterfaceNumber uint16
-				VendorId        uint16
-				ProductId       uint16
-			}
-			if err := binary.Read(dr, binary.LittleEndian, &s); err != nil {
-				return nil, err
-			}
-			serialBytes, err := ioutil.ReadAll(dr)
+			return &USBClassDevicePathData{
+				VendorId:       n.VendorId,
+				ProductId:      n.ProductId,
+				DeviceClass:    USBClass(n.DeviceClass),
+				DeviceSubClass: n.DeviceSubClass,
+				DeviceProtocol: n.DeviceProtocol}, nil
+		case uefi.MSG_USB_WWID_DP:
+			n, err := uefi.Read_USB_WWID_DEVICE_PATH(buf)
 			if err != nil {
 				return nil, err
 			}
-			serialU16 := make([]uint16, len(serialBytes)/2)
-			if err := binary.Read(bytes.NewReader(serialBytes), binary.LittleEndian, &serialU16); err != nil {
-				return nil, err
-			}
 			var serial bytes.Buffer
-			for _, c := range utf16.Decode(serialU16) {
+			for _, c := range utf16.Decode(n.SerialNumber) {
 				serial.WriteRune(c)
 			}
 			return &USBWWIDDevicePathData{
-				InterfaceNumber: s.InterfaceNumber,
-				VendorId:        s.VendorId,
-				ProductId:       s.ProductId,
+				InterfaceNumber: n.InterfaceNumber,
+				VendorId:        n.VendorId,
+				ProductId:       n.ProductId,
 				SerialNumber:    serial.String()}, nil
-		case messagingDeviceLogicalUnitDevicePath:
-			var n DeviceLogicalUnitDevicePathData
-			if err := binary.Read(dr, binary.LittleEndian, &n); err != nil {
+		case uefi.MSG_DEVICE_LOGICAL_UNIT_DP:
+			var n uefi.DEVICE_LOGICAL_UNIT_DEVICE_PATH
+			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
-			return &n, nil
-		case messagingSATADevicePath:
-			var n SATADevicePathData
-			if err := binary.Read(dr, binary.LittleEndian, &n); err != nil {
+			return &DeviceLogicalUnitDevicePathData{LUN: n.Lun}, nil
+		case uefi.MSG_SATA_DP:
+			var n uefi.SATA_DEVICE_PATH
+			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
-			return &n, nil
-		case messagingNVMENamespaceDevicePath:
-			var n NVMENamespaceDevicePathData
-			if err := binary.Read(dr, binary.LittleEndian, &n); err != nil {
+			return &SATADevicePathData{
+				HBAPortNumber:            n.HBAPortNumber,
+				PortMultiplierPortNumber: n.PortMultiplierPortNumber,
+				LUN:                      n.Lun}, nil
+		case uefi.MSG_NVME_NAMESPACE_DP:
+			var n uefi.NVME_NAMESPACE_DEVICE_PATH
+			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
-			return &n, nil
+			return &NVMENamespaceDevicePathData{
+				NamespaceID:   n.NamespaceId,
+				NamespaceUUID: n.NamespaceUuid}, nil
 		}
-	case MediaDevicePath:
+	case uefi.MEDIA_DEVICE_PATH:
 		switch h.SubType {
-		case mediaHardDriveDevicePath:
-			var s struct {
-				PartitionNumber uint32
-				PartitionStart  uint64
-				PartitionSize   uint64
-				Signature       [16]byte
-				MBRType         MBRType
-				SignatureType   uint8
-			}
-			if err := binary.Read(dr, binary.LittleEndian, &s); err != nil {
+		case uefi.MEDIA_HARDDRIVE_DP:
+			var n uefi.HARDDRIVE_DEVICE_PATH
+			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
+
 			var signature interface{}
-			switch s.SignatureType {
-			case 0:
+			switch n.SignatureType {
+			case uefi.NO_DISK_SIGNATURE:
 				signature = nil
-			case 1:
-				signature = binary.LittleEndian.Uint32(s.Signature[:])
-			case 2:
-				var g GUID
-				copy(g[:], s.Signature[:])
-				signature = g
+			case uefi.SIGNATURE_TYPE_MBR:
+				signature = binary.LittleEndian.Uint32(n.Signature[:])
+			case uefi.SIGNATURE_TYPE_GUID:
+				signature = GUID(n.Signature)
 			default:
 				return nil, errors.New("invalid signature type")
 			}
 			return &HardDriveDevicePathData{
-				PartitionNumber: s.PartitionNumber,
-				PartitionStart:  s.PartitionStart,
-				PartitionSize:   s.PartitionSize,
+				PartitionNumber: n.PartitionNumber,
+				PartitionStart:  n.PartitionStart,
+				PartitionSize:   n.PartitionSize,
 				Signature:       signature,
-				MBRType:         s.MBRType}, nil
-		case mediaCDROMDevicePath:
-			var n CDROMDevicePathData
-			if err := binary.Read(dr, binary.LittleEndian, &n); err != nil {
+				MBRType:         MBRType(n.MBRType)}, nil
+		case uefi.MEDIA_CDROM_DP:
+			var n uefi.CDROM_DEVICE_PATH
+			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
-			return &n, nil
-		case mediaFilePathDevicePath:
-			u16 := make([]uint16, dr.Len()/2)
-			if err := binary.Read(dr, binary.LittleEndian, &u16); err != nil {
+			return &CDROMDevicePathData{
+				BootEntry:      n.BootEntry,
+				PartitionStart: n.PartitionStart,
+				PartitionSize:  n.PartitionSize}, nil
+		case uefi.MEDIA_FILEPATH_DP:
+			n, err := uefi.Read_FILEPATH_DEVICE_PATH(buf)
+			if err != nil {
 				return nil, err
 			}
 			var path bytes.Buffer
-			for _, c := range utf16.Decode(u16) {
+			for _, c := range utf16.Decode(n.PathName) {
 				path.WriteRune(c)
 			}
 			return &FilePathDevicePathData{PathName: strings.TrimRight(path.String(), "\x00")}, nil
-		case mediaFvFileDevicePath:
-			name, err := ReadGUID(dr)
-			if err != nil {
+		case uefi.MEDIA_PIWG_FW_FILE_DP:
+			var n uefi.MEDIA_FW_VOL_FILEPATH_DEVICE_PATH
+			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
-			return &MediaFvFileDevicePathData{FvFileName: name}, nil
-		case mediaFvDevicePath:
-			name, err := ReadGUID(dr)
-			if err != nil {
+			return &MediaFvFileDevicePathData{FvFileName: GUID(n.FvFileName)}, nil
+		case uefi.MEDIA_PIWG_FW_VOL_DP:
+			var n uefi.MEDIA_FW_VOL_DEVICE_PATH
+			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
-			return &MediaFvDevicePathData{FvName: name}, nil
-		case mediaRelOffsetRangeDevicePath:
-			var n MediaRelOffsetRangeDevicePathData
-			if err := binary.Read(dr, binary.LittleEndian, &n); err != nil {
+			return &MediaFvDevicePathData{FvName: GUID(n.FvName)}, nil
+		case uefi.MEDIA_RELATIVE_OFFSET_RANGE_DP:
+			var n uefi.MEDIA_RELATIVE_OFFSET_RANGE_DEVICE_PATH
+			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
-			return &n, nil
+			return &MediaRelOffsetRangeDevicePathData{StartingOffset: n.StartingOffset, EndingOffset: n.EndingOffset}, nil
 		}
-	case endDevicePathType:
+	case uefi.END_DEVICE_PATH_TYPE:
 		return nil, nil
 	}
 
-	return &RawDevicePathData{Type: h.Type, SubType: h.SubType, Data: d}, nil
+	return &RawDevicePathData{Type: DevicePathType(h.Type), SubType: DevicePathSubType(h.SubType), Data: buf.Bytes()[binary.Size(h):]}, nil
 }
 
 // DecodeDevicePath decodes a device path from the supplied io.Reader.
