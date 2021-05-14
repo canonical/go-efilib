@@ -141,7 +141,7 @@ func OpenEnhancedAuthenticatedVar(name string, guid GUID) (io.ReadCloser, Variab
 		return nil, nil, 0, errors.New("variable does not have the EFI_VARIABLE_ENHANCED_AUTHENTICATED_ACCESS attribute set")
 	}
 
-	auth, err := DecodeEnhancedAuthenticationDescriptor(r)
+	auth, err := ReadEnhancedAuthenticationDescriptor(r)
 	if err != nil {
 		return nil, nil, 0, xerrors.Errorf("cannot decode authentication descriptor: %w", err)
 	}

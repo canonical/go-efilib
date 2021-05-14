@@ -273,11 +273,11 @@ type VariableAuthentication3NonceDescriptor struct {
 	VariableAuthentication3CertId
 }
 
-// DecodeEnhancedAuthenticationDescriptor decodes the enhanced authentication descriptor from the supplied io.Reader. The supplied
+// ReadEnhancedAuthenticationDescriptor decodes the enhanced authentication descriptor from the supplied io.Reader. The supplied
 // reader will typically read from the payload area of a variable with the EFI_VARIABLE_ENHANCED_AUTHENTICATION_ACCESS attribute set,
 // returned from a call to OpenVar. Alternatively, for reading variables that you know have this attribute set, use
 // ReadEnhancedAuthenticatedVar or OpenEnhancedAuthenticatedVar instead.
-func DecodeEnhancedAuthenticationDescriptor(r io.Reader) (VariableAuthentication3Descriptor, error) {
+func ReadEnhancedAuthenticationDescriptor(r io.Reader) (VariableAuthentication3Descriptor, error) {
 	var hdr uefi.EFI_VARIABLE_AUTHENTICATION_3
 	if err := binary.Read(r, binary.LittleEndian, &hdr); err != nil {
 		return nil, xerrors.Errorf("cannot read header: %w", err)
