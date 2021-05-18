@@ -116,6 +116,22 @@ func (l *SignatureList) Write(w io.Writer) error {
 	return list.Write(w)
 }
 
+// ReadSignatureList decodes a single EFI_SIGNATURE_LIST from r.
+func ReadSignatureList(r io.Reader) (*SignatureList, error) {
+	l, err := uefi.Read_EFI_SIGNATURE_LIST(r)
+	if err != nil {
+		return nil, err
+	}
+
+	list := &SignatureList{Type: GUID(l.SignatureType), Header: l.SignatureHeader}
+
+	for _, s := range l.Signatures {
+		list.Signatures = append(list.Signatures, &SignatureData{Owner: GUID(s.SignatureOwner), Data: s.SignatureData})
+	}
+
+	return list, nil
+}
+
 // SignatureDatabase corresponds to a list of EFI_SIGNATURE_LIST structures.
 type SignatureDatabase []*SignatureList
 
@@ -137,25 +153,18 @@ func (db SignatureDatabase) Write(w io.Writer) error {
 	return nil
 }
 
-// ReadSignatureDatabase decodes a list of EFI_SIGNATURE_DATABASE structures from r.
+// ReadSignatureDatabase decodes a list of EFI_SIGNATURE_LIST structures from r.
 func ReadSignatureDatabase(r io.Reader) (SignatureDatabase, error) {
 	var db SignatureDatabase
 	for i := 0; ; i++ {
-		l, err := uefi.Read_EFI_SIGNATURE_LIST(r)
+		l, err := ReadSignatureList(r)
 		if err != nil {
 			if err == io.EOF {
 				break
 			}
 			return nil, xerrors.Errorf("cannot read EFI_SIGNATURE_LIST %d: %w", i, err)
 		}
-
-		list := &SignatureList{Type: GUID(l.SignatureType), Header: l.SignatureHeader}
-
-		for _, s := range l.Signatures {
-			list.Signatures = append(list.Signatures, &SignatureData{Owner: GUID(s.SignatureOwner), Data: s.SignatureData})
-		}
-
-		db = append(db, list)
+		db = append(db, l)
 	}
 
 	return db, nil

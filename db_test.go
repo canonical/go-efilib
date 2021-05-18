@@ -50,6 +50,133 @@ func (s *dbSuite) TestSignatureDataNotEqual2(c *C) {
 	c.Check(x.Equal(&y), Equals, false)
 }
 
+type testReadSignatureListData struct {
+	path string
+	db   SignatureDatabase
+}
+
+func (s *dbSuite) testReadSignatureList(c *C, data *testReadSignatureListData) {
+	f, err := os.Open(data.path)
+	c.Assert(err, IsNil)
+	defer f.Close()
+
+	for i := 0; i < len(data.db); i++ {
+		l, err := ReadSignatureList(f)
+		c.Check(err, IsNil)
+		c.Check(l, DeepEquals, data.db[i])
+	}
+}
+
+func (s *dbSuite) TestReadSignatureList1(c *C) {
+	s.testReadSignatureList(c, &testReadSignatureListData{
+		path: "testdata/sigdbs/1.siglist",
+		db: SignatureDatabase{
+			{
+				Type:   CertX509Guid,
+				Header: []byte{},
+				Signatures: []*SignatureData{
+					{
+						Owner: dellOwnerGuid,
+						Data:  readFile(c, "testdata/sigdbs/1/cert-0.der"),
+					},
+				},
+			},
+		},
+	})
+}
+
+func (s *dbSuite) TestReadSignatureList2(c *C) {
+	s.testReadSignatureList(c, &testReadSignatureListData{
+		path: "testdata/sigdbs/2.siglist",
+		db: SignatureDatabase{
+			{
+				Type:   CertX509Guid,
+				Header: []byte{},
+				Signatures: []*SignatureData{
+					{
+						Owner: dellOwnerGuid,
+						Data:  readFile(c, "testdata/sigdbs/2/cert-0.der"),
+					},
+				},
+			},
+			{
+				Type:   CertX509Guid,
+				Header: []byte{},
+				Signatures: []*SignatureData{
+					{
+						Owner: microsoftOwnerGuid,
+						Data:  readFile(c, "testdata/sigdbs/2/cert-1.der"),
+					},
+				},
+			},
+		},
+	})
+}
+
+func (s *dbSuite) TestReadSignatureList3(c *C) {
+	s.testReadSignatureList(c, &testReadSignatureListData{
+		path: "testdata/sigdbs/3.siglist",
+		db: SignatureDatabase{
+			{
+				Type:   CertX509Guid,
+				Header: []byte{},
+				Signatures: []*SignatureData{
+					{
+						Owner: dellOwnerGuid,
+						Data:  readFile(c, "testdata/sigdbs/3/cert-0.der"),
+					},
+				},
+			},
+			{
+				Type:   CertX509Guid,
+				Header: []byte{},
+				Signatures: []*SignatureData{
+					{
+						Owner: microsoftOwnerGuid,
+						Data:  readFile(c, "testdata/sigdbs/3/cert-1.der"),
+					},
+				},
+			},
+			{
+				Type:   CertX509Guid,
+				Header: []byte{},
+				Signatures: []*SignatureData{
+					{
+						Owner: microsoftOwnerGuid,
+						Data:  readFile(c, "testdata/sigdbs/3/cert-2.der"),
+					},
+				},
+			},
+		},
+	})
+}
+
+func (s *dbSuite) TestReadSignatureList4(c *C) {
+	var db SignatureDatabase
+	db = append(db, &SignatureList{
+		Type:   CertX509Guid,
+		Header: []byte{},
+		Signatures: []*SignatureData{
+			{
+				Data: readFile(c, "testdata/sigdbs/4/cert-0.der"),
+			},
+		},
+	})
+
+	hashes := SignatureList{Type: CertSHA256Guid, Header: []byte{}}
+	for i := 1; i < 78; i++ {
+		hashes.Signatures = append(hashes.Signatures, &SignatureData{
+			Owner: microsoftOwnerGuid,
+			Data:  readFile(c, fmt.Sprintf("testdata/sigdbs/4/cert-%d.hash", i)),
+		})
+	}
+	db = append(db, &hashes)
+
+	s.testReadSignatureList(c, &testReadSignatureListData{
+		path: "testdata/sigdbs/4.siglist",
+		db:   db})
+}
+
 type testReadSignatureDatabaseData struct {
 	path string
 	db   SignatureDatabase
