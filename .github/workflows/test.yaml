@@ -32,6 +32,10 @@ jobs:
       uses: actions/setup-go@v2
       with:
         go-version: 1.9
+    - name: Build ARM
+      run: GOARCH=arm go build -v github.com/canonical/go-efilib/...
+    - name: Build ARM64
+      run: GOARCH=arm64 go build -v github.com/canonical/go-efilib/...
     - name: Build
       run: go build -v github.com/canonical/go-efilib/...
     - name: Test
@@ -56,6 +60,10 @@ jobs:
         key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
         restore-keys: |
           ${{ runner.os }}-go-
+    - name: Build ARM
+      run: GOARCH=arm go build -v -mod=readonly ./...
+    - name: Build ARM64
+      run: GOARCH=arm64 go build -v -mod=readonly ./...
     - name: Build
       run: go build -v -mod=readonly ./...
     - name: Test
