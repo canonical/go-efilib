@@ -33,6 +33,14 @@ const (
 	AttributeTimeBasedAuthenticatedWriteAccess VariableAttributes = 1 << 5
 	AttributeAppendWrite                       VariableAttributes = 1 << 6
 	AttributeEnhancedAuthenticatedAccess       VariableAttributes = 1 << 7
+
+	// unix.EFIVARFS_MAGIC is 0xde5e81e4, which is outside of
+	// `long` range on 32bit platforms. And kernel does not care,
+	// and overflows it to -28, but golang fails to compile the
+	// code as it strictly checks the const bounds meaning
+	// unix.EFIVARFS_MAGIC is int64. Define a second
+	// EFIVARFS_MAGIC2 here.
+	EFIVARFS_MAGIC2 int64 = -28
 )
 
 var (
@@ -52,10 +60,13 @@ func isAvailable() (bool, error) {
 		}
 		return false, err
 	}
-	if st.Type != unix.EFIVARFS_MAGIC {
-		return false, nil
+	if int64(st.Type) == unix.EFIVARFS_MAGIC {
+		return true, nil
 	}
-	return true, nil
+	if int64(st.Type) == EFIVARFS_MAGIC2 {
+		return true, nil
+	}
+	return false, nil
 }
 
 // OpenVar opens the EFI variable with the specified name and GUID for reading. On success, it returns the variable's attributes,
