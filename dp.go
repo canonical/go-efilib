@@ -316,7 +316,7 @@ func decodeDevicePathNodeData(r io.Reader) (interface{}, error) {
 
 	var h uefi.EFI_DEVICE_PATH_PROTOCOL
 	if err := binary.Read(r2, binary.LittleEndian, &h); err != nil {
-		return nil, ioerr.PassEOF("cannot read header", err)
+		return nil, ioerr.PassEOF("cannot read header: %w", err)
 	}
 
 	if h.Length < 4 {
@@ -324,7 +324,7 @@ func decodeDevicePathNodeData(r io.Reader) (interface{}, error) {
 	}
 
 	if _, err := io.CopyN(buf, r, int64(h.Length-4)); err != nil {
-		return nil, ioerr.EOFUnexpected("cannot read data", err)
+		return nil, ioerr.EOFUnexpected("cannot read data: %w", err)
 	}
 
 	switch h.Type {

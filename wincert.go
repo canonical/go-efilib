@@ -78,7 +78,7 @@ func (c WinCertificateAuthenticode) Write(w io.Writer) error {
 func ReadWinCertificate(r io.Reader) (WinCertificate, error) {
 	var hdr uefi.WIN_CERTIFICATE
 	if err := binary.Read(r, binary.LittleEndian, &hdr); err != nil {
-		return nil, ioerr.PassEOF("cannot read WIN_CERTIFICATE header", err)
+		return nil, ioerr.PassEOF("cannot read WIN_CERTIFICATE header: %w", err)
 	}
 	if hdr.Revision != 0x0200 {
 		return nil, errors.New("unexpected revision")
@@ -89,27 +89,27 @@ func ReadWinCertificate(r io.Reader) (WinCertificate, error) {
 		cert := uefi.WIN_CERTIFICATE_EFI_PKCS{Hdr: hdr}
 		cert.CertData = make([]byte, int(cert.Hdr.Length)-binary.Size(cert.Hdr))
 		if _, err := io.ReadFull(r, cert.CertData); err != nil {
-			return nil, ioerr.EOFUnexpected("cannot read WIN_CERTIFICATE_EFI_PKCS.CertData", err)
+			return nil, ioerr.EOFUnexpected("cannot read WIN_CERTIFICATE_EFI_PKCS.CertData: %w", err)
 		}
 		return WinCertificateAuthenticode(cert.CertData), nil
 	case uefi.WIN_CERT_TYPE_EFI_PKCS115:
 		cert := uefi.WIN_CERTIFICATE_EFI_PKCS1_15{Hdr: hdr}
 		cert.Signature = make([]byte, int(cert.Hdr.Length)-binary.Size(cert.Hdr)-binary.Size(cert.HashAlgorithm))
 		if _, err := io.ReadFull(r, cert.HashAlgorithm[:]); err != nil {
-			return nil, ioerr.EOFUnexpected("cannot read WIN_CERTIFICATE_EFI_PKCS1_15.HashAlgorithm", err)
+			return nil, ioerr.EOFUnexpected("cannot read WIN_CERTIFICATE_EFI_PKCS1_15.HashAlgorithm: %w", err)
 		}
 		if _, err := io.ReadFull(r, cert.Signature); err != nil {
-			return nil, ioerr.EOFUnexpected("cannot read WIN_CERTIFICATE_EFI_PKCS1_15.Signature", err)
+			return nil, ioerr.EOFUnexpected("cannot read WIN_CERTIFICATE_EFI_PKCS1_15.Signature: %w", err)
 		}
 		return &WinCertificatePKCS1_15{HashAlgorithm: GUID(cert.HashAlgorithm), Signature: cert.Signature}, nil
 	case uefi.WIN_CERT_TYPE_EFI_GUID:
 		cert := uefi.WIN_CERTIFICATE_UEFI_GUID{Hdr: hdr}
 		cert.CertData = make([]byte, int(cert.Hdr.Length)-binary.Size(cert.Hdr)-binary.Size(cert.CertType))
 		if _, err := io.ReadFull(r, cert.CertType[:]); err != nil {
-			return nil, ioerr.EOFUnexpected("cannot read WIN_CERTIFICATE_UEFI_GUID.CertType", err)
+			return nil, ioerr.EOFUnexpected("cannot read WIN_CERTIFICATE_UEFI_GUID.CertType: %w", err)
 		}
 		if _, err := io.ReadFull(r, cert.CertData); err != nil {
-			return nil, ioerr.EOFUnexpected("cannot read WIN_CERTIFICATE_UEFI_GUID.CertData", err)
+			return nil, ioerr.EOFUnexpected("cannot read WIN_CERTIFICATE_UEFI_GUID.CertData: %w", err)
 		}
 		return newWinCertificateGUID(&cert), nil
 	default:

@@ -7,7 +7,6 @@ package uefi
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"io"
 
 	"github.com/canonical/go-efilib/internal/ioerr"
@@ -72,21 +71,21 @@ func (l *EFI_SIGNATURE_LIST) Write(w io.Writer) error {
 func Read_EFI_SIGNATURE_LIST(r io.Reader) (out *EFI_SIGNATURE_LIST, err error) {
 	out = &EFI_SIGNATURE_LIST{}
 	if err := binary.Read(r, binary.LittleEndian, &out.SignatureType); err != nil {
-		return nil, ioerr.PassEOF("cannot read SignatureType", err)
+		return nil, ioerr.PassEOF("cannot read SignatureType: %w", err)
 	}
 	if err := binary.Read(r, binary.LittleEndian, &out.SignatureListSize); err != nil {
-		return nil, ioerr.EOFUnexpected("cannot read SignatureListSize", err)
+		return nil, ioerr.EOFUnexpected("cannot read SignatureListSize: %w", err)
 	}
 	if err := binary.Read(r, binary.LittleEndian, &out.SignatureHeaderSize); err != nil {
-		return nil, ioerr.EOFUnexpected("cannot read SignatureHeaderSize", err)
+		return nil, ioerr.EOFUnexpected("cannot read SignatureHeaderSize: %w", err)
 	}
 	if err := binary.Read(r, binary.LittleEndian, &out.SignatureSize); err != nil {
-		return nil, ioerr.EOFUnexpected("cannot read SignatureSize", err)
+		return nil, ioerr.EOFUnexpected("cannot read SignatureSize: %w", err)
 	}
 
 	out.SignatureHeader = make([]byte, out.SignatureHeaderSize)
 	if _, err := io.ReadFull(r, out.SignatureHeader); err != nil {
-		return nil, ioerr.EOFUnexpected("cannot read SignatureHeader", err)
+		return nil, ioerr.EOFUnexpected("cannot read SignatureHeader: %w", err)
 	}
 
 	signaturesSize := out.SignatureListSize - out.SignatureHeaderSize - ESLHeaderSize
@@ -101,12 +100,12 @@ func Read_EFI_SIGNATURE_LIST(r io.Reader) (out *EFI_SIGNATURE_LIST, err error) {
 	for i := 0; i < numOfSignatures; i++ {
 		var s EFI_SIGNATURE_DATA
 		if _, err := io.ReadFull(r, s.SignatureOwner[:]); err != nil {
-			return nil, ioerr.EOFUnexpected(fmt.Sprintf("cannot read SignatureOwner for %d", i), err)
+			return nil, ioerr.EOFUnexpected("cannot read SignatureOwner for %d: %w", i, err)
 		}
 
 		s.SignatureData = make([]byte, int(out.SignatureSize)-binary.Size(s.SignatureOwner))
 		if _, err := io.ReadFull(r, s.SignatureData); err != nil {
-			return nil, ioerr.EOFUnexpected(fmt.Sprintf("cannot read SignatureData for %d", i), err)
+			return nil, ioerr.EOFUnexpected("cannot read SignatureData for %d: %w", i, err)
 		}
 
 		out.Signatures = append(out.Signatures, s)
