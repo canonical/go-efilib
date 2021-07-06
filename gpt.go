@@ -157,7 +157,12 @@ const (
 	BackupPartitionTable
 )
 
-func ReadPartitionTable(r io.ReaderAt, totalSz, blockSz int64, role PartitionTableRole, checkCrc32 bool) ([]*PartitionEntry, error) {
+type PartitionTable struct {
+	Hdr     *PartitionTableHeader
+	Entries []*PartitionEntry
+}
+
+func ReadPartitionTable(r io.ReaderAt, totalSz, blockSz int64, role PartitionTableRole, checkCrc32 bool) (*PartitionTable, error) {
 	r2 := io.NewSectionReader(r, 0, totalSz)
 
 	var mbr mbr
@@ -205,5 +210,10 @@ func ReadPartitionTable(r io.ReaderAt, totalSz, blockSz int64, role PartitionTab
 		return nil, err
 	}
 
-	return readPartitionEntries(r2, hdr.NumberOfPartitionEntries, hdr.SizeOfPartitionEntry, hdr.PartitionEntryArrayCRC32, checkCrc32)
+	entries, err := readPartitionEntries(r2, hdr.NumberOfPartitionEntries, hdr.SizeOfPartitionEntry, hdr.PartitionEntryArrayCRC32, checkCrc32)
+	if err != nil {
+		return nil, ioerr.EOFUnexpected("cannot read GPT entries: %w", err)
+	}
+
+	return &PartitionTable{hdr, entries}, nil
 }
