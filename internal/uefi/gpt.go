@@ -8,10 +8,13 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"hash/crc32"
 	"io"
+
+	"github.com/canonical/go-efilib/internal/ioerr"
 )
 
-const gptSignature uint64 = 0x5452415020494645
+const EFI_PTAB_HEADER_ID uint64 = 0x5452415020494645
 
 type EFI_PARTITION_ENTRY struct {
 	PartitionTypeGUID   EFI_GUID
@@ -35,33 +38,34 @@ type EFI_PARTITION_TABLE_HEADER struct {
 	PartitionEntryArrayCRC32 uint32
 }
 
-func Read_EFI_PARTITION_TABLE_HEADER(r io.Reader) (out *EFI_PARTITION_TABLE_HEADER, err error) {
-	b := new(bytes.Buffer)
-	r2 := io.TeeReader(r, b)
-
+func Read_EFI_PARTITION_TABLE_HEADER(r io.Reader) (out *EFI_PARTITION_TABLE_HEADER, crc uint32, err error) {
 	var hdr EFI_TABLE_HEADER
-	if err := binary.Read(r2, binary.LittleEndian, &hdr); err != nil {
-		return nil, err
+	if err := binary.Read(r, binary.LittleEndian, &hdr); err != nil {
+		return nil, 0, ioerr.PassEOF("cannot read header: %w", err)
 	}
 	if hdr.HeaderSize < uint32(binary.Size(hdr)) {
-		return nil, errors.New("invalid header size")
+		return nil, 0, errors.New("invalid header size")
 	}
+
+	origCrc := hdr.CRC
+	hdr.CRC = 0
+
+	b := new(bytes.Buffer)
+	if err := binary.Write(b, binary.LittleEndian, &hdr); err != nil {
+		return nil, 0, err
+	}
+
 	if _, err := io.CopyN(b, r, int64(hdr.HeaderSize-uint32(binary.Size(hdr)))); err != nil {
-		if err == io.EOF {
-			err = io.ErrUnexpectedEOF
-		}
-		return nil, err
+		return nil, 0, ioerr.EOFUnexpected("cannot read rest of header: %w", err)
 	}
+
+	crc = crc32.ChecksumIEEE(b.Bytes())
 
 	out = &EFI_PARTITION_TABLE_HEADER{}
 	if err := binary.Read(b, binary.LittleEndian, out); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	if out.Hdr.Signature != gptSignature {
-		return nil, errors.New("invalid signature")
-	}
-	if out.Hdr.Revision != 0x10000 {
-		return nil, errors.New("unexpected revision")
-	}
-	return out, nil
+	out.Hdr.CRC = origCrc
+
+	return out, crc, nil
 }

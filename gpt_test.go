@@ -6,6 +6,7 @@ package efi_test
 
 import (
 	"bytes"
+	"os"
 
 	. "github.com/canonical/go-efilib"
 
@@ -18,20 +19,78 @@ var _ = Suite(&gptSuite{})
 
 type testReadPartitionTableHeaderData struct {
 	r        *bytes.Reader
+	checkCrc bool
 	expected *PartitionTableHeader
+	errMatch string
 }
 
 func (s *gptSuite) testReadPartitionTableHeader(c *C, data *testReadPartitionTableHeaderData) {
 	start := data.r.Len()
-	out, err := ReadPartitionTableHeader(data.r)
-	c.Assert(err, IsNil)
+	out, err := ReadPartitionTableHeader(data.r, data.checkCrc)
+	if data.errMatch == "" {
+		c.Check(err, IsNil)
+		c.Check(out, DeepEquals, data.expected)
+	} else {
+		c.Check(err, ErrorMatches, data.errMatch)
+	}
 	c.Check(start-data.r.Len(), Equals, 92)
-	c.Check(out, DeepEquals, data.expected)
 }
 
 func (s *gptSuite) TestReadPartitionTableHeader1(c *C) {
 	s.testReadPartitionTableHeader(c, &testReadPartitionTableHeaderData{
 		r: bytes.NewReader(decodeHexString(c, "4546492050415254000001005c000000edeb4e64000000000100000000000000af5277ee000000002200000000"+
+			"0000008e5277ee00000000c273aea42f0e1345bd3c456da7f7f0fd02000000000000008000000080000000f628450b")),
+		checkCrc: true,
+		expected: &PartitionTableHeader{
+			MyLBA:                    1,
+			AlternateLBA:             4000797359,
+			FirstUsableLBA:           34,
+			LastUsableLBA:            4000797326,
+			DiskGUID:                 MakeGUID(0xa4ae73c2, 0x0e2f, 0x4513, 0xbd3c, [...]uint8{0x45, 0x6d, 0xa7, 0xf7, 0xf0, 0xfd}),
+			PartitionEntryLBA:        2,
+			NumberOfPartitionEntries: 128,
+			SizeOfPartitionEntry:     128,
+			PartitionEntryArrayCRC32: 189081846}})
+}
+
+func (s *gptSuite) TestReadPartitionTableHeader2(c *C) {
+	s.testReadPartitionTableHeader(c, &testReadPartitionTableHeaderData{
+		r: bytes.NewReader(decodeHexString(c, "4546492050415254000001005c000000edeb4e64000000000100000000000000af5277ee000000002200000000"+
+			"0000008e5277ee00000000c273aea42f0e1345bd3c456da7f7f0fd02000000000000008000000080000000f628450ba5a5a5a5a5a5a5a5")),
+		checkCrc: true,
+		expected: &PartitionTableHeader{
+			MyLBA:                    1,
+			AlternateLBA:             4000797359,
+			FirstUsableLBA:           34,
+			LastUsableLBA:            4000797326,
+			DiskGUID:                 MakeGUID(0xa4ae73c2, 0x0e2f, 0x4513, 0xbd3c, [...]uint8{0x45, 0x6d, 0xa7, 0xf7, 0xf0, 0xfd}),
+			PartitionEntryLBA:        2,
+			NumberOfPartitionEntries: 128,
+			SizeOfPartitionEntry:     128,
+			PartitionEntryArrayCRC32: 189081846}})
+}
+
+func (s *gptSuite) TestReadPartitionTableHeader3(c *C) {
+	s.testReadPartitionTableHeader(c, &testReadPartitionTableHeaderData{
+		r: bytes.NewReader(decodeHexString(c, "4546492050415254000001005c000000edeb4e65000000000100000000000000af5277ee000000002200000000"+
+			"0000008e5277ee00000000c273aea42f0e1345bd3c456da7f7f0fd02000000000000008000000080000000f628450b")),
+		checkCrc: true,
+		expected: &PartitionTableHeader{
+			MyLBA:                    1,
+			AlternateLBA:             4000797359,
+			FirstUsableLBA:           34,
+			LastUsableLBA:            4000797326,
+			DiskGUID:                 MakeGUID(0xa4ae73c2, 0x0e2f, 0x4513, 0xbd3c, [...]uint8{0x45, 0x6d, 0xa7, 0xf7, 0xf0, 0xfd}),
+			PartitionEntryLBA:        2,
+			NumberOfPartitionEntries: 128,
+			SizeOfPartitionEntry:     128,
+			PartitionEntryArrayCRC32: 189081846},
+		errMatch: "CRC check failed"})
+}
+
+func (s *gptSuite) TestReadPartitionTableHeader4(c *C) {
+	s.testReadPartitionTableHeader(c, &testReadPartitionTableHeaderData{
+		r: bytes.NewReader(decodeHexString(c, "4546492050415254000001005c000000edeb4e65000000000100000000000000af5277ee000000002200000000"+
 			"0000008e5277ee00000000c273aea42f0e1345bd3c456da7f7f0fd02000000000000008000000080000000f628450b")),
 		expected: &PartitionTableHeader{
 			MyLBA:                    1,
@@ -41,22 +100,8 @@ func (s *gptSuite) TestReadPartitionTableHeader1(c *C) {
 			DiskGUID:                 MakeGUID(0xa4ae73c2, 0x0e2f, 0x4513, 0xbd3c, [...]uint8{0x45, 0x6d, 0xa7, 0xf7, 0xf0, 0xfd}),
 			PartitionEntryLBA:        2,
 			NumberOfPartitionEntries: 128,
-			SizeOfPartitionEntry:     128}})
-}
-
-func (s *gptSuite) TestReadPartitionTableHeader2(c *C) {
-	s.testReadPartitionTableHeader(c, &testReadPartitionTableHeaderData{
-		r: bytes.NewReader(decodeHexString(c, "4546492050415254000001005c000000edeb4e64000000000100000000000000af5277ee000000002200000000"+
-			"0000008e5277ee00000000c273aea42f0e1345bd3c456da7f7f0fd02000000000000008000000080000000f628450ba5a5a5a5a5a5a5a5")),
-		expected: &PartitionTableHeader{
-			MyLBA:                    1,
-			AlternateLBA:             4000797359,
-			FirstUsableLBA:           34,
-			LastUsableLBA:            4000797326,
-			DiskGUID:                 MakeGUID(0xa4ae73c2, 0x0e2f, 0x4513, 0xbd3c, [...]uint8{0x45, 0x6d, 0xa7, 0xf7, 0xf0, 0xfd}),
-			PartitionEntryLBA:        2,
-			NumberOfPartitionEntries: 128,
-			SizeOfPartitionEntry:     128}})
+			SizeOfPartitionEntry:     128,
+			PartitionEntryArrayCRC32: 189081846}})
 }
 
 type testDecodePartitionEntriesData struct {
@@ -130,4 +175,143 @@ func (s *gptSuite) TestDecodePartitionEntries3(c *C) {
 				EndingLBA:           1050623,
 				Attributes:          0,
 				PartitionName:       "EFI System Partition"}}})
+}
+
+type testReadPartitionTableData struct {
+	path           string
+	role           PartitionTableRole
+	checkCrc       bool
+	expected       map[int]*PartitionEntry
+	expectedLength int
+	errMatch       string
+}
+
+func (s *gptSuite) testReadPartitionTable(c *C, data *testReadPartitionTableData) {
+	f, err := os.Open(data.path)
+	c.Assert(err, IsNil)
+	defer f.Close()
+
+	fi, err := f.Stat()
+	c.Assert(err, IsNil)
+
+	entries, err := ReadPartitionTable(f, fi.Size(), 512, data.role, data.checkCrc)
+	if data.errMatch == "" {
+		c.Check(err, IsNil)
+		c.Assert(entries, HasLen, data.expectedLength)
+		expected := make([]*PartitionEntry, len(entries))
+		for i := 0; i < len(expected); i++ {
+			expected[i] = new(PartitionEntry)
+		}
+		for i, e := range data.expected {
+			expected[i] = e
+		}
+		c.Check(entries, DeepEquals, expected)
+		c.Log(entries)
+	} else {
+		c.Check(err, ErrorMatches, data.errMatch)
+	}
+}
+
+func (s *gptSuite) TestReadPartitionTable1(c *C) {
+	s.testReadPartitionTable(c, &testReadPartitionTableData{
+		path:     "testdata/partitiontables/cloudimg",
+		role:     PrimaryPartitionTable,
+		checkCrc: true,
+		expected: map[int]*PartitionEntry{
+			0: &PartitionEntry{
+				PartitionTypeGUID:   MakeGUID(0x0fc63daf, 0x8483, 0x4772, 0x8e79, [...]uint8{0x3d, 0x69, 0xd8, 0x47, 0x7d, 0xe4}),
+				UniquePartitionGUID: MakeGUID(0x15eae969, 0x91f2, 0x437b, 0x95cc, [...]uint8{0xec, 0x11, 0xd3, 0x40, 0x95, 0x9b}),
+				StartingLBA:         227328,
+				EndingLBA:           4612062},
+			13: &PartitionEntry{
+				PartitionTypeGUID:   MakeGUID(0x21686148, 0x6449, 0x6e6f, 0x744e, [...]uint8{0x65, 0x65, 0x64, 0x45, 0x46, 0x49}),
+				UniquePartitionGUID: MakeGUID(0x71c94a7b, 0xfa01, 0x416c, 0x9cdd, [...]uint8{0x60, 0x02, 0x5b, 0x54, 0xd8, 0xd2}),
+				StartingLBA:         2048,
+				EndingLBA:           10239},
+			14: &PartitionEntry{
+				PartitionTypeGUID:   MakeGUID(0xc12a7328, 0xf81f, 0x11d2, 0xba4b, [...]uint8{0x00, 0xa0, 0xc9, 0x3e, 0xc9, 0x3b}),
+				UniquePartitionGUID: MakeGUID(0x6992c444, 0x90c6, 0x4842, 0x8d5a, [...]uint8{0x44, 0xc4, 0x56, 0xea, 0x6c, 0xc9}),
+				StartingLBA:         10240,
+				EndingLBA:           227327},
+		},
+		expectedLength: 128,
+	})
+}
+
+func (s *gptSuite) TestReadPartitionTable2(c *C) {
+	s.testReadPartitionTable(c, &testReadPartitionTableData{
+		path:     "testdata/partitiontables/cloudimg-invalid-hdr-checksum",
+		role:     PrimaryPartitionTable,
+		checkCrc: true,
+		errMatch: "cannot read GPT header: CRC check failed",
+	})
+}
+
+func (s *gptSuite) TestReadPartitionTable3(c *C) {
+	s.testReadPartitionTable(c, &testReadPartitionTableData{
+		path:     "testdata/partitiontables/cloudimg-invalid-array-checksum",
+		role:     PrimaryPartitionTable,
+		checkCrc: true,
+		errMatch: "CRC check failed",
+	})
+}
+
+func (s *gptSuite) TestReadPartitionTable4(c *C) {
+	s.testReadPartitionTable(c, &testReadPartitionTableData{
+		path: "testdata/partitiontables/cloudimg-invalid-hdr-checksum",
+		role: PrimaryPartitionTable,
+		expected: map[int]*PartitionEntry{
+			0: &PartitionEntry{
+				PartitionTypeGUID:   MakeGUID(0x0fc63daf, 0x8483, 0x4772, 0x8e79, [...]uint8{0x3d, 0x69, 0xd8, 0x47, 0x7d, 0xe4}),
+				UniquePartitionGUID: MakeGUID(0x15eae969, 0x91f2, 0x437b, 0x95cc, [...]uint8{0xec, 0x11, 0xd3, 0x40, 0x95, 0x9b}),
+				StartingLBA:         227328,
+				EndingLBA:           4612062},
+			13: &PartitionEntry{
+				PartitionTypeGUID:   MakeGUID(0x21686148, 0x6449, 0x6e6f, 0x744e, [...]uint8{0x65, 0x65, 0x64, 0x45, 0x46, 0x49}),
+				UniquePartitionGUID: MakeGUID(0x71c94a7b, 0xfa01, 0x416c, 0x9cdd, [...]uint8{0x60, 0x02, 0x5b, 0x54, 0xd8, 0xd2}),
+				StartingLBA:         2048,
+				EndingLBA:           10239},
+			14: &PartitionEntry{
+				PartitionTypeGUID:   MakeGUID(0xc12a7328, 0xf81f, 0x11d2, 0xba4b, [...]uint8{0x00, 0xa0, 0xc9, 0x3e, 0xc9, 0x3b}),
+				UniquePartitionGUID: MakeGUID(0x6992c444, 0x90c6, 0x4842, 0x8d5a, [...]uint8{0x44, 0xc4, 0x56, 0xea, 0x6c, 0xc9}),
+				StartingLBA:         10240,
+				EndingLBA:           227327},
+		},
+		expectedLength: 128,
+	})
+}
+
+func (s *gptSuite) TestReadPartitionTable5(c *C) {
+	s.testReadPartitionTable(c, &testReadPartitionTableData{
+		path:     "testdata/partitiontables/backup",
+		role:     BackupPartitionTable,
+		checkCrc: true,
+		expected: map[int]*PartitionEntry{
+			0: &PartitionEntry{
+				PartitionTypeGUID:   MakeGUID(0x0fc63daf, 0x8483, 0x4772, 0x8e79, [...]uint8{0x3d, 0x69, 0xd8, 0x47, 0x7d, 0xe4}),
+				UniquePartitionGUID: MakeGUID(0x506fddfc, 0xad5e, 0x4548, 0xb7dd, [...]uint8{0xe7, 0x73, 0x62, 0x17, 0x5c, 0x31}),
+				StartingLBA:         34,
+				EndingLBA:           333},
+			1: &PartitionEntry{
+				PartitionTypeGUID:   MakeGUID(0xc12a7328, 0xf81f, 0x11d2, 0xba4b, [...]uint8{0x00, 0xa0, 0xc9, 0x3e, 0xc9, 0x3b}),
+				UniquePartitionGUID: MakeGUID(0x5ff783fc, 0xa97c, 0x684f, 0xacd8, [...]uint8{0xe1, 0x70, 0x28, 0xf6, 0x1c, 0x5f}),
+				StartingLBA:         334,
+				EndingLBA:           433},
+			2: &PartitionEntry{
+				PartitionTypeGUID:   MakeGUID(0x21686148, 0x6449, 0x6e6f, 0x744e, [...]uint8{0x65, 0x65, 0x64, 0x45, 0x46, 0x49}),
+				UniquePartitionGUID: MakeGUID(0x94da1fcc, 0x1c0f, 0x5645, 0xabf9, [...]uint8{0xff, 0x9a, 0xc4, 0x68, 0x24, 0x2d}),
+				StartingLBA:         434,
+				EndingLBA:           478},
+		},
+		expectedLength: 128,
+	})
+}
+
+func (s *gptSuite) TestReadPartitionTable6(c *C) {
+	s.testReadPartitionTable(c, &testReadPartitionTableData{
+		path:     "testdata/partitiontables/backup",
+		role:     PrimaryPartitionTable,
+		checkCrc: true,
+		errMatch: "cannot read GPT header: CRC check failed",
+	})
 }
