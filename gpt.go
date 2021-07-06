@@ -21,6 +21,7 @@ import (
 
 // PartitionTableHeader correponds to the EFI_PARTITION_TABLE_HEADER type.
 type PartitionTableHeader struct {
+	HeaderSize               uint32
 	MyLBA                    LBA
 	AlternateLBA             LBA
 	FirstUsableLBA           LBA
@@ -50,6 +51,7 @@ func ReadPartitionTableHeader(r io.Reader, checkCrc32 bool) (*PartitionTableHead
 	}
 
 	return &PartitionTableHeader{
+		HeaderSize:               hdr.Hdr.HeaderSize,
 		MyLBA:                    LBA(hdr.MyLBA),
 		AlternateLBA:             LBA(hdr.AlternateLBA),
 		FirstUsableLBA:           LBA(hdr.FirstUsableLBA),
