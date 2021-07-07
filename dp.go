@@ -493,13 +493,10 @@ func ReadDevicePath(r io.Reader) (*DevicePathNode, error) {
 		nodeData = append(nodeData, d)
 	}
 
-	var nodes []*DevicePathNode
+	var lastNode *DevicePathNode
 	for _, d := range nodeData {
-		nodes = append(nodes, &DevicePathNode{Data: d})
+		node := &DevicePathNode{Parent: lastNode, Data: d}
+		lastNode = node
 	}
-	for i := len(nodes) - 1; i > 0; i-- {
-		nodes[i].Parent = nodes[i-1]
-	}
-
-	return nodes[len(nodes)-1], nil
+	return lastNode, nil
 }
