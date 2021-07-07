@@ -7,6 +7,7 @@ package uefi
 import (
 	"encoding/binary"
 	"io"
+	"io/ioutil"
 
 	"golang.org/x/xerrors"
 
@@ -64,7 +65,7 @@ func Read_EFI_LOAD_OPTION(r io.Reader) (out *EFI_LOAD_OPTION, err error) {
 		return nil, ioerr.EOFUnexpected("cannot read FilePathList: %w", err)
 	}
 
-	optionalData, err := io.ReadAll(r)
+	optionalData, err := ioutil.ReadAll(r)
 	if err != nil {
 		return nil, xerrors.Errorf("cannot read OptionalData: %w", err)
 	}
