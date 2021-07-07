@@ -52,7 +52,7 @@ func Read_EFI_LOAD_OPTION(r io.Reader) (out *EFI_LOAD_OPTION, err error) {
 	for i := 0; ; i++ {
 		var c uint16
 		if err := binary.Read(r, binary.LittleEndian, &c); err != nil {
-			return nil, ioerr.EOFUnexpected("cannot read character %i from Description: %w", err)
+			return nil, ioerr.EOFUnexpected("cannot read character %d from Description: %w", i, err)
 		}
 		out.Description = append(out.Description, c)
 		if c == 0 {
