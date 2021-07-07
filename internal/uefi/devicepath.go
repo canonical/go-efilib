@@ -8,6 +8,8 @@ import (
 	"encoding/binary"
 	"io"
 
+	"golang.org/x/xerrors"
+
 	"github.com/canonical/go-efilib/internal/ioerr"
 )
 
@@ -41,6 +43,8 @@ const (
 	MEDIA_PIWG_FW_FILE_DP          = 0x06
 	MEDIA_PIWG_FW_VOL_DP           = 0x07
 	MEDIA_RELATIVE_OFFSET_RANGE_DP = 0x08
+
+	END_ENTIRE_DEVICE_PATH_SUBTYPE = 0xff
 )
 
 type EFI_DEVICE_PATH_PROTOCOL struct {
@@ -88,6 +92,25 @@ type USB_WWID_DEVICE_PATH struct {
 	VendorId        uint16
 	ProductId       uint16
 	SerialNumber    []uint16
+}
+
+func (p *USB_WWID_DEVICE_PATH) WriteTo(w io.Writer) error {
+	if err := binary.Write(w, binary.LittleEndian, &p.Header); err != nil {
+		return xerrors.Errorf("cannot write header: %w", err)
+	}
+	if err := binary.Write(w, binary.LittleEndian, p.InterfaceNumber); err != nil {
+		return xerrors.Errorf("cannot write InterfaceNumber: %w", err)
+	}
+	if err := binary.Write(w, binary.LittleEndian, p.VendorId); err != nil {
+		return xerrors.Errorf("cannot write VendorId: %w", err)
+	}
+	if err := binary.Write(w, binary.LittleEndian, p.ProductId); err != nil {
+		return xerrors.Errorf("cannot write ProductId: %w", err)
+	}
+	if err := binary.Write(w, binary.LittleEndian, p.SerialNumber); err != nil {
+		return xerrors.Errorf("cannot write SerialNumber: %w", err)
+	}
+	return nil
 }
 
 func Read_USB_WWID_DEVICE_PATH(r io.Reader) (out *USB_WWID_DEVICE_PATH, err error) {
@@ -151,6 +174,16 @@ type CDROM_DEVICE_PATH struct {
 type FILEPATH_DEVICE_PATH struct {
 	Header   EFI_DEVICE_PATH_PROTOCOL
 	PathName []uint16
+}
+
+func (p *FILEPATH_DEVICE_PATH) WriteTo(w io.Writer) error {
+	if err := binary.Write(w, binary.LittleEndian, &p.Header); err != nil {
+		return xerrors.Errorf("cannot write header: %w", err)
+	}
+	if err := binary.Write(w, binary.LittleEndian, p.PathName); err != nil {
+		return xerrors.Errorf("cannot write PathName: %w", err)
+	}
+	return nil
 }
 
 func Read_FILEPATH_DEVICE_PATH(r io.Reader) (out *FILEPATH_DEVICE_PATH, err error) {
