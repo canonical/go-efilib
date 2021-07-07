@@ -24,7 +24,7 @@ type VariableAuthentication struct {
 	AuthInfo       WinCertificateGUID
 }
 
-func (a *VariableAuthentication) Write(w io.Writer) error {
+func (a *VariableAuthentication) WriteTo(w io.Writer) error {
 	desc := uefi.EFI_VARIABLE_AUTHENTICATION{
 		MonotonicCount: a.MonotonicCount,
 		AuthInfo:       *a.AuthInfo.toUefiType()}
@@ -51,7 +51,7 @@ type VariableAuthentication2 struct {
 	AuthInfo  WinCertificateGUID
 }
 
-func (a *VariableAuthentication2) Write(w io.Writer) error {
+func (a *VariableAuthentication2) WriteTo(w io.Writer) error {
 	desc := uefi.EFI_VARIABLE_AUTHENTICATION_2{
 		TimeStamp: *uefi.New_EFI_TIME(a.TimeStamp),
 		AuthInfo:  *a.AuthInfo.toUefiType()}
@@ -83,7 +83,7 @@ type VariableAuthentication3Timestamp struct {
 	SigningCert WinCertificateGUID
 }
 
-func (a *VariableAuthentication3Timestamp) Write(w io.Writer) error {
+func (a *VariableAuthentication3Timestamp) WriteTo(w io.Writer) error {
 	var buf bytes.Buffer
 
 	t := uefi.New_EFI_TIME(a.TimeStamp)
@@ -127,7 +127,7 @@ type VariableAuthentication3Nonce struct {
 	SigningCert WinCertificateGUID
 }
 
-func (a *VariableAuthentication3Nonce) Write(w io.Writer) error {
+func (a *VariableAuthentication3Nonce) WriteTo(w io.Writer) error {
 	var buf bytes.Buffer
 
 	n := uefi.EFI_VARIABLE_AUTHENTICATION_3_NONCE{
