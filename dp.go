@@ -729,8 +729,11 @@ func decodeDevicePathNode(r io.Reader) (DevicePathNode, error) {
 func ReadDevicePath(r io.Reader) (out DevicePath, err error) {
 	for i := 0; ; i++ {
 		node, err := decodeDevicePathNode(r)
-		if err != nil {
-			return nil, xerrors.Errorf("cannot decode node %d: %w", i, err)
+		switch {
+		case err != nil && i == 0:
+			return nil, ioerr.PassEOF("cannot decode node %d: %w", i, err)
+		case err != nil:
+			return nil, ioerr.EOFUnexpected("cannot decode node: %d: %w", i, err)
 		}
 		if node == nil {
 			break
