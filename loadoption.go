@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"unicode/utf16"
 
 	"golang.org/x/xerrors"
 
@@ -33,21 +32,8 @@ func (o *LoadOption) String() string {
 func (o *LoadOption) WriteTo(w io.Writer) error {
 	opt := uefi.EFI_LOAD_OPTION{
 		Attributes:   o.Attributes,
+		Description:  ConvertUTF8ToUTF16(o.Description + "\x00"),
 		OptionalData: o.OptionalData}
-
-	description := bytes.NewReader([]byte(o.Description + "\x00"))
-	var unicodeDescription []rune
-	for {
-		c, _, err := description.ReadRune()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return err
-		}
-		unicodeDescription = append(unicodeDescription, c)
-	}
-	opt.Description = utf16.Encode(unicodeDescription)
 
 	dp := new(bytes.Buffer)
 	if err := o.FilePath.WriteTo(dp); err != nil {
@@ -72,16 +58,8 @@ func ReadLoadOption(r io.Reader) (out *LoadOption, err error) {
 
 	out = &LoadOption{
 		Attributes:   opt.Attributes,
+		Description:  ConvertUTF16ToUTF8(opt.Description),
 		OptionalData: opt.OptionalData}
-
-	var description bytes.Buffer
-	for _, c := range utf16.Decode(opt.Description) {
-		if c == 0 {
-			break
-		}
-		description.WriteRune(c)
-	}
-	out.Description = description.String()
 
 	dp, err := ReadDevicePath(bytes.NewReader(opt.FilePathList))
 	if err != nil {

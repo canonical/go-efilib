@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"hash/crc32"
 	"io"
-	"unicode/utf16"
 
 	"golang.org/x/xerrors"
 
@@ -130,24 +129,11 @@ func (e *PartitionEntry) WriteTo(w io.Writer) error {
 		EndingLBA:           uefi.EFI_LBA(e.EndingLBA),
 		Attributes:          e.Attributes}
 
-	name := bytes.NewReader([]byte(e.PartitionName))
-	var unicodeName []rune
-	for {
-		c, _, err := name.ReadRune()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return err
-		}
-		unicodeName = append(unicodeName, c)
-	}
-
-	utf16Name := utf16.Encode(unicodeName)
-	if len(utf16Name) > len(entry.PartitionName) {
+	partitionName := ConvertUTF8ToUTF16(e.PartitionName)
+	if len(partitionName) > len(entry.PartitionName) {
 		return errors.New("PartitionName is too long")
 	}
-	copy(entry.PartitionName[:], utf16Name)
+	copy(entry.PartitionName[:], partitionName)
 
 	return binary.Write(w, binary.LittleEndian, &entry)
 }
@@ -159,21 +145,13 @@ func ReadPartitionEntry(r io.Reader) (*PartitionEntry, error) {
 		return nil, err
 	}
 
-	var name bytes.Buffer
-	for _, c := range utf16.Decode(e.PartitionName[:]) {
-		if c == rune(0) {
-			break
-		}
-		name.WriteRune(c)
-	}
-
 	return &PartitionEntry{
 		PartitionTypeGUID:   GUID(e.PartitionTypeGUID),
 		UniquePartitionGUID: GUID(e.UniquePartitionGUID),
 		StartingLBA:         LBA(e.StartingLBA),
 		EndingLBA:           LBA(e.EndingLBA),
 		Attributes:          e.Attributes,
-		PartitionName:       name.String()}, nil
+		PartitionName:       ConvertUTF16ToUTF8(e.PartitionName[:])}, nil
 }
 
 func readPartitionEntries(r io.Reader, num, sz, expectedCrc uint32, checkCrc bool) (out []*PartitionEntry, err error) {

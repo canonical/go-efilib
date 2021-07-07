@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"unicode/utf16"
 
 	"github.com/canonical/go-efilib/internal/ioerr"
 	"github.com/canonical/go-efilib/internal/uefi"
@@ -286,21 +285,8 @@ func (d *USBWWIDDevicePathNode) WriteTo(w io.Writer) error {
 			SubType: uint8(uefi.MSG_USB_WWID_DP)},
 		InterfaceNumber: d.InterfaceNumber,
 		VendorId:        d.VendorId,
-		ProductId:       d.ProductId}
-
-	serial := bytes.NewReader([]byte(d.SerialNumber))
-	var unicodeSerial []rune
-	for {
-		c, _, err := serial.ReadRune()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return err
-		}
-		unicodeSerial = append(unicodeSerial, c)
-	}
-	data.SerialNumber = utf16.Encode(unicodeSerial)
+		ProductId:       d.ProductId,
+		SerialNumber:	 ConvertUTF8ToUTF16(d.SerialNumber)}
 
 	data.Header.Length = uint16(binary.Size(data.Header) + binary.Size(data.InterfaceNumber) + binary.Size(data.VendorId) + binary.Size(data.ProductId) + binary.Size(data.SerialNumber))
 
@@ -472,21 +458,8 @@ func (d FilePathDevicePathNode) WriteTo(w io.Writer) error {
 	data := uefi.FILEPATH_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MEDIA_DEVICE_PATH),
-			SubType: uint8(uefi.MEDIA_FILEPATH_DP)}}
-
-	pathName := bytes.NewReader([]byte(d + "\x00"))
-	var unicodePathName []rune
-	for {
-		c, _, err := pathName.ReadRune()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return err
-		}
-		unicodePathName = append(unicodePathName, c)
-	}
-	data.PathName = utf16.Encode(unicodePathName)
+			SubType: uint8(uefi.MEDIA_FILEPATH_DP)},
+		PathName: ConvertUTF8ToUTF16(string(d) + "\x00")}
 	data.Header.Length = uint16(binary.Size(data.Header) + binary.Size(data.PathName))
 
 	return data.WriteTo(w)
@@ -615,15 +588,11 @@ func decodeDevicePathNode(r io.Reader) (DevicePathNode, error) {
 			if err != nil {
 				return nil, err
 			}
-			var serial bytes.Buffer
-			for _, c := range utf16.Decode(n.SerialNumber) {
-				serial.WriteRune(c)
-			}
 			return &USBWWIDDevicePathNode{
 				InterfaceNumber: n.InterfaceNumber,
 				VendorId:        n.VendorId,
 				ProductId:       n.ProductId,
-				SerialNumber:    serial.String()}, nil
+				SerialNumber:    ConvertUTF16ToUTF8(n.SerialNumber)}, nil
 		case uefi.MSG_DEVICE_LOGICAL_UNIT_DP:
 			var n uefi.DEVICE_LOGICAL_UNIT_DEVICE_PATH
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
@@ -687,14 +656,7 @@ func decodeDevicePathNode(r io.Reader) (DevicePathNode, error) {
 			if err != nil {
 				return nil, err
 			}
-			var path bytes.Buffer
-			for _, c := range utf16.Decode(n.PathName) {
-				if c == 0 {
-					break
-				}
-				path.WriteRune(c)
-			}
-			return FilePathDevicePathNode(path.String()), nil
+			return FilePathDevicePathNode(ConvertUTF16ToUTF8(n.PathName)), nil
 		case uefi.MEDIA_PIWG_FW_FILE_DP:
 			var n uefi.MEDIA_FW_VOL_FILEPATH_DEVICE_PATH
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
