@@ -97,6 +97,25 @@ func (s *gptSuite) TestReadPartitionTableHeader4(c *C) {
 			PartitionEntryArrayCRC32: 189081846}})
 }
 
+func (s *gptSuite) TestWritePartitionTableHeader(c *C) {
+	header := PartitionTableHeader{
+		HeaderSize:               92,
+		MyLBA:                    1,
+		AlternateLBA:             4000797359,
+		FirstUsableLBA:           34,
+		LastUsableLBA:            4000797326,
+		DiskGUID:                 MakeGUID(0xa4ae73c2, 0x0e2f, 0x4513, 0xbd3c, [...]uint8{0x45, 0x6d, 0xa7, 0xf7, 0xf0, 0xfd}),
+		PartitionEntryLBA:        2,
+		NumberOfPartitionEntries: 128,
+		SizeOfPartitionEntry:     128,
+		PartitionEntryArrayCRC32: 189081846}
+
+	w := new(bytes.Buffer)
+	c.Check(header.WriteTo(w), IsNil)
+	c.Check(w.Bytes(), DeepEquals, decodeHexString(c, "4546492050415254000001005c000000edeb4e64000000000100000000000000af5277ee00000000"+
+		"22000000000000008e5277ee00000000c273aea42f0e1345bd3c456da7f7f0fd02000000000000008000000080000000f628450b"))
+}
+
 type testDecodePartitionEntriesData struct {
 	r        *bytes.Reader
 	num      uint32
@@ -168,6 +187,47 @@ func (s *gptSuite) TestDecodePartitionEntries3(c *C) {
 				EndingLBA:           1050623,
 				Attributes:          0,
 				PartitionName:       "EFI System Partition"}}})
+}
+
+type testWritePartitionEntryData struct {
+	entry    *PartitionEntry
+	expected []byte
+}
+
+func (s *gptSuite) testWritePartitionEntry(c *C, data *testWritePartitionEntryData) {
+	w := new(bytes.Buffer)
+	c.Check(data.entry.WriteTo(w), IsNil)
+	c.Check(w.Bytes(), DeepEquals, data.expected)
+}
+
+func (s *gptSuite) TestWritePartitionEntry1(c *C) {
+	s.testWritePartitionEntry(c, &testWritePartitionEntryData{
+		entry: &PartitionEntry{
+			PartitionTypeGUID:   MakeGUID(0xc12a7328, 0xf81f, 0x11d2, 0xba4b, [...]uint8{0x00, 0xa0, 0xc9, 0x3e, 0xc9, 0x3b}),
+			UniquePartitionGUID: MakeGUID(0x66de947b, 0xfdb2, 0x4525, 0xb752, [...]uint8{0x30, 0xd6, 0x6b, 0xb2, 0xb9, 0x60}),
+			StartingLBA:         2048,
+			EndingLBA:           1050623,
+			Attributes:          0,
+			PartitionName:       "EFI System Partition"},
+		expected: decodeHexString(c, "28732ac11ff8d211ba4b00a0c93ec93b7b94de66b2fd2545b75230d66bb2b9600008000000000000ff071000"+
+			"0000000000000000000000004500460049002000530079007300740065006d00200050006100720074006900740069006f006e00000000000000000000000000"+
+			"0000000000000000000000000000000000000000"),
+	})
+}
+
+func (s *gptSuite) TestWritePartitionEntry2(c *C) {
+	s.testWritePartitionEntry(c, &testWritePartitionEntryData{
+		entry: &PartitionEntry{
+			PartitionTypeGUID:   MakeGUID(0x0fc63daf, 0x8483, 0x4772, 0x8e79, [...]uint8{0x3d, 0x69, 0xd8, 0x47, 0x7d, 0xe4}),
+			UniquePartitionGUID: MakeGUID(0x631b17dc, 0xedb7, 0x4d1d, 0xa761, [...]uint8{0x6d, 0xce, 0x3e, 0xfc, 0xe4, 0x15}),
+			StartingLBA:         1050624,
+			EndingLBA:           2549759,
+			Attributes:          0,
+			PartitionName:       ""},
+		expected: decodeHexString(c, "af3dc60f838472478e793d69d8477de4dc171b63b7ed1d4da7616dce3efce4150008100000000000ffe72600000"+
+			"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"+
+			"0000000000000000000000000000000000000"),
+	})
 }
 
 type testReadPartitionTableData struct {
