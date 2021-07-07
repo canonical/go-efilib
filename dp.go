@@ -57,6 +57,8 @@ type DevicePathNode interface {
 	WriteTo(w io.Writer) error
 }
 
+// DevicePath represents a complete device path with the first node
+// representing the root.
 type DevicePath []DevicePathNode
 
 func (p DevicePath) String() string {
@@ -67,6 +69,7 @@ func (p DevicePath) String() string {
 	return s.String()
 }
 
+// WriteTo serializes the complete device path to w.
 func (p DevicePath) WriteTo(w io.Writer) error {
 	for i, node := range p {
 		if err := node.WriteTo(w); err != nil {
