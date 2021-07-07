@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"strings"
 	"unicode/utf16"
 
 	"github.com/canonical/go-efilib/internal/ioerr"
@@ -463,21 +462,19 @@ func (d *CDROMDevicePathNode) WriteTo(w io.Writer) error {
 }
 
 // FilePathDevicePathNode corresponds to a file path device path node.
-type FilePathDevicePathNode struct {
-	PathName string
+type FilePathDevicePathNode string
+
+func (d FilePathDevicePathNode) String() string {
+	return string(d)
 }
 
-func (d *FilePathDevicePathNode) String() string {
-	return d.PathName
-}
-
-func (d *FilePathDevicePathNode) WriteTo(w io.Writer) error {
+func (d FilePathDevicePathNode) WriteTo(w io.Writer) error {
 	data := uefi.FILEPATH_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MEDIA_DEVICE_PATH),
 			SubType: uint8(uefi.MEDIA_FILEPATH_DP)}}
 
-	pathName := bytes.NewReader([]byte(d.PathName + "\x00"))
+	pathName := bytes.NewReader([]byte(d + "\x00"))
 	var unicodePathName []rune
 	for {
 		c, _, err := pathName.ReadRune()
@@ -496,40 +493,36 @@ func (d *FilePathDevicePathNode) WriteTo(w io.Writer) error {
 }
 
 // MediaFvFileDevicePathNode corresponds to a firmware volume file device path node.
-type MediaFvFileDevicePathNode struct {
-	FvFileName GUID
+type MediaFvFileDevicePathNode GUID
+
+func (d MediaFvFileDevicePathNode) String() string {
+	return fmt.Sprintf("FvFile(%s)", GUID(d))
 }
 
-func (d *MediaFvFileDevicePathNode) String() string {
-	return fmt.Sprintf("FvFile(%s)", d.FvFileName)
-}
-
-func (d *MediaFvFileDevicePathNode) WriteTo(w io.Writer) error {
+func (d MediaFvFileDevicePathNode) WriteTo(w io.Writer) error {
 	data := uefi.MEDIA_FW_VOL_FILEPATH_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MEDIA_DEVICE_PATH),
 			SubType: uint8(uefi.MEDIA_PIWG_FW_FILE_DP)},
-		FvFileName: uefi.EFI_GUID(d.FvFileName)}
+		FvFileName: uefi.EFI_GUID(d)}
 	data.Header.Length = uint16(binary.Size(data))
 
 	return binary.Write(w, binary.LittleEndian, &data)
 }
 
 // MediaFvDevicePathNode corresponds to a firmware volume device path node.
-type MediaFvDevicePathNode struct {
-	FvName GUID
+type MediaFvDevicePathNode GUID
+
+func (d MediaFvDevicePathNode) String() string {
+	return fmt.Sprintf("Fv(%s)", GUID(d))
 }
 
-func (d *MediaFvDevicePathNode) String() string {
-	return fmt.Sprintf("Fv(%s)", d.FvName)
-}
-
-func (d *MediaFvDevicePathNode) WriteTo(w io.Writer) error {
+func (d MediaFvDevicePathNode) WriteTo(w io.Writer) error {
 	data := uefi.MEDIA_FW_VOL_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MEDIA_DEVICE_PATH),
 			SubType: uint8(uefi.MEDIA_PIWG_FW_VOL_DP)},
-		FvName: uefi.EFI_GUID(d.FvName)}
+		FvName: uefi.EFI_GUID(d)}
 	data.Header.Length = uint16(binary.Size(data))
 
 	return binary.Write(w, binary.LittleEndian, &data)
@@ -696,21 +689,24 @@ func decodeDevicePathNode(r io.Reader) (DevicePathNode, error) {
 			}
 			var path bytes.Buffer
 			for _, c := range utf16.Decode(n.PathName) {
+				if c == 0 {
+					break
+				}
 				path.WriteRune(c)
 			}
-			return &FilePathDevicePathNode{PathName: strings.TrimRight(path.String(), "\x00")}, nil
+			return FilePathDevicePathNode(path.String()), nil
 		case uefi.MEDIA_PIWG_FW_FILE_DP:
 			var n uefi.MEDIA_FW_VOL_FILEPATH_DEVICE_PATH
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
-			return &MediaFvFileDevicePathNode{FvFileName: GUID(n.FvFileName)}, nil
+			return MediaFvFileDevicePathNode(GUID(n.FvFileName)), nil
 		case uefi.MEDIA_PIWG_FW_VOL_DP:
 			var n uefi.MEDIA_FW_VOL_DEVICE_PATH
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
-			return &MediaFvDevicePathNode{FvName: GUID(n.FvName)}, nil
+			return MediaFvDevicePathNode(GUID(n.FvName)), nil
 		case uefi.MEDIA_RELATIVE_OFFSET_RANGE_DP:
 			var n uefi.MEDIA_RELATIVE_OFFSET_RANGE_DEVICE_PATH
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
