@@ -51,29 +51,26 @@ const (
 // DevicePathSubType is the sub-type of a device path node.
 type DevicePathSubType uint8
 
-type devicePathNodeData interface {
-	baseName() string
-	writeTo(w io.Writer) error
-}
-
 // DevicePathNode represents a single node in a device path.
-type DevicePathNode struct {
-	Parent *DevicePathNode // The parent node
-
-	// Data provides additional information about this node. The concrete type is dependent on the type of this device path node,
-	// and will be a pointer to one of the DevicePathData types.
-	Data interface{}
+type DevicePathNode interface {
+	fmt.Stringer
+	WriteTo(w io.Writer) error
 }
 
-func (n *DevicePathNode) WriteTo(w io.Writer) error {
-	var data []devicePathNodeData
-	for cur := n; cur != nil; cur = cur.Parent {
-		data = append([]devicePathNodeData{cur.Data.(devicePathNodeData)}, data...)
-	}
+type DevicePath []DevicePathNode
 
-	for _, d := range data {
-		if err := d.writeTo(w); err != nil {
-			return err
+func (p DevicePath) String() string {
+	s := new(bytes.Buffer)
+	for _, node := range p {
+		fmt.Fprintf(s, "\\%s", node)
+	}
+	return s.String()
+}
+
+func (p DevicePath) WriteTo(w io.Writer) error {
+	for i, node := range p {
+		if err := node.WriteTo(w); err != nil {
+			return xerrors.Errorf("cannot write node %d: %w", i, err)
 		}
 	}
 
@@ -84,34 +81,14 @@ func (n *DevicePathNode) WriteTo(w io.Writer) error {
 	return binary.Write(w, binary.LittleEndian, &end)
 }
 
-// BaseName returns the string representation of this node.
-func (n *DevicePathNode) BaseName() string {
-	return n.Data.(devicePathNodeData).baseName()
-}
-
-// String returns the string representation of the full path of this node.
-func (n *DevicePathNode) String() string {
-	var nodes []*DevicePathNode
-	for n != nil {
-		nodes = append(nodes, n)
-		n = n.Parent
-	}
-
-	var builder bytes.Buffer
-	for i := len(nodes) - 1; i >= 0; i-- {
-		fmt.Fprintf(&builder, "\\%s", nodes[i].BaseName())
-	}
-	return builder.String()
-}
-
-// RawDevicePathData provides information for device path nodes with an unhandled type.
-type RawDevicePathData struct {
+// RawDevicePathNode corresponds to a device path nodes with an unhandled type.
+type RawDevicePathNode struct {
 	Type    DevicePathType
 	SubType DevicePathSubType
 	Data    []byte
 }
 
-func (d *RawDevicePathData) baseName() string {
+func (d *RawDevicePathNode) String() string {
 	var builder bytes.Buffer
 	fmt.Fprintf(&builder, "%s(%d", d.Type, d.SubType)
 	if len(d.Data) > 0 {
@@ -124,7 +101,7 @@ func (d *RawDevicePathData) baseName() string {
 	return builder.String()
 }
 
-func (d *RawDevicePathData) writeTo(w io.Writer) error {
+func (d *RawDevicePathNode) WriteTo(w io.Writer) error {
 	data := uefi.EFI_DEVICE_PATH_PROTOCOL{
 		Type:    uint8(d.Type),
 		SubType: uint8(d.SubType)}
@@ -142,17 +119,17 @@ func (d *RawDevicePathData) writeTo(w io.Writer) error {
 	return err
 }
 
-// PCIDevicePathData provides information for PCI device path nodes.
-type PCIDevicePathData struct {
+// PCIDevicePathNode corresponds to a PCI device path node.
+type PCIDevicePathNode struct {
 	Function uint8
 	Device   uint8
 }
 
-func (d *PCIDevicePathData) baseName() string {
+func (d *PCIDevicePathNode) String() string {
 	return fmt.Sprintf("Pci(0x%x,0x%x)", d.Device, d.Function)
 }
 
-func (d *PCIDevicePathData) writeTo(w io.Writer) error {
+func (d *PCIDevicePathNode) WriteTo(w io.Writer) error {
 	data := uefi.PCI_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.HARDWARE_DEVICE_PATH),
@@ -164,13 +141,13 @@ func (d *PCIDevicePathData) writeTo(w io.Writer) error {
 	return binary.Write(w, binary.LittleEndian, &data)
 }
 
-// ACPIDevicePathData provides information for ACPI device path nodes.
-type ACPIDevicePathData struct {
+// ACPIDevicePathNode corresponds to an ACPI device path node.
+type ACPIDevicePathNode struct {
 	HID uint32
 	UID uint32
 }
 
-func (d *ACPIDevicePathData) baseName() string {
+func (d *ACPIDevicePathNode) String() string {
 	if d.HID&0xffff == 0x41d0 {
 		switch d.HID >> 16 {
 		case 0x0a03:
@@ -186,7 +163,7 @@ func (d *ACPIDevicePathData) baseName() string {
 	return fmt.Sprintf("Acpi(0x%08x,0x%x)", d.HID, d.UID)
 }
 
-func (d *ACPIDevicePathData) writeTo(w io.Writer) error {
+func (d *ACPIDevicePathNode) WriteTo(w io.Writer) error {
 	data := uefi.ACPI_HID_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.ACPI_DEVICE_PATH),
@@ -198,17 +175,17 @@ func (d *ACPIDevicePathData) writeTo(w io.Writer) error {
 	return binary.Write(w, binary.LittleEndian, &data)
 }
 
-// SCSIDevicePathData provides information for SCSI device path nodes.
-type SCSIDevicePathData struct {
+// SCSIDevicePathNode corresponds to a SCSI device path node.
+type SCSIDevicePathNode struct {
 	PUN uint16
 	LUN uint16
 }
 
-func (d *SCSIDevicePathData) baseName() string {
+func (d *SCSIDevicePathNode) String() string {
 	return fmt.Sprintf("Scsi(0x%x,0x%x)", d.PUN, d.LUN)
 }
 
-func (d *SCSIDevicePathData) writeTo(w io.Writer) error {
+func (d *SCSIDevicePathNode) WriteTo(w io.Writer) error {
 	data := uefi.SCSI_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MESSAGING_DEVICE_PATH),
@@ -220,17 +197,17 @@ func (d *SCSIDevicePathData) writeTo(w io.Writer) error {
 	return binary.Write(w, binary.LittleEndian, &data)
 }
 
-// USBDevicePathData provides information for USB device path nodes.
-type USBDevicePathData struct {
+// USBDevicePathNode corresponds to a USB device path node.
+type USBDevicePathNode struct {
 	ParentPortNumber uint8
 	InterfaceNumber  uint8
 }
 
-func (d *USBDevicePathData) baseName() string {
+func (d *USBDevicePathNode) String() string {
 	return fmt.Sprintf("USB(0x%x,0x%x)", d.ParentPortNumber, d.InterfaceNumber)
 }
 
-func (d *USBDevicePathData) writeTo(w io.Writer) error {
+func (d *USBDevicePathNode) WriteTo(w io.Writer) error {
 	data := uefi.USB_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MESSAGING_DEVICE_PATH),
@@ -249,8 +226,8 @@ const (
 	USBClassHub         USBClass = 0x09
 )
 
-// USBClassDevicePathData provides information for USB class device path nodes.
-type USBClassDevicePathData struct {
+// USBClassDevicePathNode corresponds to a USB class device path node.
+type USBClassDevicePathNode struct {
 	VendorId       uint16
 	ProductId      uint16
 	DeviceClass    USBClass
@@ -258,7 +235,7 @@ type USBClassDevicePathData struct {
 	DeviceProtocol uint8
 }
 
-func (d *USBClassDevicePathData) baseName() string {
+func (d *USBClassDevicePathNode) String() string {
 	var builder bytes.Buffer
 	switch d.DeviceClass {
 	case USBClassMassStorage:
@@ -273,7 +250,7 @@ func (d *USBClassDevicePathData) baseName() string {
 	return builder.String()
 }
 
-func (d *USBClassDevicePathData) writeTo(w io.Writer) error {
+func (d *USBClassDevicePathNode) WriteTo(w io.Writer) error {
 	data := uefi.USB_CLASS_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MESSAGING_DEVICE_PATH),
@@ -288,19 +265,19 @@ func (d *USBClassDevicePathData) writeTo(w io.Writer) error {
 	return binary.Write(w, binary.LittleEndian, &data)
 }
 
-// USBWWIDDevicePathData provides information for USB WWID device path nodes.
-type USBWWIDDevicePathData struct {
+// USBWWIDDevicePathNode corresponds to a USB WWID device path node.
+type USBWWIDDevicePathNode struct {
 	InterfaceNumber uint16
 	VendorId        uint16
 	ProductId       uint16
 	SerialNumber    string
 }
 
-func (d *USBWWIDDevicePathData) baseName() string {
+func (d *USBWWIDDevicePathNode) String() string {
 	return fmt.Sprintf("UsbWwid(0x%x,0x%x,0x%x,\"%s\"", d.VendorId, d.ProductId, d.InterfaceNumber, d.SerialNumber)
 }
 
-func (d *USBWWIDDevicePathData) writeTo(w io.Writer) error {
+func (d *USBWWIDDevicePathNode) WriteTo(w io.Writer) error {
 	data := uefi.USB_WWID_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MESSAGING_DEVICE_PATH),
@@ -328,15 +305,15 @@ func (d *USBWWIDDevicePathData) writeTo(w io.Writer) error {
 	return binary.Write(w, binary.LittleEndian, &data)
 }
 
-type DeviceLogicalUnitDevicePathData struct {
+type DeviceLogicalUnitDevicePathNode struct {
 	LUN uint8
 }
 
-func (d *DeviceLogicalUnitDevicePathData) baseName() string {
+func (d *DeviceLogicalUnitDevicePathNode) String() string {
 	return fmt.Sprintf("Unit(0x%x)", d.LUN)
 }
 
-func (d *DeviceLogicalUnitDevicePathData) writeTo(w io.Writer) error {
+func (d *DeviceLogicalUnitDevicePathNode) WriteTo(w io.Writer) error {
 	data := uefi.DEVICE_LOGICAL_UNIT_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MESSAGING_DEVICE_PATH),
@@ -347,18 +324,18 @@ func (d *DeviceLogicalUnitDevicePathData) writeTo(w io.Writer) error {
 	return binary.Write(w, binary.LittleEndian, &data)
 }
 
-// SATADevicePathData provides information for SATA device path nodes.
-type SATADevicePathData struct {
+// SATADevicePathNode corresponds to a SATA device path node.
+type SATADevicePathNode struct {
 	HBAPortNumber            uint16
 	PortMultiplierPortNumber uint16
 	LUN                      uint16
 }
 
-func (d *SATADevicePathData) baseName() string {
+func (d *SATADevicePathNode) String() string {
 	return fmt.Sprintf("Sata(0x%x,0x%x,0x%x)", d.HBAPortNumber, d.PortMultiplierPortNumber, d.LUN)
 }
 
-func (d *SATADevicePathData) writeTo(w io.Writer) error {
+func (d *SATADevicePathNode) WriteTo(w io.Writer) error {
 	data := uefi.SATA_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MESSAGING_DEVICE_PATH),
@@ -371,20 +348,20 @@ func (d *SATADevicePathData) writeTo(w io.Writer) error {
 	return binary.Write(w, binary.LittleEndian, &data)
 }
 
-// NVMENamespaceDevicePathData provides information for NVME namespace device path nodes.
-type NVMENamespaceDevicePathData struct {
+// NVMENamespaceDevicePathNode corresponds to a NVME namespace device path node.
+type NVMENamespaceDevicePathNode struct {
 	NamespaceID   uint32
 	NamespaceUUID uint64
 }
 
-func (d *NVMENamespaceDevicePathData) baseName() string {
+func (d *NVMENamespaceDevicePathNode) String() string {
 	var uuid [8]uint8
 	binary.BigEndian.PutUint64(uuid[:], d.NamespaceUUID)
 	return fmt.Sprintf("NVMe(0x%x-0x%02x-0x%02x-0x%02x-0x%02x-0x%02x-0x%02x-0x%02x-0x%02x)", d.NamespaceID,
 		uuid[0], uuid[1], uuid[2], uuid[3], uuid[4], uuid[5], uuid[6], uuid[7])
 }
 
-func (d *NVMENamespaceDevicePathData) writeTo(w io.Writer) error {
+func (d *NVMENamespaceDevicePathNode) WriteTo(w io.Writer) error {
 	data := uefi.NVME_NAMESPACE_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MESSAGING_DEVICE_PATH),
@@ -403,8 +380,8 @@ const (
 	GPT               = 2
 )
 
-// HardDriveDevicePathData provides information for hard drive device path nodes.
-type HardDriveDevicePathData struct {
+// HardDriveDevicePathNode corresponds to a hard drive device path node.
+type HardDriveDevicePathNode struct {
 	PartitionNumber uint32
 	PartitionStart  uint64
 	PartitionSize   uint64
@@ -412,7 +389,7 @@ type HardDriveDevicePathData struct {
 	MBRType         MBRType
 }
 
-func (d *HardDriveDevicePathData) baseName() string {
+func (d *HardDriveDevicePathNode) String() string {
 	var builder bytes.Buffer
 	switch sig := d.Signature.(type) {
 	case nil:
@@ -429,7 +406,7 @@ func (d *HardDriveDevicePathData) baseName() string {
 	return builder.String()
 }
 
-func (d *HardDriveDevicePathData) writeTo(w io.Writer) error {
+func (d *HardDriveDevicePathNode) WriteTo(w io.Writer) error {
 	data := uefi.HARDDRIVE_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MEDIA_DEVICE_PATH),
@@ -458,18 +435,18 @@ func (d *HardDriveDevicePathData) writeTo(w io.Writer) error {
 	return binary.Write(w, binary.LittleEndian, &data)
 }
 
-// CDROMDevicePathData provides information for CDROM device path nodes.
-type CDROMDevicePathData struct {
+// CDROMDevicePathNode corresponds to a CDROM device path node.
+type CDROMDevicePathNode struct {
 	BootEntry      uint32
 	PartitionStart uint64
 	PartitionSize  uint64
 }
 
-func (d *CDROMDevicePathData) baseName() string {
+func (d *CDROMDevicePathNode) String() string {
 	return fmt.Sprintf("CDROM(0x%x,0x%x,0x%x)", d.BootEntry, d.PartitionStart, d.PartitionSize)
 }
 
-func (d *CDROMDevicePathData) writeTo(w io.Writer) error {
+func (d *CDROMDevicePathNode) WriteTo(w io.Writer) error {
 	data := uefi.CDROM_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MEDIA_DEVICE_PATH),
@@ -482,16 +459,16 @@ func (d *CDROMDevicePathData) writeTo(w io.Writer) error {
 	return binary.Write(w, binary.LittleEndian, &data)
 }
 
-// FilePathDevicePathData provides information for file path device path nodes.
-type FilePathDevicePathData struct {
+// FilePathDevicePathNode corresponds to a file path device path node.
+type FilePathDevicePathNode struct {
 	PathName string
 }
 
-func (d *FilePathDevicePathData) baseName() string {
+func (d *FilePathDevicePathNode) String() string {
 	return d.PathName
 }
 
-func (d *FilePathDevicePathData) writeTo(w io.Writer) error {
+func (d *FilePathDevicePathNode) WriteTo(w io.Writer) error {
 	data := uefi.FILEPATH_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MEDIA_DEVICE_PATH),
@@ -515,16 +492,16 @@ func (d *FilePathDevicePathData) writeTo(w io.Writer) error {
 	return data.WriteTo(w)
 }
 
-// MediaFvFileDevicePathData provides information for firmware volume file device path nodes.
-type MediaFvFileDevicePathData struct {
+// MediaFvFileDevicePathNode corresponds to a firmware volume file device path node.
+type MediaFvFileDevicePathNode struct {
 	FvFileName GUID
 }
 
-func (d *MediaFvFileDevicePathData) baseName() string {
+func (d *MediaFvFileDevicePathNode) String() string {
 	return fmt.Sprintf("FvFile(%s)", d.FvFileName)
 }
 
-func (d *MediaFvFileDevicePathData) writeTo(w io.Writer) error {
+func (d *MediaFvFileDevicePathNode) WriteTo(w io.Writer) error {
 	data := uefi.MEDIA_FW_VOL_FILEPATH_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MEDIA_DEVICE_PATH),
@@ -535,16 +512,16 @@ func (d *MediaFvFileDevicePathData) writeTo(w io.Writer) error {
 	return binary.Write(w, binary.LittleEndian, &data)
 }
 
-// MediaFvDevicePathData provides information for firmware volume device path nodes.
-type MediaFvDevicePathData struct {
+// MediaFvDevicePathNode corresponds to a firmware volume device path node.
+type MediaFvDevicePathNode struct {
 	FvName GUID
 }
 
-func (d *MediaFvDevicePathData) baseName() string {
+func (d *MediaFvDevicePathNode) String() string {
 	return fmt.Sprintf("Fv(%s)", d.FvName)
 }
 
-func (d *MediaFvDevicePathData) writeTo(w io.Writer) error {
+func (d *MediaFvDevicePathNode) WriteTo(w io.Writer) error {
 	data := uefi.MEDIA_FW_VOL_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MEDIA_DEVICE_PATH),
@@ -555,16 +532,16 @@ func (d *MediaFvDevicePathData) writeTo(w io.Writer) error {
 	return binary.Write(w, binary.LittleEndian, &data)
 }
 
-type MediaRelOffsetRangeDevicePathData struct {
+type MediaRelOffsetRangeDevicePathNode struct {
 	StartingOffset uint64
 	EndingOffset   uint64
 }
 
-func (d *MediaRelOffsetRangeDevicePathData) baseName() string {
+func (d *MediaRelOffsetRangeDevicePathNode) String() string {
 	return fmt.Sprintf("Offset(0x%x,0x%x)", d.StartingOffset, d.EndingOffset)
 }
 
-func (d *MediaRelOffsetRangeDevicePathData) writeTo(w io.Writer) error {
+func (d *MediaRelOffsetRangeDevicePathNode) WriteTo(w io.Writer) error {
 	data := uefi.MEDIA_RELATIVE_OFFSET_RANGE_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MEDIA_DEVICE_PATH),
@@ -576,7 +553,7 @@ func (d *MediaRelOffsetRangeDevicePathData) writeTo(w io.Writer) error {
 	return binary.Write(w, binary.LittleEndian, &data)
 }
 
-func decodeDevicePathNodeData(r io.Reader) (interface{}, error) {
+func decodeDevicePathNode(r io.Reader) (DevicePathNode, error) {
 	buf := new(bytes.Buffer)
 	r2 := io.TeeReader(r, buf)
 
@@ -601,7 +578,7 @@ func decodeDevicePathNodeData(r io.Reader) (interface{}, error) {
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
-			return &PCIDevicePathData{Function: n.Function, Device: n.Device}, nil
+			return &PCIDevicePathNode{Function: n.Function, Device: n.Device}, nil
 		}
 	case uefi.ACPI_DEVICE_PATH:
 		switch h.SubType {
@@ -610,7 +587,7 @@ func decodeDevicePathNodeData(r io.Reader) (interface{}, error) {
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
-			return &ACPIDevicePathData{HID: n.HID, UID: n.UID}, nil
+			return &ACPIDevicePathNode{HID: n.HID, UID: n.UID}, nil
 		}
 	case uefi.MESSAGING_DEVICE_PATH:
 		switch h.SubType {
@@ -619,19 +596,19 @@ func decodeDevicePathNodeData(r io.Reader) (interface{}, error) {
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
-			return &SCSIDevicePathData{PUN: n.Pun, LUN: n.Lun}, nil
+			return &SCSIDevicePathNode{PUN: n.Pun, LUN: n.Lun}, nil
 		case uefi.MSG_USB_DP:
 			var n uefi.USB_DEVICE_PATH
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
-			return &USBDevicePathData{ParentPortNumber: n.ParentPortNumber, InterfaceNumber: n.InterfaceNumber}, nil
+			return &USBDevicePathNode{ParentPortNumber: n.ParentPortNumber, InterfaceNumber: n.InterfaceNumber}, nil
 		case uefi.MSG_USB_CLASS_DP:
 			var n uefi.USB_CLASS_DEVICE_PATH
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
-			return &USBClassDevicePathData{
+			return &USBClassDevicePathNode{
 				VendorId:       n.VendorId,
 				ProductId:      n.ProductId,
 				DeviceClass:    USBClass(n.DeviceClass),
@@ -646,7 +623,7 @@ func decodeDevicePathNodeData(r io.Reader) (interface{}, error) {
 			for _, c := range utf16.Decode(n.SerialNumber) {
 				serial.WriteRune(c)
 			}
-			return &USBWWIDDevicePathData{
+			return &USBWWIDDevicePathNode{
 				InterfaceNumber: n.InterfaceNumber,
 				VendorId:        n.VendorId,
 				ProductId:       n.ProductId,
@@ -656,13 +633,13 @@ func decodeDevicePathNodeData(r io.Reader) (interface{}, error) {
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
-			return &DeviceLogicalUnitDevicePathData{LUN: n.Lun}, nil
+			return &DeviceLogicalUnitDevicePathNode{LUN: n.Lun}, nil
 		case uefi.MSG_SATA_DP:
 			var n uefi.SATA_DEVICE_PATH
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
-			return &SATADevicePathData{
+			return &SATADevicePathNode{
 				HBAPortNumber:            n.HBAPortNumber,
 				PortMultiplierPortNumber: n.PortMultiplierPortNumber,
 				LUN:                      n.Lun}, nil
@@ -671,7 +648,7 @@ func decodeDevicePathNodeData(r io.Reader) (interface{}, error) {
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
-			return &NVMENamespaceDevicePathData{
+			return &NVMENamespaceDevicePathNode{
 				NamespaceID:   n.NamespaceId,
 				NamespaceUUID: n.NamespaceUuid}, nil
 		}
@@ -694,7 +671,7 @@ func decodeDevicePathNodeData(r io.Reader) (interface{}, error) {
 			default:
 				return nil, errors.New("invalid signature type")
 			}
-			return &HardDriveDevicePathData{
+			return &HardDriveDevicePathNode{
 				PartitionNumber: n.PartitionNumber,
 				PartitionStart:  n.PartitionStart,
 				PartitionSize:   n.PartitionSize,
@@ -705,7 +682,7 @@ func decodeDevicePathNodeData(r io.Reader) (interface{}, error) {
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
-			return &CDROMDevicePathData{
+			return &CDROMDevicePathNode{
 				BootEntry:      n.BootEntry,
 				PartitionStart: n.PartitionStart,
 				PartitionSize:  n.PartitionSize}, nil
@@ -718,51 +695,44 @@ func decodeDevicePathNodeData(r io.Reader) (interface{}, error) {
 			for _, c := range utf16.Decode(n.PathName) {
 				path.WriteRune(c)
 			}
-			return &FilePathDevicePathData{PathName: strings.TrimRight(path.String(), "\x00")}, nil
+			return &FilePathDevicePathNode{PathName: strings.TrimRight(path.String(), "\x00")}, nil
 		case uefi.MEDIA_PIWG_FW_FILE_DP:
 			var n uefi.MEDIA_FW_VOL_FILEPATH_DEVICE_PATH
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
-			return &MediaFvFileDevicePathData{FvFileName: GUID(n.FvFileName)}, nil
+			return &MediaFvFileDevicePathNode{FvFileName: GUID(n.FvFileName)}, nil
 		case uefi.MEDIA_PIWG_FW_VOL_DP:
 			var n uefi.MEDIA_FW_VOL_DEVICE_PATH
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
-			return &MediaFvDevicePathData{FvName: GUID(n.FvName)}, nil
+			return &MediaFvDevicePathNode{FvName: GUID(n.FvName)}, nil
 		case uefi.MEDIA_RELATIVE_OFFSET_RANGE_DP:
 			var n uefi.MEDIA_RELATIVE_OFFSET_RANGE_DEVICE_PATH
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
-			return &MediaRelOffsetRangeDevicePathData{StartingOffset: n.StartingOffset, EndingOffset: n.EndingOffset}, nil
+			return &MediaRelOffsetRangeDevicePathNode{StartingOffset: n.StartingOffset, EndingOffset: n.EndingOffset}, nil
 		}
 	case uefi.END_DEVICE_PATH_TYPE:
 		return nil, nil
 	}
 
-	return &RawDevicePathData{Type: DevicePathType(h.Type), SubType: DevicePathSubType(h.SubType), Data: buf.Bytes()[binary.Size(h):]}, nil
+	return &RawDevicePathNode{Type: DevicePathType(h.Type), SubType: DevicePathSubType(h.SubType), Data: buf.Bytes()[binary.Size(h):]}, nil
 }
 
 // ReadDevicePath decodes a device path from the supplied io.Reader.
-func ReadDevicePath(r io.Reader) (*DevicePathNode, error) {
-	var nodeData []interface{}
+func ReadDevicePath(r io.Reader) (out DevicePath, err error) {
 	for i := 0; ; i++ {
-		d, err := decodeDevicePathNodeData(r)
+		node, err := decodeDevicePathNode(r)
 		if err != nil {
 			return nil, xerrors.Errorf("cannot decode node %d: %w", i, err)
 		}
-		if d == nil {
+		if node == nil {
 			break
 		}
-		nodeData = append(nodeData, d)
+		out = append(out, node)
 	}
-
-	var lastNode *DevicePathNode
-	for _, d := range nodeData {
-		node := &DevicePathNode{Parent: lastNode, Data: d}
-		lastNode = node
-	}
-	return lastNode, nil
+	return out, nil
 }
