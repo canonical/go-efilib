@@ -36,9 +36,9 @@ func (d *SignatureData) toUefiType() *uefi.EFI_SIGNATURE_DATA {
 		SignatureData:  d.Data}
 }
 
-// WriteTo serializes this signature data to w.
-func (d *SignatureData) WriteTo(w io.Writer) error {
-	return d.toUefiType().WriteTo(w)
+// Write serializes this signature data to w.
+func (d *SignatureData) Write(w io.Writer) error {
+	return d.toUefiType().Write(w)
 }
 
 // Equal determines whether other is equal to this SignatureData
@@ -107,13 +107,13 @@ func (l *SignatureList) String() string {
 	return b.String()
 }
 
-// WriteTo serializes this signature list to w.
-func (l *SignatureList) WriteTo(w io.Writer) error {
+// Write serializes this signature list to w.
+func (l *SignatureList) Write(w io.Writer) error {
 	list, err := l.toUefiType()
 	if err != nil {
 		return err
 	}
-	return list.WriteTo(w)
+	return list.Write(w)
 }
 
 // ReadSignatureList decodes a single EFI_SIGNATURE_LIST from r.
@@ -143,10 +143,10 @@ func (db SignatureDatabase) String() string {
 	return s
 }
 
-// WriteTo serializes this signature database to w.
-func (db SignatureDatabase) WriteTo(w io.Writer) error {
+// Write serializes this signature database to w.
+func (db SignatureDatabase) Write(w io.Writer) error {
 	for i, l := range db {
-		if err := l.WriteTo(w); err != nil {
+		if err := l.Write(w); err != nil {
 			return xerrors.Errorf("cannot encode signature list %d: %w", i, err)
 		}
 	}

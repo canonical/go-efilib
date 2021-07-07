@@ -32,9 +32,9 @@ type PartitionTableHeader struct {
 	PartitionEntryArrayCRC32 uint32
 }
 
-// WriteTo serializes this PartitionTableHeader to w. The CRC field is
+// Write serializes this PartitionTableHeader to w. The CRC field is
 // computed automatically.
-func (h *PartitionTableHeader) WriteTo(w io.Writer) error {
+func (h *PartitionTableHeader) Write(w io.Writer) error {
 	hdr := uefi.EFI_PARTITION_TABLE_HEADER{
 		Hdr: uefi.EFI_TABLE_HEADER{
 			Signature:  uefi.EFI_PTAB_HEADER_ID,
@@ -116,12 +116,12 @@ func (e *PartitionEntry) String() string {
 	return fmt.Sprintf("PartitionTypeGUID: %s, UniquePartitionGUID: %s, PartitionName: \"%s\"", e.PartitionTypeGUID, e.UniquePartitionGUID, e.PartitionName)
 }
 
-// WriteTo serializes this PartitionEntry to w. Note that it doesn't write
+// Write serializes this PartitionEntry to w. Note that it doesn't write
 // any bytes beyond the end of the EFI_PARTITION_ENTRY structure, so if the
 // caller is writing several entries and the partition table header defines
 // an entry size of greater than 128 bytes, the caller is responsible for
 // inserting the 0 padding bytes.
-func (e *PartitionEntry) WriteTo(w io.Writer) error {
+func (e *PartitionEntry) Write(w io.Writer) error {
 	entry := uefi.EFI_PARTITION_ENTRY{
 		PartitionTypeGUID:   uefi.EFI_GUID(e.PartitionTypeGUID),
 		UniquePartitionGUID: uefi.EFI_GUID(e.UniquePartitionGUID),

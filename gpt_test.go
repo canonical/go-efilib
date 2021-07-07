@@ -111,7 +111,7 @@ func (s *gptSuite) TestWritePartitionTableHeader(c *C) {
 		PartitionEntryArrayCRC32: 189081846}
 
 	w := new(bytes.Buffer)
-	c.Check(header.WriteTo(w), IsNil)
+	c.Check(header.Write(w), IsNil)
 	c.Check(w.Bytes(), DeepEquals, decodeHexString(c, "4546492050415254000001005c000000edeb4e64000000000100000000000000af5277ee00000000"+
 		"22000000000000008e5277ee00000000c273aea42f0e1345bd3c456da7f7f0fd02000000000000008000000080000000f628450b"))
 }
@@ -196,7 +196,7 @@ type testWritePartitionEntryData struct {
 
 func (s *gptSuite) testWritePartitionEntry(c *C, data *testWritePartitionEntryData) {
 	w := new(bytes.Buffer)
-	c.Check(data.entry.WriteTo(w), IsNil)
+	c.Check(data.entry.Write(w), IsNil)
 	c.Check(w.Bytes(), DeepEquals, data.expected)
 }
 

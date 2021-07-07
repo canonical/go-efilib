@@ -22,7 +22,7 @@ type EFI_LOAD_OPTION struct {
 	OptionalData       []byte
 }
 
-func (o *EFI_LOAD_OPTION) WriteTo(w io.Writer) error {
+func (o *EFI_LOAD_OPTION) Write(w io.Writer) error {
 	if err := binary.Write(w, binary.LittleEndian, o.Attributes); err != nil {
 		return xerrors.Errorf("cannot write Attributes: %w", err)
 	}

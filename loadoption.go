@@ -29,14 +29,14 @@ func (o *LoadOption) String() string {
 		o.Attributes, o.Description, o.FilePath, o.OptionalData)
 }
 
-func (o *LoadOption) WriteTo(w io.Writer) error {
+func (o *LoadOption) Write(w io.Writer) error {
 	opt := uefi.EFI_LOAD_OPTION{
 		Attributes:   o.Attributes,
 		Description:  ConvertUTF8ToUTF16(o.Description + "\x00"),
 		OptionalData: o.OptionalData}
 
 	dp := new(bytes.Buffer)
-	if err := o.FilePath.WriteTo(dp); err != nil {
+	if err := o.FilePath.Write(dp); err != nil {
 		return err
 	}
 	if dp.Len() > math.MaxUint16 {
@@ -45,7 +45,7 @@ func (o *LoadOption) WriteTo(w io.Writer) error {
 	opt.FilePathList = dp.Bytes()
 	opt.FilePathListLength = uint16(dp.Len())
 
-	return opt.WriteTo(w)
+	return opt.Write(w)
 }
 
 // ReadLoadOption reads a LoadOption from the supplied io.Reader.

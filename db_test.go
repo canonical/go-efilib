@@ -330,7 +330,7 @@ func (s *dbSuite) testWriteSignatureDatabase(c *C, path string) {
 	c.Check(err, IsNil)
 
 	var e bytes.Buffer
-	c.Check(db.WriteTo(&e), IsNil)
+	c.Check(db.Write(&e), IsNil)
 	c.Check(e.Bytes(), DeepEquals, b.Bytes())
 }
 
@@ -365,7 +365,7 @@ func (s *dbSuite) TestWriteSignatureWithWrongSize(c *C) {
 		},
 	}
 	var b bytes.Buffer
-	c.Check(db.WriteTo(&b), ErrorMatches, "cannot encode signature list 0: signature 1 contains the wrong size")
+	c.Check(db.Write(&b), ErrorMatches, "cannot encode signature list 0: signature 1 contains the wrong size")
 }
 
 func (s *dbSuite) TestWriteSignatureData(c *C) {
@@ -374,7 +374,7 @@ func (s *dbSuite) TestWriteSignatureData(c *C) {
 		Data:  readFile(c, "testdata/sigdbs/1/cert-0.der")}
 
 	var b bytes.Buffer
-	c.Check(d.WriteTo(&b), IsNil)
+	c.Check(d.Write(&b), IsNil)
 
 	var owner GUID
 	_, err := b.Read(owner[:])

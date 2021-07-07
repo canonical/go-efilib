@@ -15,7 +15,7 @@ import (
 
 // WinCertificate is an interface type corresponding to implementations of WIN_CERTIFICATE.
 type WinCertificate interface {
-	WriteTo(w io.Writer) error // Encode this certificate to the supplied io.Writer
+	Write(w io.Writer) error // Encode this certificate to the supplied io.Writer
 }
 
 // WinCertificatePKCS1_15 corresponds to the WIN_CERTIFICATE_EFI_PKCS1_15 type.
@@ -24,7 +24,7 @@ type WinCertificatePKCS1_15 struct {
 	Signature     []byte
 }
 
-func (c *WinCertificatePKCS1_15) WriteTo(w io.Writer) error {
+func (c *WinCertificatePKCS1_15) Write(w io.Writer) error {
 	cert := uefi.WIN_CERTIFICATE_EFI_PKCS1_15{
 		HashAlgorithm: uefi.EFI_GUID(c.HashAlgorithm),
 		Signature:     c.Signature}
@@ -41,7 +41,7 @@ type WinCertificateGUID struct {
 	Data []byte
 }
 
-func (c *WinCertificateGUID) WriteTo(w io.Writer) error {
+func (c *WinCertificateGUID) Write(w io.Writer) error {
 	return binary.Write(w, binary.LittleEndian, c.toUefiType())
 }
 
@@ -63,7 +63,7 @@ func newWinCertificateGUID(cert *uefi.WIN_CERTIFICATE_UEFI_GUID) *WinCertificate
 // WinCertificateAuthenticode corresponds to an Authenticode signature.
 type WinCertificateAuthenticode []byte
 
-func (c WinCertificateAuthenticode) WriteTo(w io.Writer) error {
+func (c WinCertificateAuthenticode) Write(w io.Writer) error {
 	cert := uefi.WIN_CERTIFICATE_EFI_PKCS{CertData: c}
 	cert.Hdr = uefi.WIN_CERTIFICATE{
 		Length:          uint32(binary.Size(cert.Hdr) + len(c)),

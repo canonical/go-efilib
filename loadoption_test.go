@@ -85,7 +85,7 @@ type testWriteLoadOptionData struct {
 
 func (s *loadoptionSuite) testWriteLoadOption(c *C, data *testWriteLoadOptionData) {
 	w := new(bytes.Buffer)
-	c.Check(data.option.WriteTo(w), IsNil)
+	c.Check(data.option.Write(w), IsNil)
 	c.Check(w.Bytes(), DeepEquals, data.expected)
 }
 

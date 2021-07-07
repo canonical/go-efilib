@@ -56,6 +56,6 @@ func (s *dpSuite) TestWriteDevicePath(c *C) {
 	c.Assert(err, IsNil)
 
 	w := new(bytes.Buffer)
-	c.Check(path.WriteTo(w), IsNil)
+	c.Check(path.Write(w), IsNil)
 	c.Check(w.Bytes(), DeepEquals, src)
 }

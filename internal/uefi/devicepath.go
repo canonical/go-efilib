@@ -94,7 +94,7 @@ type USB_WWID_DEVICE_PATH struct {
 	SerialNumber    []uint16
 }
 
-func (p *USB_WWID_DEVICE_PATH) WriteTo(w io.Writer) error {
+func (p *USB_WWID_DEVICE_PATH) Write(w io.Writer) error {
 	if err := binary.Write(w, binary.LittleEndian, &p.Header); err != nil {
 		return xerrors.Errorf("cannot write header: %w", err)
 	}
@@ -176,7 +176,7 @@ type FILEPATH_DEVICE_PATH struct {
 	PathName []uint16
 }
 
-func (p *FILEPATH_DEVICE_PATH) WriteTo(w io.Writer) error {
+func (p *FILEPATH_DEVICE_PATH) Write(w io.Writer) error {
 	if err := binary.Write(w, binary.LittleEndian, &p.Header); err != nil {
 		return xerrors.Errorf("cannot write header: %w", err)
 	}
