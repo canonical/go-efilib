@@ -10,8 +10,6 @@ import (
 	"io"
 
 	"github.com/canonical/go-efilib/internal/ioerr"
-
-	"golang.org/x/xerrors"
 )
 
 const ESLHeaderSize = 28
@@ -23,10 +21,10 @@ type EFI_SIGNATURE_DATA struct {
 
 func (d *EFI_SIGNATURE_DATA) Write(w io.Writer) error {
 	if _, err := w.Write(d.SignatureOwner[:]); err != nil {
-		return xerrors.Errorf("cannot write SignatureOwner: %w", err)
+		return err
 	}
 	if _, err := w.Write(d.SignatureData); err != nil {
-		return xerrors.Errorf("cannot write SignatureData: %w", err)
+		return err
 	}
 	return nil
 }
@@ -43,25 +41,25 @@ type EFI_SIGNATURE_LIST struct {
 
 func (l *EFI_SIGNATURE_LIST) Write(w io.Writer) error {
 	if _, err := w.Write(l.SignatureType[:]); err != nil {
-		return xerrors.Errorf("cannot write SignatureType: %w", err)
+		return err
 	}
 	if err := binary.Write(w, binary.LittleEndian, l.SignatureListSize); err != nil {
-		return xerrors.Errorf("cannot write SignatureListSize: %w", err)
+		return err
 	}
 	if err := binary.Write(w, binary.LittleEndian, l.SignatureHeaderSize); err != nil {
-		return xerrors.Errorf("cannot write SignatureHeaderSize: %w", err)
+		return err
 	}
 	if err := binary.Write(w, binary.LittleEndian, l.SignatureSize); err != nil {
-		return xerrors.Errorf("cannot write SignatureSize: %w", err)
+		return err
 	}
 
 	if _, err := w.Write(l.SignatureHeader); err != nil {
-		return xerrors.Errorf("cannot write SignatureHeader: %w", err)
+		return err
 	}
 
-	for i, s := range l.Signatures {
+	for _, s := range l.Signatures {
 		if err := s.Write(w); err != nil {
-			return xerrors.Errorf("cannot write signature %d: %w", i, err)
+			return err
 		}
 	}
 
@@ -71,21 +69,21 @@ func (l *EFI_SIGNATURE_LIST) Write(w io.Writer) error {
 func Read_EFI_SIGNATURE_LIST(r io.Reader) (out *EFI_SIGNATURE_LIST, err error) {
 	out = &EFI_SIGNATURE_LIST{}
 	if err := binary.Read(r, binary.LittleEndian, &out.SignatureType); err != nil {
-		return nil, ioerr.PassRawEOF("cannot read SignatureType: %w", err)
+		return nil, err
 	}
 	if err := binary.Read(r, binary.LittleEndian, &out.SignatureListSize); err != nil {
-		return nil, ioerr.EOFIsUnexpected("cannot read SignatureListSize: %w", err)
+		return nil, ioerr.EOFIsUnexpected(err)
 	}
 	if err := binary.Read(r, binary.LittleEndian, &out.SignatureHeaderSize); err != nil {
-		return nil, ioerr.EOFIsUnexpected("cannot read SignatureHeaderSize: %w", err)
+		return nil, ioerr.EOFIsUnexpected(err)
 	}
 	if err := binary.Read(r, binary.LittleEndian, &out.SignatureSize); err != nil {
-		return nil, ioerr.EOFIsUnexpected("cannot read SignatureSize: %w", err)
+		return nil, ioerr.EOFIsUnexpected(err)
 	}
 
 	out.SignatureHeader = make([]byte, out.SignatureHeaderSize)
 	if _, err := io.ReadFull(r, out.SignatureHeader); err != nil {
-		return nil, ioerr.EOFIsUnexpected("cannot read SignatureHeader: %w", err)
+		return nil, ioerr.EOFIsUnexpected(err)
 	}
 
 	signaturesSize := out.SignatureListSize - out.SignatureHeaderSize - ESLHeaderSize
@@ -100,12 +98,12 @@ func Read_EFI_SIGNATURE_LIST(r io.Reader) (out *EFI_SIGNATURE_LIST, err error) {
 	for i := 0; i < numOfSignatures; i++ {
 		var s EFI_SIGNATURE_DATA
 		if _, err := io.ReadFull(r, s.SignatureOwner[:]); err != nil {
-			return nil, ioerr.EOFIsUnexpected("cannot read SignatureOwner for %d: %w", i, err)
+			return nil, ioerr.EOFIsUnexpected(err)
 		}
 
 		s.SignatureData = make([]byte, int(out.SignatureSize)-binary.Size(s.SignatureOwner))
 		if _, err := io.ReadFull(r, s.SignatureData); err != nil {
-			return nil, ioerr.EOFIsUnexpected("cannot read SignatureData for %d: %w", i, err)
+			return nil, ioerr.EOFIsUnexpected(err)
 		}
 
 		out.Signatures = append(out.Signatures, s)

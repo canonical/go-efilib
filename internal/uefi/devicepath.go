@@ -8,8 +8,6 @@ import (
 	"encoding/binary"
 	"io"
 
-	"golang.org/x/xerrors"
-
 	"github.com/canonical/go-efilib/internal/ioerr"
 )
 
@@ -96,19 +94,19 @@ type USB_WWID_DEVICE_PATH struct {
 
 func (p *USB_WWID_DEVICE_PATH) Write(w io.Writer) error {
 	if err := binary.Write(w, binary.LittleEndian, &p.Header); err != nil {
-		return xerrors.Errorf("cannot write header: %w", err)
+		return err
 	}
 	if err := binary.Write(w, binary.LittleEndian, p.InterfaceNumber); err != nil {
-		return xerrors.Errorf("cannot write InterfaceNumber: %w", err)
+		return err
 	}
 	if err := binary.Write(w, binary.LittleEndian, p.VendorId); err != nil {
-		return xerrors.Errorf("cannot write VendorId: %w", err)
+		return err
 	}
 	if err := binary.Write(w, binary.LittleEndian, p.ProductId); err != nil {
-		return xerrors.Errorf("cannot write ProductId: %w", err)
+		return err
 	}
 	if err := binary.Write(w, binary.LittleEndian, p.SerialNumber); err != nil {
-		return xerrors.Errorf("cannot write SerialNumber: %w", err)
+		return err
 	}
 	return nil
 }
@@ -116,21 +114,21 @@ func (p *USB_WWID_DEVICE_PATH) Write(w io.Writer) error {
 func Read_USB_WWID_DEVICE_PATH(r io.Reader) (out *USB_WWID_DEVICE_PATH, err error) {
 	out = &USB_WWID_DEVICE_PATH{}
 	if err := binary.Read(r, binary.LittleEndian, &out.Header); err != nil {
-		return nil, ioerr.PassRawEOF("cannot read header: %w", err)
+		return nil, err
 	}
 	if err := binary.Read(r, binary.LittleEndian, &out.InterfaceNumber); err != nil {
-		return nil, ioerr.EOFIsUnexpected("cannot read InterfaceNumber: %w", err)
+		return nil, ioerr.EOFIsUnexpected(err)
 	}
 	if err := binary.Read(r, binary.LittleEndian, &out.VendorId); err != nil {
-		return nil, ioerr.EOFIsUnexpected("cannot read VendorId: %w", err)
+		return nil, ioerr.EOFIsUnexpected(err)
 	}
 	if err := binary.Read(r, binary.LittleEndian, &out.ProductId); err != nil {
-		return nil, ioerr.EOFIsUnexpected("cannot read ProductId: %w", err)
+		return nil, ioerr.EOFIsUnexpected(err)
 	}
 
 	out.SerialNumber = make([]uint16, (int(out.Header.Length)-binary.Size(out.Header)-binary.Size(out.InterfaceNumber)-binary.Size(out.VendorId)-binary.Size(out.ProductId))/2)
 	if err := binary.Read(r, binary.LittleEndian, out.SerialNumber); err != nil {
-		return nil, ioerr.EOFIsUnexpected("cannot read SerialNumber: %w", err)
+		return nil, ioerr.EOFIsUnexpected(err)
 	}
 
 	return out, nil
@@ -178,10 +176,10 @@ type FILEPATH_DEVICE_PATH struct {
 
 func (p *FILEPATH_DEVICE_PATH) Write(w io.Writer) error {
 	if err := binary.Write(w, binary.LittleEndian, &p.Header); err != nil {
-		return xerrors.Errorf("cannot write header: %w", err)
+		return err
 	}
 	if err := binary.Write(w, binary.LittleEndian, p.PathName); err != nil {
-		return xerrors.Errorf("cannot write PathName: %w", err)
+		return err
 	}
 	return nil
 }
@@ -189,12 +187,12 @@ func (p *FILEPATH_DEVICE_PATH) Write(w io.Writer) error {
 func Read_FILEPATH_DEVICE_PATH(r io.Reader) (out *FILEPATH_DEVICE_PATH, err error) {
 	out = &FILEPATH_DEVICE_PATH{}
 	if err := binary.Read(r, binary.LittleEndian, &out.Header); err != nil {
-		return nil, ioerr.PassRawEOF("cannot read header: %w", err)
+		return nil, err
 	}
 
 	out.PathName = make([]uint16, (int(out.Header.Length)-binary.Size(out.Header))/2)
 	if err := binary.Read(r, binary.LittleEndian, &out.PathName); err != nil {
-		return nil, ioerr.EOFIsUnexpected("cannot read path: %w", err)
+		return nil, ioerr.EOFIsUnexpected(err)
 	}
 
 	return out, nil

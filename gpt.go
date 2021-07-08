@@ -246,7 +246,7 @@ func ReadPartitionTable(r io.ReaderAt, totalSz, blockSz int64, role PartitionTab
 
 	var mbr mbr
 	if err := binary.Read(r2, binary.LittleEndian, &mbr); err != nil {
-		return nil, ioerr.PassRawEOF("cannot read MBR: %w", err)
+		return nil, err
 	}
 	if mbr.Signature != 0xaa55 {
 		return nil, errors.New("invalid MBR signature")

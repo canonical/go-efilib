@@ -15,7 +15,8 @@ import (
 	"path/filepath"
 
 	"golang.org/x/sys/unix"
-	"golang.org/x/xerrors"
+
+	"github.com/canonical/go-efilib/internal/ioerr"
 )
 
 var (
@@ -79,7 +80,7 @@ func OpenVar(name string, guid GUID) (io.ReadCloser, VariableAttributes, error) 
 	var attrs VariableAttributes
 	if err := binary.Read(f, binary.LittleEndian, &attrs); err != nil {
 		f.Close()
-		if err == io.EOF {
+		if err == io.EOF || err == io.ErrUnexpectedEOF {
 			return nil, 0, errors.New("invalid variable format: too short")
 		}
 		return nil, 0, err
@@ -143,7 +144,7 @@ func OpenEnhancedAuthenticatedVar(name string, guid GUID) (io.ReadCloser, Variab
 
 	auth, err := ReadEnhancedAuthenticationDescriptor(r)
 	if err != nil {
-		return nil, nil, 0, xerrors.Errorf("cannot decode authentication descriptor: %w", err)
+		return nil, nil, 0, ioerr.EOFIsUnexpected("cannot decode authentication descriptor: %w", err)
 	}
 
 	return r, auth, attrs, nil
