@@ -41,7 +41,7 @@ type EFI_PARTITION_TABLE_HEADER struct {
 func Read_EFI_PARTITION_TABLE_HEADER(r io.Reader) (out *EFI_PARTITION_TABLE_HEADER, crc uint32, err error) {
 	var hdr EFI_TABLE_HEADER
 	if err := binary.Read(r, binary.LittleEndian, &hdr); err != nil {
-		return nil, 0, ioerr.PassEOF("cannot read header: %w", err)
+		return nil, 0, ioerr.PassRawEOF("cannot read header: %w", err)
 	}
 	if hdr.HeaderSize < uint32(binary.Size(hdr)) {
 		return nil, 0, errors.New("invalid header size")
@@ -56,7 +56,7 @@ func Read_EFI_PARTITION_TABLE_HEADER(r io.Reader) (out *EFI_PARTITION_TABLE_HEAD
 	}
 
 	if _, err := io.CopyN(b, r, int64(hdr.HeaderSize-uint32(binary.Size(hdr)))); err != nil {
-		return nil, 0, ioerr.EOFUnexpected("cannot read rest of header: %w", err)
+		return nil, 0, ioerr.EOFIsUnexpected("cannot read rest of header: %w", err)
 	}
 
 	crc = crc32.ChecksumIEEE(b.Bytes())

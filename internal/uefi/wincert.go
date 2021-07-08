@@ -39,7 +39,7 @@ type WIN_CERTIFICATE_UEFI_GUID struct {
 func Read_WIN_CERTIFICATE_UEFI_GUID(r io.Reader) (out *WIN_CERTIFICATE_UEFI_GUID, err error) {
 	out = &WIN_CERTIFICATE_UEFI_GUID{}
 	if err := binary.Read(r, binary.LittleEndian, &out.Hdr); err != nil {
-		return nil, ioerr.PassEOF("cannot read Hdr: %w", err)
+		return nil, ioerr.PassRawEOF("cannot read Hdr: %w", err)
 	}
 	if out.Hdr.Revision != 0x0200 {
 		return nil, errors.New("unexpected Hdr.Revision")
@@ -49,12 +49,12 @@ func Read_WIN_CERTIFICATE_UEFI_GUID(r io.Reader) (out *WIN_CERTIFICATE_UEFI_GUID
 	}
 
 	if _, err := io.ReadFull(r, out.CertType[:]); err != nil {
-		return nil, ioerr.EOFUnexpected("cannot read CertType: %w", err)
+		return nil, ioerr.EOFIsUnexpected("cannot read CertType: %w", err)
 	}
 
 	out.CertData = make([]byte, int(out.Hdr.Length)-binary.Size(out.Hdr)-binary.Size(out.CertType))
 	if _, err := io.ReadFull(r, out.CertData); err != nil {
-		return nil, ioerr.EOFUnexpected("cannot read CertData: %w", err)
+		return nil, ioerr.EOFIsUnexpected("cannot read CertData: %w", err)
 	}
 
 	return out, nil

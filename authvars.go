@@ -170,7 +170,7 @@ func (a *VariableAuthentication3Nonce) Write(w io.Writer) error {
 func ReadEnhancedVariableAuthentication(r io.Reader) (VariableAuthentication3, error) {
 	var hdr uefi.EFI_VARIABLE_AUTHENTICATION_3
 	if err := binary.Read(r, binary.LittleEndian, &hdr); err != nil {
-		return nil, ioerr.PassEOF("cannot read header: %w", err)
+		return nil, ioerr.PassRawEOF("cannot read header: %w", err)
 	}
 	if hdr.Version != 1 {
 		return nil, errors.New("unexpected version")
@@ -182,21 +182,21 @@ func ReadEnhancedVariableAuthentication(r io.Reader) (VariableAuthentication3, e
 	case uefi.EFI_VARIABLE_AUTHENTICATION_3_TIMESTAMP_TYPE:
 		var t uefi.EFI_TIME
 		if err := binary.Read(lr, binary.LittleEndian, &t); err != nil {
-			return nil, ioerr.EOFUnexpected("cannot read time: %w", err)
+			return nil, ioerr.EOFIsUnexpected("cannot read time: %w", err)
 		}
 
 		var newCert *uefi.WIN_CERTIFICATE_UEFI_GUID
 		if hdr.Flags&1 > 0 {
 			cert, err := uefi.Read_WIN_CERTIFICATE_UEFI_GUID(r)
 			if err != nil {
-				return nil, ioerr.EOFUnexpected("cannot read new cert: %w", err)
+				return nil, ioerr.EOFIsUnexpected("cannot read new cert: %w", err)
 			}
 			newCert = cert
 		}
 
 		signingCert, err := uefi.Read_WIN_CERTIFICATE_UEFI_GUID(r)
 		if err != nil {
-			return nil, ioerr.EOFUnexpected("cannot read signing cert: %w", err)
+			return nil, ioerr.EOFIsUnexpected("cannot read signing cert: %w", err)
 		}
 
 		out := &VariableAuthentication3Timestamp{
@@ -209,21 +209,21 @@ func ReadEnhancedVariableAuthentication(r io.Reader) (VariableAuthentication3, e
 	case uefi.EFI_VARIABLE_AUTHENTICATION_3_NONCE_TYPE:
 		n, err := uefi.Read_EFI_VARIABLE_AUTHENTICATION_3_NONCE(r)
 		if err != nil {
-			return nil, ioerr.EOFUnexpected("cannot read nonce: %w", err)
+			return nil, ioerr.EOFIsUnexpected("cannot read nonce: %w", err)
 		}
 
 		var newCert *uefi.WIN_CERTIFICATE_UEFI_GUID
 		if hdr.Flags&1 > 0 {
 			cert, err := uefi.Read_WIN_CERTIFICATE_UEFI_GUID(r)
 			if err != nil {
-				return nil, ioerr.EOFUnexpected("cannot read new cert: %w", err)
+				return nil, ioerr.EOFIsUnexpected("cannot read new cert: %w", err)
 			}
 			newCert = cert
 		}
 
 		signingCert, err := uefi.Read_WIN_CERTIFICATE_UEFI_GUID(r)
 		if err != nil {
-			return nil, ioerr.EOFUnexpected("cannot read signing cert: %w", err)
+			return nil, ioerr.EOFIsUnexpected("cannot read signing cert: %w", err)
 		}
 
 		out := &VariableAuthentication3Nonce{

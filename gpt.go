@@ -246,7 +246,7 @@ func ReadPartitionTable(r io.ReaderAt, totalSz, blockSz int64, role PartitionTab
 
 	var mbr mbr
 	if err := binary.Read(r2, binary.LittleEndian, &mbr); err != nil {
-		return nil, ioerr.PassEOF("cannot read MBR: %w", err)
+		return nil, ioerr.PassRawEOF("cannot read MBR: %w", err)
 	}
 	if mbr.Signature != 0xaa55 {
 		return nil, errors.New("invalid MBR signature")
@@ -282,7 +282,7 @@ func ReadPartitionTable(r io.ReaderAt, totalSz, blockSz int64, role PartitionTab
 
 	hdr, err := ReadPartitionTableHeader(r2, checkCrc)
 	if err != nil {
-		return nil, ioerr.EOFUnexpected("cannot read GPT header: %w", err)
+		return nil, ioerr.EOFIsUnexpected("cannot read GPT header: %w", err)
 	}
 
 	if _, err := r2.Seek(int64(hdr.PartitionEntryLBA)*blockSz, io.SeekStart); err != nil {
@@ -291,7 +291,7 @@ func ReadPartitionTable(r io.ReaderAt, totalSz, blockSz int64, role PartitionTab
 
 	entries, err := readPartitionEntries(r2, hdr.NumberOfPartitionEntries, hdr.SizeOfPartitionEntry, hdr.PartitionEntryArrayCRC32, checkCrc)
 	if err != nil {
-		return nil, ioerr.EOFUnexpected("cannot read GPT entries: %w", err)
+		return nil, ioerr.EOFIsUnexpected("cannot read GPT entries: %w", err)
 	}
 
 	return &PartitionTable{hdr, entries}, nil
