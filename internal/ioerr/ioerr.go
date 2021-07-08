@@ -76,11 +76,17 @@ func EOFIsUnexpected(args ...interface{}) error {
 		}
 		return xerrors.Errorf(format, args[1:]...)
 	case len(args) == 1:
-		err := args[0].(error)
-		if err == io.EOF {
-			err = io.ErrUnexpectedEOF
+		switch err := args[0].(type) {
+		case error:
+			if err == io.EOF {
+				err = io.ErrUnexpectedEOF
+			}
+			return err
+		case nil:
+			return nil
+		default:
+			panic("invalid type")
 		}
-		return err
 	default:
 		panic("no arguments")
 	}

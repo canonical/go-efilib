@@ -57,6 +57,10 @@ func (s *ioerrSuite) TestEOFIsUnexpectedWithoutEOF(c *C) {
 	c.Check(EOFIsUnexpected(err1), Equals, err1)
 }
 
+func (s *ioerrSuite) TestEOFIsUnexpectedWithNil(c *C) {
+	c.Check(EOFIsUnexpected(nil), IsNil)
+}
+
 func (s *ioerrSuite) TestPassRawEOFWithEOF(c *C) {
 	c.Check(PassRawEOF("foo: %w", io.EOF), Equals, io.EOF)
 }
