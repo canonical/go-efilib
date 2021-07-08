@@ -522,7 +522,7 @@ func (d *MediaRelOffsetRangeDevicePathNode) Write(w io.Writer) error {
 	return binary.Write(w, binary.LittleEndian, &data)
 }
 
-func decodeDevicePathNode(r io.Reader) (DevicePathNode, error) {
+func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 	buf := new(bytes.Buffer)
 	r2 := io.TeeReader(r, buf)
 
@@ -532,12 +532,24 @@ func decodeDevicePathNode(r io.Reader) (DevicePathNode, error) {
 	}
 
 	if h.Length < 4 {
-		return nil, errors.New("invalid length")
+		return nil, fmt.Errorf("invalid length %d bytes (too small)", h.Length)
 	}
 
 	if _, err := io.CopyN(buf, r, int64(h.Length-4)); err != nil {
 		return nil, ioerr.EOFIsUnexpected(err)
 	}
+
+	defer func() {
+		switch {
+		case err == io.EOF:
+			fallthrough
+		case xerrors.Is(err, io.ErrUnexpectedEOF):
+			err = fmt.Errorf("invalid length %d bytes (too small)", h.Length)
+		case err != nil:
+		case buf.Len() > 0:
+			err = fmt.Errorf("invalid length %d bytes (too large)", h.Length)
+		}
+	}()
 
 	switch h.Type {
 	case uefi.HARDWARE_DEVICE_PATH:
@@ -677,6 +689,7 @@ func decodeDevicePathNode(r io.Reader) (DevicePathNode, error) {
 			return &MediaRelOffsetRangeDevicePathNode{StartingOffset: n.StartingOffset, EndingOffset: n.EndingOffset}, nil
 		}
 	case uefi.END_DEVICE_PATH_TYPE:
+		buf.Reset()
 		return nil, nil
 	}
 
