@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math"
 
 	"github.com/canonical/go-efilib/internal/ioerr"
@@ -693,7 +694,8 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 		return nil, nil
 	}
 
-	return &RawDevicePathNode{Type: DevicePathType(h.Type), SubType: DevicePathSubType(h.SubType), Data: buf.Bytes()[binary.Size(h):]}, nil
+	data, _ := ioutil.ReadAll(buf)
+	return &RawDevicePathNode{Type: DevicePathType(h.Type), SubType: DevicePathSubType(h.SubType), Data: data}, nil
 }
 
 // ReadDevicePath decodes a device path from the supplied io.Reader.
