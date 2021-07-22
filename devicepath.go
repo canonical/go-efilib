@@ -208,7 +208,7 @@ func readVendorDevicePathNode(r io.Reader) (out *VendorDevicePathNode, err error
 	out = &VendorDevicePathNode{
 		Type: DevicePathType(n.Header.Type),
 		GUID: GUID(n.Guid)}
-	data, _ := io.ReadAll(r)
+	data, _ := ioutil.ReadAll(r)
 	out.Data = data
 
 	return out, nil
