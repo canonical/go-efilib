@@ -23,13 +23,16 @@ const (
 	BBS_DEVICE_PATH       = 0x05
 	END_DEVICE_PATH_TYPE  = 0x7f
 
-	HW_PCI_DP = 0x01
+	HW_PCI_DP    = 0x01
+	HW_VENDOR_DP = 0x04
 
-	ACPI_DP = 0x01
+	ACPI_DP          = 0x01
+	ACPI_EXTENDED_DP = 0x02
 
 	MSG_SCSI_DP                = 0x02
 	MSG_USB_DP                 = 0x05
 	MSG_USB_CLASS_DP           = 0x0f
+	MSG_VENDOR_DP              = 0x0a
 	MSG_USB_WWID_DP            = 0x10
 	MSG_DEVICE_LOGICAL_UNIT_DP = 0x11
 	MSG_SATA_DP                = 0x12
@@ -37,6 +40,7 @@ const (
 
 	MEDIA_HARDDRIVE_DP             = 0x01
 	MEDIA_CDROM_DP                 = 0x02
+	MEDIA_VENDOR_DP                = 0x03
 	MEDIA_FILEPATH_DP              = 0x04
 	MEDIA_PIWG_FW_FILE_DP          = 0x06
 	MEDIA_PIWG_FW_VOL_DP           = 0x07
@@ -57,10 +61,22 @@ type PCI_DEVICE_PATH struct {
 	Device   uint8
 }
 
+type VENDOR_DEVICE_PATH struct {
+	Header EFI_DEVICE_PATH_PROTOCOL
+	Guid   EFI_GUID
+}
+
 type ACPI_HID_DEVICE_PATH struct {
 	Header EFI_DEVICE_PATH_PROTOCOL
 	HID    uint32
 	UID    uint32
+}
+
+type ACPI_EXTENDED_HID_DEVICE_PATH struct {
+	Header EFI_DEVICE_PATH_PROTOCOL
+	HID    uint32
+	UID    uint32
+	CID    uint32
 }
 
 type SCSI_DEVICE_PATH struct {
