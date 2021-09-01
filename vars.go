@@ -45,27 +45,25 @@ func varsPath() string {
 	return filepath.Join(varsRoot, "sys/firmware/efi/efivars")
 }
 
-func isAvailable() (bool, error) {
+func checkAvailable() error {
 	var st unix.Statfs_t
 	if err := unixStatfs(varsPath(), &st); err != nil {
 		if os.IsNotExist(err) {
-			return false, nil
+			return ErrVarsUnavailable
 		}
-		return false, err
+		return err
 	}
 	if st.Type != unix.EFIVARFS_MAGIC {
-		return false, nil
+		return ErrVarsUnavailable
 	}
-	return true, nil
+	return nil
 }
 
 // OpenVar opens the EFI variable with the specified name and GUID for reading. On success, it returns the variable's attributes,
 // and a io.ReadCloser for reading the variable value.
 func OpenVar(name string, guid GUID) (io.ReadCloser, VariableAttributes, error) {
-	if available, err := isAvailable(); err != nil {
+	if err := checkAvailable(); err != nil {
 		return nil, 0, err
-	} else if !available {
-		return nil, 0, ErrVarsUnavailable
 	}
 
 	path := filepath.Join(varsPath(), fmt.Sprintf("%s-%s", name, guid))
@@ -107,10 +105,8 @@ func ReadVar(name string, guid GUID) ([]byte, VariableAttributes, error) {
 
 // WriteVar writes the supplied data value with the specified attributes to the EFI variable with the specified name and GUID.
 func WriteVar(name string, guid GUID, attrs VariableAttributes, data []byte) error {
-	if available, err := isAvailable(); err != nil {
+	if err := checkAvailable(); err != nil {
 		return err
-	} else if !available {
-		return ErrVarsUnavailable
 	}
 
 	path := filepath.Join(varsPath(), fmt.Sprintf("%s-%s", name, guid))
