@@ -19,10 +19,6 @@ import (
 	"github.com/canonical/go-efilib/internal/ioerr"
 )
 
-var (
-	varsRoot = "/"
-)
-
 type VariableAttributes uint32
 
 const (
@@ -41,13 +37,57 @@ var (
 	ErrVariableNotFound = errors.New("a variable with the supplied name could not be found")
 )
 
+type varReadWriteCloser interface {
+	io.ReadWriteCloser
+	MakeImmutable() (restore func() error, err error)
+}
+
+type realVarReadWriteCloser struct {
+	*os.File
+}
+
+func (rwc *realVarReadWriteCloser) MakeImmutable() (restore func() error, err error) {
+	const immutableFlag = 0x00000010
+
+	flags, err := unix.IoctlGetUint32(int(rwc.Fd()), unix.FS_IOC_GETFLAGS)
+	if err != nil {
+		return nil, err
+	}
+
+	if flags&immutableFlag == 0 {
+		// Nothing to do
+		return func() error { return nil }, nil
+	}
+
+	if err := unix.IoctlSetPointerInt(int(rwc.Fd()), unix.FS_IOC_SETFLAGS, int(flags&^immutableFlag)); err != nil {
+		return nil, err
+	}
+
+	return func() error {
+		return unix.IoctlSetPointerInt(int(rwc.Fd()), unix.FS_IOC_SETFLAGS, int(flags))
+	}, nil
+}
+
+func realOpenVarFile(path string, flags int, perm os.FileMode) (varReadWriteCloser, error) {
+	f, err := os.OpenFile(path, flags, perm)
+	if err != nil {
+		return nil, err
+	}
+	return &realVarReadWriteCloser{f}, nil
+}
+
+var (
+	openVarFile = realOpenVarFile
+	varsStatfs  = unix.Statfs
+)
+
 func varsPath() string {
-	return filepath.Join(varsRoot, "sys/firmware/efi/efivars")
+	return "/sys/firmware/efi/efivars"
 }
 
 func checkAvailable() error {
 	var st unix.Statfs_t
-	if err := unixStatfs(varsPath(), &st); err != nil {
+	if err := varsStatfs(varsPath(), &st); err != nil {
 		if os.IsNotExist(err) {
 			return ErrVarsUnavailable
 		}
@@ -67,7 +107,7 @@ func OpenVar(name string, guid GUID) (io.ReadCloser, VariableAttributes, error) 
 	}
 
 	path := filepath.Join(varsPath(), fmt.Sprintf("%s-%s", name, guid))
-	f, err := os.Open(path)
+	f, err := openVarFile(path, os.O_RDONLY, 0)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, 0, ErrVariableNotFound
@@ -78,7 +118,10 @@ func OpenVar(name string, guid GUID) (io.ReadCloser, VariableAttributes, error) 
 	var attrs VariableAttributes
 	if err := binary.Read(f, binary.LittleEndian, &attrs); err != nil {
 		f.Close()
-		if err == io.EOF || err == io.ErrUnexpectedEOF {
+		switch err {
+		case io.EOF:
+			return nil, 0, ErrVariableNotFound
+		case io.ErrUnexpectedEOF:
 			return nil, 0, errors.New("invalid variable format: too short")
 		}
 		return nil, 0, err
@@ -109,12 +152,36 @@ func WriteVar(name string, guid GUID, attrs VariableAttributes, data []byte) err
 		return err
 	}
 
+	flags := os.O_WRONLY
+	if attrs&AttributeAppendWrite != 0 {
+		flags |= os.O_APPEND
+	}
+
 	path := filepath.Join(varsPath(), fmt.Sprintf("%s-%s", name, guid))
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0644)
+	r, err := openVarFile(path, os.O_RDONLY, 0)
+	switch {
+	case os.IsNotExist(err):
+		flags |= (os.O_CREATE | os.O_EXCL)
+	case err != nil:
+		return err
+	default:
+		defer r.Close()
+
+		restoreImmutable, err := r.MakeImmutable()
+		if err != nil {
+			return err
+		}
+		defer restoreImmutable()
+	}
+
+	// XXX: This is racy - another process could come along and delete
+	// and recreate the variable. If that happens, this open might still
+	// fail with EPERM.
+	w, err := openVarFile(path, flags, 0644)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer w.Close()
 
 	var buf bytes.Buffer
 	if err := binary.Write(&buf, binary.LittleEndian, attrs); err != nil {
@@ -124,7 +191,7 @@ func WriteVar(name string, guid GUID, attrs VariableAttributes, data []byte) err
 		return err
 	}
 
-	_, err = buf.WriteTo(f)
+	_, err = buf.WriteTo(w)
 	return err
 }
 

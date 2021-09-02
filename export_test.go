@@ -5,23 +5,25 @@
 package efi
 
 import (
+	"os"
+
 	"golang.org/x/sys/unix"
 )
 
-func MockVarsRoot(path string, fstype int64) (restore func()) {
-	origRoot := varsRoot
-	origStatfs := unixStatfs
-	varsRoot = path
-	unixStatfs = func(path string, st *unix.Statfs_t) error {
-		if err := unix.Statfs(path, st); err != nil {
-			return err
-		}
-		st.Type = fstype
-		return nil
-	}
+type VarReadWriteCloser = varReadWriteCloser
 
+func MockOpenVarFile(fn func(string, int, os.FileMode) (VarReadWriteCloser, error)) (restore func()) {
+	orig := openVarFile
+	openVarFile = fn
 	return func() {
-		varsRoot = origRoot
-		unixStatfs = origStatfs
+		openVarFile = orig
+	}
+}
+
+func MockVarsStatfs(fn func(string, *unix.Statfs_t) error) (restore func()) {
+	orig := varsStatfs
+	varsStatfs = fn
+	return func() {
+		varsStatfs = orig
 	}
 }
