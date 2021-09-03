@@ -79,6 +79,7 @@ func realOpenVarFile(path string, flags int, perm os.FileMode) (varFile, error) 
 
 var (
 	openVarFile   = realOpenVarFile
+	readVarDir    = os.ReadDir
 	unlinkVarFile = os.Remove
 	varsStatfs    = unix.Statfs
 )
@@ -213,12 +214,8 @@ func writeVarFile(path string, attrs VariableAttributes, data []byte) (retry boo
 	defer w.Close()
 
 	var buf bytes.Buffer
-	if err := binary.Write(&buf, binary.LittleEndian, attrs); err != nil {
-		return false, err
-	}
-	if _, err := buf.Write(data); err != nil {
-		return false, err
-	}
+	binary.Write(&buf, binary.LittleEndian, attrs)
+	buf.Write(data)
 
 	_, err = buf.WriteTo(w)
 	return false, err
@@ -233,10 +230,7 @@ func writeVarFile(path string, attrs VariableAttributes, data []byte) (retry boo
 // If the variable does not exist, it will be created.
 //
 // If the variable already exists and the corresponding file in efivarfs is
-// immutable, this function will temporarily remove the immutable flag. This can
-// potentially race with other processes that delete and recreate the variable, so
-// the write will be retried up to 5 times if it fails and the underlying inode
-// changes.
+// immutable, this function will temporarily remove the immutable flag.
 func WriteVar(name string, guid GUID, attrs VariableAttributes, data []byte) error {
 	if err := checkAvailable(); err != nil {
 		return err
@@ -297,6 +291,54 @@ func DeleteVar(name string, guid GUID) error {
 
 	path := filepath.Join(varsPath(), fmt.Sprintf("%s-%s", name, guid))
 	return maybeRetry(4, func() (bool, error) { return deleteVarFile(path) })
+}
+
+type VarEntry struct {
+	Name string
+	GUID GUID
+}
+
+var guidLength = len("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
+
+// ListVars returns a list of variables that can be accessed via efivarfs.
+func ListVars() ([]VarEntry, error) {
+	if err := checkAvailable(); err != nil {
+		return nil, err
+	}
+
+	dirents, err := readVarDir(varsPath())
+	if err != nil {
+		return nil, err
+	}
+
+	var entries []VarEntry
+
+	for _, dirent := range dirents {
+		if !dirent.Type().IsRegular() {
+			// Skip non-regular files
+			continue
+		}
+		if len(dirent.Name()) < guidLength+1 {
+			// Skip files with a basename that isn't long enough
+			// to contain a GUID and a hyphen
+			continue
+		}
+		if dirent.Name()[len(dirent.Name())-guidLength-1] != '-' {
+			// Skip files where the basename doesn't contain a
+			// hyphen between the name and GUID
+			continue
+		}
+
+		name := dirent.Name()[:len(dirent.Name())-guidLength-1]
+		guid, err := DecodeGUIDString(dirent.Name()[len(name)+1:])
+		if err != nil {
+			continue
+		}
+
+		entries = append(entries, VarEntry{Name: name, GUID: guid})
+	}
+
+	return entries, nil
 }
 
 func OpenEnhancedAuthenticatedVar(name string, guid GUID) (io.ReadCloser, VariableAuthentication3Descriptor, VariableAttributes, error) {

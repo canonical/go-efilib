@@ -31,6 +31,15 @@ func MockOpenVarFile(fn func(string, int, os.FileMode) (VarFile, error)) (restor
 	}
 }
 
+func MockReadVarDir(fn func(string) ([]os.DirEntry, error)) (restore func()) {
+	orig := readVarDir
+	readVarDir = fn
+
+	return func() {
+		readVarDir = orig
+	}
+}
+
 func MockUnlinkVarFile(fn func(string) error) (restore func()) {
 	orig := unlinkVarFile
 

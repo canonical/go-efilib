@@ -99,3 +99,37 @@ func (s *guidSuite) TestReadGUID3(c *C) {
 		r:        bytes.NewReader(decodeHexString(c, "61dfe48bca93d211aa0d00e098032b8caaaaaaaaaaaaaa")),
 		expected: decodeHexString(c, "61dfe48bca93d211aa0d00e098032b8c")})
 }
+
+type testDecodeGUIDStringData struct {
+	str      string
+	expected GUID
+}
+
+func (s *guidSuite) testDecodeGUIDString(c *C, data *testDecodeGUIDStringData) {
+	guid, err := DecodeGUIDString(data.str)
+	c.Check(err, IsNil)
+	c.Check(guid, Equals, data.expected)
+}
+
+func (s *guidSuite) TestDecodeGUIDString1(c *C) {
+	s.testDecodeGUIDString(c, &testDecodeGUIDStringData{
+		str:      "8be4df61-93ca-11d2-aa0d-00e098032b8c",
+		expected: MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c})})
+}
+
+func (s *guidSuite) TestDecodeGUIDString2(c *C) {
+	s.testDecodeGUIDString(c, &testDecodeGUIDStringData{
+		str:      "{8be4df61-93ca-11d2-aa0d-00e098032b8c}",
+		expected: MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c})})
+}
+
+func (s *guidSuite) TestDecodeGUIDString3(c *C) {
+	s.testDecodeGUIDString(c, &testDecodeGUIDStringData{
+		str:      "d719b2cb-3d3a-4596-a3bc-dad00e67656f",
+		expected: MakeGUID(0xd719b2cb, 0x3d3a, 0x4596, 0xa3bc, [...]uint8{0xda, 0xd0, 0x0e, 0x67, 0x65, 0x6f})})
+}
+
+func (s *guidSuite) TestDecodeGUIDStringInvalid(c *C) {
+	_, err := DecodeGUIDString("8be4df61-93ca-11d2-aa0d00e098032b8c")
+	c.Check(err, ErrorMatches, "invalid format")
+}

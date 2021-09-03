@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"syscall"
 
 	"golang.org/x/sys/unix"
@@ -19,6 +20,17 @@ import (
 
 	. "github.com/canonical/go-efilib"
 )
+
+type mockDirent struct {
+	name string
+	mode os.FileMode
+}
+
+func (d mockDirent) Name() string { return string(d.name) }
+
+func (d mockDirent) IsDir() bool                { return d.mode.IsDir() }
+func (d mockDirent) Type() os.FileMode          { return d.mode }
+func (d mockDirent) Info() (os.FileInfo, error) { return nil, nil }
 
 type mockVarFile struct {
 	name   string
@@ -128,7 +140,7 @@ func (r *mockVarReaderFile) Write(_ []byte) (int, error) {
 
 type mockEfiVar struct {
 	data      []byte
-	perm      os.FileMode
+	mode      os.FileMode
 	immutable bool
 }
 
@@ -155,8 +167,10 @@ func (m *mockEfiVarfs) Open(name string, flags int, perm os.FileMode) (VarFile, 
 		switch {
 		case !ok && flags&os.O_CREATE == 0:
 			return nil, &os.PathError{Op: "open", Path: name, Err: syscall.ENOENT}
+		case !ok && perm&os.ModeType != 0:
+			return nil, &os.PathError{Op: "open", Path: name, Err: syscall.EINVAL}
 		case !ok:
-			v = &mockEfiVar{perm: perm, immutable: true}
+			v = &mockEfiVar{mode: perm, immutable: true}
 			m.vars[name] = v
 		case v.immutable:
 			return nil, &os.PathError{Op: "open", Path: name, Err: syscall.EPERM}
@@ -166,6 +180,16 @@ func (m *mockEfiVarfs) Open(name string, flags int, perm os.FileMode) (VarFile, 
 	default:
 		return nil, syscall.EINVAL
 	}
+}
+
+func (m *mockEfiVarfs) List() (out []os.DirEntry) {
+	for k, v := range m.vars {
+		out = append(out, mockDirent{filepath.Base(k), v.mode})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].Name() < out[j].Name()
+	})
+	return out
 }
 
 func (m *mockEfiVarfs) Unlink(name string) error {
@@ -184,6 +208,7 @@ type varsSuite struct {
 	mockEfiVarfs *mockEfiVarfs
 
 	restoreOpenVarFile   func()
+	restoreReadVarDir    func()
 	restoreUnlinkVarFile func()
 	restoreVarsStatfs    func()
 }
@@ -195,6 +220,14 @@ func (s *varsSuite) SetUpTest(c *C) {
 	s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"] = &mockEfiVar{data: decodeHexString(c, "07000000a5a5a5a5"), immutable: true}
 
 	s.restoreOpenVarFile = MockOpenVarFile(s.mockEfiVarfs.Open)
+
+	s.restoreReadVarDir = MockReadVarDir(func(path string) ([]os.DirEntry, error) {
+		if path != "/sys/firmware/efi/efivars" {
+			return nil, &os.PathError{Op: "open", Path: path, Err: syscall.ENOENT}
+		}
+		return s.mockEfiVarfs.List(), nil
+	})
+
 	s.restoreUnlinkVarFile = MockUnlinkVarFile(s.mockEfiVarfs.Unlink)
 
 	s.restoreVarsStatfs = MockVarsStatfs(func(path string, st *unix.Statfs_t) error {
@@ -213,6 +246,7 @@ func (s *varsSuite) SetUpTest(c *C) {
 func (s *varsSuite) TearDownTest(c *C) {
 	s.restoreVarsStatfs()
 	s.restoreUnlinkVarFile()
+	s.restoreReadVarDir()
 	s.restoreOpenVarFile()
 
 	c.Check(s.mockEfiVarfs.openCount, Equals, 0)
@@ -329,7 +363,7 @@ func (s *varsSuite) TestCreateVar(c *C) {
 	v, ok := s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/Test2-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"]
 	c.Check(ok, Equals, true)
 	c.Check(v.data, DeepEquals, decodeHexString(c, "07000000a5a5a5a5"))
-	c.Check(v.perm, Equals, os.FileMode(0644))
+	c.Check(v.mode, Equals, os.FileMode(0644))
 }
 
 func (s *varsSuite) TestWriteVarVarsUnavailable(c *C) {
@@ -475,4 +509,29 @@ func (s *varsSuite) TestDeleteVarRaceGiveUp(c *C) {
 
 	err := DeleteVar("Test", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}))
 	c.Check(err, ErrorMatches, "remove /sys/firmware/efi/efivars/Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520: operation not permitted")
+}
+
+func (s *varsSuite) TestListVars(c *C) {
+	ents, err := ListVars()
+	c.Check(err, IsNil)
+	c.Check(ents, DeepEquals, []VarEntry{
+		{Name: "BootOrder", GUID: MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c})},
+		{Name: "SecureBoot", GUID: MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c})},
+		{Name: "Test", GUID: MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20})}})
+}
+
+func (s *varsSuite) TestListVarsInvalidNames(c *C) {
+	restore := MockReadVarDir(func(_ string) ([]os.DirEntry, error) {
+		return []os.DirEntry{
+			mockDirent{name: "Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520", mode: os.ModeDir | os.FileMode(0755)},
+			mockDirent{name: "e1f6e301-bcfc-4eff-bca1-54f1d6bd4520", mode: 0644},
+			mockDirent{name: "Test+e1f6e301-bcfc-4eff-bca1-54f1d6bd4520", mode: 0644},
+			mockDirent{name: "Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520", mode: 0644},
+		}, nil
+	})
+	defer restore()
+
+	ents, err := ListVars()
+	c.Check(err, IsNil)
+	c.Check(ents, DeepEquals, []VarEntry{{Name: "Test", GUID: MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20})}})
 }
