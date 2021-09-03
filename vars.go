@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"syscall"
 
 	"golang.org/x/sys/unix"
 
@@ -37,19 +38,19 @@ var (
 	ErrVariableNotFound = errors.New("a variable with the supplied name could not be found")
 )
 
-type varReadWriteCloser interface {
+type varFile interface {
 	io.ReadWriteCloser
 	MakeImmutable() (restore func() error, err error)
 }
 
-type realVarReadWriteCloser struct {
+type realVarFile struct {
 	*os.File
 }
 
-func (rwc *realVarReadWriteCloser) MakeImmutable() (restore func() error, err error) {
+func (f *realVarFile) MakeImmutable() (restore func() error, err error) {
 	const immutableFlag = 0x00000010
 
-	flags, err := unix.IoctlGetUint32(int(rwc.Fd()), unix.FS_IOC_GETFLAGS)
+	flags, err := unix.IoctlGetUint32(int(f.Fd()), unix.FS_IOC_GETFLAGS)
 	if err != nil {
 		return nil, err
 	}
@@ -59,26 +60,27 @@ func (rwc *realVarReadWriteCloser) MakeImmutable() (restore func() error, err er
 		return func() error { return nil }, nil
 	}
 
-	if err := unix.IoctlSetPointerInt(int(rwc.Fd()), unix.FS_IOC_SETFLAGS, int(flags&^immutableFlag)); err != nil {
+	if err := unix.IoctlSetPointerInt(int(f.Fd()), unix.FS_IOC_SETFLAGS, int(flags&^immutableFlag)); err != nil {
 		return nil, err
 	}
 
 	return func() error {
-		return unix.IoctlSetPointerInt(int(rwc.Fd()), unix.FS_IOC_SETFLAGS, int(flags))
+		return unix.IoctlSetPointerInt(int(f.Fd()), unix.FS_IOC_SETFLAGS, int(flags))
 	}, nil
 }
 
-func realOpenVarFile(path string, flags int, perm os.FileMode) (varReadWriteCloser, error) {
+func realOpenVarFile(path string, flags int, perm os.FileMode) (varFile, error) {
 	f, err := os.OpenFile(path, flags, perm)
 	if err != nil {
 		return nil, err
 	}
-	return &realVarReadWriteCloser{f}, nil
+	return &realVarFile{f}, nil
 }
 
 var (
-	openVarFile = realOpenVarFile
-	varsStatfs  = unix.Statfs
+	openVarFile   = realOpenVarFile
+	unlinkVarFile = os.Remove
+	varsStatfs    = unix.Statfs
 )
 
 func varsPath() string {
@@ -99,8 +101,9 @@ func checkAvailable() error {
 	return nil
 }
 
-// OpenVar opens the EFI variable with the specified name and GUID for reading. On success, it returns the variable's attributes,
-// and a io.ReadCloser for reading the variable value.
+// OpenVar opens the EFI variable with the specified name and GUID for reading using
+// efivarfs. On success, it returns the variable's attributes, and a io.ReadCloser
+// for reading the variable value.
 func OpenVar(name string, guid GUID) (io.ReadCloser, VariableAttributes, error) {
 	if err := checkAvailable(); err != nil {
 		return nil, 0, err
@@ -130,7 +133,8 @@ func OpenVar(name string, guid GUID) (io.ReadCloser, VariableAttributes, error) 
 	return f, attrs, nil
 }
 
-// ReadVar returns the value and attributes of the EFI variable with the specified name and GUID.
+// ReadVar returns the value and attributes of the EFI variable with the specified
+// name and GUID using efivarfs.
 func ReadVar(name string, guid GUID) ([]byte, VariableAttributes, error) {
 	f, attrs, err := OpenVar(name, guid)
 	if err != nil {
@@ -146,53 +150,153 @@ func ReadVar(name string, guid GUID) ([]byte, VariableAttributes, error) {
 	return val, attrs, nil
 }
 
-// WriteVar writes the supplied data value with the specified attributes to the EFI variable with the specified name and GUID.
-func WriteVar(name string, guid GUID, attrs VariableAttributes, data []byte) error {
-	if err := checkAvailable(); err != nil {
-		return err
+func maybeRetry(n int, fn func() (bool, error)) error {
+	for i := 1; ; i++ {
+		retry, err := fn()
+		switch {
+		case i > n:
+			return err
+		case !retry:
+			return err
+		case err == nil:
+			return nil
+		}
 	}
+}
 
-	flags := os.O_WRONLY
+func writeVarFile(path string, attrs VariableAttributes, data []byte) (retry bool, err error) {
+	flags := os.O_WRONLY | os.O_CREATE
 	if attrs&AttributeAppendWrite != 0 {
 		flags |= os.O_APPEND
 	}
 
-	path := filepath.Join(varsPath(), fmt.Sprintf("%s-%s", name, guid))
 	r, err := openVarFile(path, os.O_RDONLY, 0)
 	switch {
 	case os.IsNotExist(err):
-		flags |= (os.O_CREATE | os.O_EXCL)
 	case err != nil:
-		return err
+		return false, err
 	default:
 		defer r.Close()
 
 		restoreImmutable, err := r.MakeImmutable()
 		if err != nil {
-			return err
+			return false, err
 		}
 		defer restoreImmutable()
 	}
 
-	// XXX: This is racy - another process could come along and delete
-	// and recreate the variable. If that happens, this open might still
-	// fail with EPERM.
 	w, err := openVarFile(path, flags, 0644)
-	if err != nil {
-		return err
+	switch {
+	case os.IsPermission(err):
+		pe, ok := err.(*os.PathError)
+		if !ok {
+			return false, err
+		}
+		if pe.Err == syscall.EACCES {
+			// open will fail with EACCES if we lack the privileges
+			// to write to the file or the parent directory in the
+			// case where we need to create a new file. Don't retry
+			// in this case.
+			return false, err
+		}
+
+		// open will fail with EPERM if the file exists but we can't
+		// write to it because it is immutable. This might happen as a
+		// result of a race with another process that might have been
+		// writing to the variable or may have deleted and recreated
+		// it, making the underlying inode immutable again. Retry in
+		// this case.
+		return true, err
+	case err != nil:
+		return false, err
 	}
 	defer w.Close()
 
 	var buf bytes.Buffer
 	if err := binary.Write(&buf, binary.LittleEndian, attrs); err != nil {
-		return err
+		return false, err
 	}
 	if _, err := buf.Write(data); err != nil {
-		return err
+		return false, err
 	}
 
 	_, err = buf.WriteTo(w)
-	return err
+	return false, err
+}
+
+// WriteVar writes the supplied data value with the specified attributes to the
+// EFI variable with the specified name and GUID using efivarfs.
+//
+// If the variable already exists, the specified attributes must match the existing
+// attributes with the exception of AttributeAppendWrite.
+//
+// If the variable does not exist, it will be created.
+//
+// If the variable already exists and the corresponding file in efivarfs is
+// immutable, this function will temporarily remove the immutable flag. This can
+// potentially race with other processes that delete and recreate the variable, so
+// the write will be retried up to 5 times if it fails and the underlying inode
+// changes.
+func WriteVar(name string, guid GUID, attrs VariableAttributes, data []byte) error {
+	if err := checkAvailable(); err != nil {
+		return err
+	}
+
+	path := filepath.Join(varsPath(), fmt.Sprintf("%s-%s", name, guid))
+	return maybeRetry(4, func() (bool, error) { return writeVarFile(path, attrs, data) })
+}
+
+func deleteVarFile(path string) (retry bool, err error) {
+	r, err := openVarFile(path, os.O_RDONLY, 0)
+	switch {
+	case os.IsNotExist(err):
+		return false, ErrVariableNotFound
+	case err != nil:
+		return false, err
+	}
+	defer r.Close()
+
+	_, err = r.MakeImmutable()
+	if err != nil {
+		return false, err
+	}
+
+	if err := unlinkVarFile(path); err != nil {
+		if os.IsPermission(err) {
+			pe, ok := err.(*os.PathError)
+			if !ok {
+				return false, err
+			}
+			if pe.Err == syscall.EACCES {
+				// unlink will fail with EACCES if we lack the privileges
+				// to write to the parent directory. Don't retry in this
+				// case.
+				return false, err
+			}
+
+			// unlink will fail with EPERM if the file is immutable.
+			// This might happen due to a race with another process
+			// which might have been writing to the variable or may
+			// have deleted and recreated it and has since made the
+			// underlying inode immutable again. Have another go in
+			// this case.
+			return true, err
+		}
+		return false, err
+	}
+
+	return false, nil
+}
+
+// DeleteVar deletes the variable with the specified GUID and name using
+// efivarfs.
+func DeleteVar(name string, guid GUID) error {
+	if err := checkAvailable(); err != nil {
+		return err
+	}
+
+	path := filepath.Join(varsPath(), fmt.Sprintf("%s-%s", name, guid))
+	return maybeRetry(4, func() (bool, error) { return deleteVarFile(path) })
 }
 
 func OpenEnhancedAuthenticatedVar(name string, guid GUID) (io.ReadCloser, VariableAuthentication3Descriptor, VariableAttributes, error) {
