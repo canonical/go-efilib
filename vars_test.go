@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"sort"
 	"syscall"
+	"time"
 
 	"golang.org/x/sys/unix"
 
@@ -24,13 +25,19 @@ import (
 type mockDirent struct {
 	name string
 	mode os.FileMode
+	size int64
 }
 
 func (d mockDirent) Name() string { return string(d.name) }
 
 func (d mockDirent) IsDir() bool                { return d.mode.IsDir() }
 func (d mockDirent) Type() os.FileMode          { return d.mode }
-func (d mockDirent) Info() (os.FileInfo, error) { return nil, nil }
+func (d mockDirent) Info() (os.FileInfo, error) { return d, nil }
+
+func (d mockDirent) Size() int64        { return d.size }
+func (d mockDirent) Mode() os.FileMode  { return d.mode }
+func (d mockDirent) ModTime() time.Time { return time.Time{} }
+func (d mockDirent) Sys() interface{}   { return nil }
 
 type mockVarFile struct {
 	name   string
@@ -184,7 +191,7 @@ func (m *mockEfiVarfs) Open(name string, flags int, perm os.FileMode) (VarFile, 
 
 func (m *mockEfiVarfs) List() (out []os.DirEntry) {
 	for k, v := range m.vars {
-		out = append(out, mockDirent{filepath.Base(k), v.mode})
+		out = append(out, mockDirent{filepath.Base(k), v.mode, int64(len(v.data))})
 	}
 	sort.Slice(out, func(i, j int) bool {
 		return out[i].Name() < out[j].Name()
@@ -207,10 +214,9 @@ func (m *mockEfiVarfs) Unlink(name string) error {
 type varsSuite struct {
 	mockEfiVarfs *mockEfiVarfs
 
-	restoreOpenVarFile   func()
-	restoreReadVarDir    func()
-	restoreUnlinkVarFile func()
-	restoreVarsStatfs    func()
+	restoreOpenVarFile func()
+	restoreReadVarDir  func()
+	restoreVarsStatfs  func()
 }
 
 func (s *varsSuite) SetUpTest(c *C) {
@@ -228,8 +234,6 @@ func (s *varsSuite) SetUpTest(c *C) {
 		return s.mockEfiVarfs.List(), nil
 	})
 
-	s.restoreUnlinkVarFile = MockUnlinkVarFile(s.mockEfiVarfs.Unlink)
-
 	s.restoreVarsStatfs = MockVarsStatfs(func(path string, st *unix.Statfs_t) error {
 		if path != "/sys/firmware/efi/efivars" {
 			return syscall.ENOENT
@@ -245,7 +249,6 @@ func (s *varsSuite) SetUpTest(c *C) {
 
 func (s *varsSuite) TearDownTest(c *C) {
 	s.restoreVarsStatfs()
-	s.restoreUnlinkVarFile()
 	s.restoreReadVarDir()
 	s.restoreOpenVarFile()
 
@@ -441,76 +444,6 @@ func (s *varsSuite) TestWriteVarRaceGiveUp(c *C) {
 	c.Check(count, Equals, 5)
 }
 
-func (s *varsSuite) TestDeleteVarImmutable(c *C) {
-	c.Check(DeleteVar("Test", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20})), IsNil)
-	_, ok := s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"]
-	c.Check(ok, Equals, false)
-}
-
-func (s *varsSuite) TestDeleteVarMutable(c *C) {
-	c.Check(DeleteVar("BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c})), IsNil)
-	_, ok := s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/BootOrder-8be4df61-93ca-11d2-aa0d-00e098032b8c"]
-	c.Check(ok, Equals, false)
-}
-
-func (s *varsSuite) TestDeleteVarUnavailable(c *C) {
-	err := DeleteVar("Test2", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}))
-	c.Check(err, Equals, ErrVariableNotFound)
-}
-
-func (s *varsSuite) TestDeleteVarVarsUnavailable(c *C) {
-	restore := s.mockWrongFsType()
-	defer restore()
-
-	err := DeleteVar("Test", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}))
-	c.Check(err, Equals, ErrVarsUnavailable)
-}
-
-func (s *varsSuite) TestDeleteVarEACCES(c *C) {
-	restore := MockUnlinkVarFile(func(path string) error {
-		return &os.PathError{Op: "remove", Path: path, Err: syscall.EACCES}
-	})
-	defer restore()
-
-	err := DeleteVar("Test", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}))
-	c.Check(err, ErrorMatches, "remove /sys/firmware/efi/efivars/Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520: permission denied")
-}
-
-func (s *varsSuite) TestDeleteVarRace(c *C) {
-	var restore func()
-	restore = MockUnlinkVarFile(func(path string) error {
-		// Simulate another process flipping the immutable flag back
-		s.mockEfiVarfs.vars[path].immutable = true
-		restore()
-		restore = nil
-		return Defer
-	})
-	defer func() {
-		if restore == nil {
-			return
-		}
-		restore()
-	}()
-
-	c.Check(DeleteVar("Test", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20})), IsNil)
-	_, ok := s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"]
-	c.Check(ok, Equals, false)
-}
-
-func (s *varsSuite) TestDeleteVarRaceGiveUp(c *C) {
-	count := 0
-	restore := MockUnlinkVarFile(func(path string) error {
-		// Simulate another process flipping the immutable flag back
-		s.mockEfiVarfs.vars[path].immutable = true
-		count += 1
-		return Defer
-	})
-	defer restore()
-
-	err := DeleteVar("Test", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}))
-	c.Check(err, ErrorMatches, "remove /sys/firmware/efi/efivars/Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520: operation not permitted")
-}
-
 func (s *varsSuite) TestListVars(c *C) {
 	ents, err := ListVars()
 	c.Check(err, IsNil)
@@ -523,10 +456,11 @@ func (s *varsSuite) TestListVars(c *C) {
 func (s *varsSuite) TestListVarsInvalidNames(c *C) {
 	restore := MockReadVarDir(func(_ string) ([]os.DirEntry, error) {
 		return []os.DirEntry{
-			mockDirent{name: "Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520", mode: os.ModeDir | os.FileMode(0755)},
-			mockDirent{name: "e1f6e301-bcfc-4eff-bca1-54f1d6bd4520", mode: 0644},
-			mockDirent{name: "Test+e1f6e301-bcfc-4eff-bca1-54f1d6bd4520", mode: 0644},
-			mockDirent{name: "Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520", mode: 0644},
+			mockDirent{name: "Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520", mode: os.ModeDir | os.FileMode(0755), size: 10},
+			mockDirent{name: "e1f6e301-bcfc-4eff-bca1-54f1d6bd4520", mode: 0644, size: 10},
+			mockDirent{name: "Test+e1f6e301-bcfc-4eff-bca1-54f1d6bd4520", mode: 0644, size: 10},
+			mockDirent{name: "Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520", mode: 0644, size: 0},
+			mockDirent{name: "Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520", mode: 0644, size: 10},
 		}, nil
 	})
 	defer restore()

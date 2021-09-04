@@ -40,22 +40,6 @@ func MockReadVarDir(fn func(string) ([]os.DirEntry, error)) (restore func()) {
 	}
 }
 
-func MockUnlinkVarFile(fn func(string) error) (restore func()) {
-	orig := unlinkVarFile
-
-	unlinkVarFile = func(path string) error {
-		err := fn(path)
-		if err == Defer {
-			return orig(path)
-		}
-		return err
-	}
-
-	return func() {
-		unlinkVarFile = orig
-	}
-}
-
 func MockVarsStatfs(fn func(string, *unix.Statfs_t) error) (restore func()) {
 	orig := varsStatfs
 	varsStatfs = fn

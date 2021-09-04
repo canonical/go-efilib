@@ -78,10 +78,9 @@ func realOpenVarFile(path string, flags int, perm os.FileMode) (varFile, error) 
 }
 
 var (
-	openVarFile   = realOpenVarFile
-	readVarDir    = os.ReadDir
-	unlinkVarFile = os.Remove
-	varsStatfs    = unix.Statfs
+	openVarFile = realOpenVarFile
+	readVarDir  = os.ReadDir
+	varsStatfs  = unix.Statfs
 )
 
 func varsPath() string {
@@ -240,59 +239,6 @@ func WriteVar(name string, guid GUID, attrs VariableAttributes, data []byte) err
 	return maybeRetry(4, func() (bool, error) { return writeVarFile(path, attrs, data) })
 }
 
-func deleteVarFile(path string) (retry bool, err error) {
-	r, err := openVarFile(path, os.O_RDONLY, 0)
-	switch {
-	case os.IsNotExist(err):
-		return false, ErrVariableNotFound
-	case err != nil:
-		return false, err
-	}
-	defer r.Close()
-
-	_, err = r.MakeImmutable()
-	if err != nil {
-		return false, err
-	}
-
-	if err := unlinkVarFile(path); err != nil {
-		if os.IsPermission(err) {
-			pe, ok := err.(*os.PathError)
-			if !ok {
-				return false, err
-			}
-			if pe.Err == syscall.EACCES {
-				// unlink will fail with EACCES if we lack the privileges
-				// to write to the parent directory. Don't retry in this
-				// case.
-				return false, err
-			}
-
-			// unlink will fail with EPERM if the file is immutable.
-			// This might happen due to a race with another process
-			// which might have been writing to the variable or may
-			// have deleted and recreated it and has since made the
-			// underlying inode immutable again. Have another go in
-			// this case.
-			return true, err
-		}
-		return false, err
-	}
-
-	return false, nil
-}
-
-// DeleteVar deletes the variable with the specified GUID and name using
-// efivarfs.
-func DeleteVar(name string, guid GUID) error {
-	if err := checkAvailable(); err != nil {
-		return err
-	}
-
-	path := filepath.Join(varsPath(), fmt.Sprintf("%s-%s", name, guid))
-	return maybeRetry(4, func() (bool, error) { return deleteVarFile(path) })
-}
-
 type VarEntry struct {
 	Name string
 	GUID GUID
@@ -326,6 +272,16 @@ func ListVars() ([]VarEntry, error) {
 		if dirent.Name()[len(dirent.Name())-guidLength-1] != '-' {
 			// Skip files where the basename doesn't contain a
 			// hyphen between the name and GUID
+			continue
+		}
+
+		info, err := dirent.Info()
+		if err != nil {
+			continue
+		}
+		if info.Size() == 0 {
+			// Skip files with zero size. These are variables that
+			// have been deleted by writing an empty payload
 			continue
 		}
 
