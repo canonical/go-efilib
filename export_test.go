@@ -4,37 +4,15 @@
 
 package efi
 
-import (
-	"errors"
-	"os"
-
-	"golang.org/x/sys/unix"
+type (
+	NullVarsBackend = nullVarsBackend
+	VarsBackend     = varsBackend
 )
 
-type VarFile = varFile
-
-var Defer = errors.New("")
-
-func MockOpenVarFile(fn func(string, int, os.FileMode) (VarFile, error)) (restore func()) {
-	orig := openVarFile
-
-	openVarFile = func(path string, flags int, perm os.FileMode) (VarFile, error) {
-		f, err := fn(path, flags, perm)
-		if err == Defer {
-			return orig(path, flags, perm)
-		}
-		return f, err
-	}
-
+func MockVarsBackend(backend VarsBackend) (restore func()) {
+	orig := vars
+	vars = backend
 	return func() {
-		openVarFile = orig
-	}
-}
-
-func MockVarsStatfs(fn func(string, *unix.Statfs_t) error) (restore func()) {
-	orig := varsStatfs
-	varsStatfs = fn
-	return func() {
-		varsStatfs = orig
+		vars = orig
 	}
 }

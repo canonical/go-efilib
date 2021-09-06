@@ -1,4 +1,4 @@
-// Copyright 2020 Canonical Ltd.
+// Copyright 2020-2021 Canonical Ltd.
 // Licensed under the LGPLv3 with static-linking exception.
 // See LICENCE file for details.
 
@@ -6,17 +6,8 @@ package efi
 
 import (
 	"bytes"
-	"encoding/binary"
 	"errors"
-	"fmt"
-	"io"
 	"io/ioutil"
-	"os"
-	"path/filepath"
-	"sort"
-	"syscall"
-
-	"golang.org/x/sys/unix"
 
 	"github.com/canonical/go-efilib/internal/ioerr"
 )
@@ -35,305 +26,79 @@ const (
 )
 
 var (
-	ErrVarsUnavailable  = errors.New("no efivarfs mounted in the expected location")
+	ErrVarsUnavailable  = errors.New("no variable backend is available")
 	ErrVariableNotFound = errors.New("a variable with the supplied name could not be found")
 )
-
-type varFile interface {
-	io.ReadWriteCloser
-	Readdir(n int) ([]os.FileInfo, error)
-	MakeImmutable() (restore func() error, err error)
-}
-
-type realVarFile struct {
-	*os.File
-}
-
-func (f *realVarFile) MakeImmutable() (restore func() error, err error) {
-	const immutableFlag = 0x00000010
-
-	flags, err := unix.IoctlGetUint32(int(f.Fd()), unix.FS_IOC_GETFLAGS)
-	if err != nil {
-		return nil, err
-	}
-
-	if flags&immutableFlag == 0 {
-		// Nothing to do
-		return func() error { return nil }, nil
-	}
-
-	if err := unix.IoctlSetPointerInt(int(f.Fd()), unix.FS_IOC_SETFLAGS, int(flags&^immutableFlag)); err != nil {
-		return nil, err
-	}
-
-	return func() error {
-		return unix.IoctlSetPointerInt(int(f.Fd()), unix.FS_IOC_SETFLAGS, int(flags))
-	}, nil
-}
-
-func realOpenVarFile(path string, flags int, perm os.FileMode) (varFile, error) {
-	f, err := os.OpenFile(path, flags, perm)
-	if err != nil {
-		return nil, err
-	}
-	return &realVarFile{f}, nil
-}
-
-var (
-	openVarFile = realOpenVarFile
-	varsStatfs  = unix.Statfs
-)
-
-func varsPath() string {
-	return "/sys/firmware/efi/efivars"
-}
-
-func checkAvailable() error {
-	var st unix.Statfs_t
-	if err := varsStatfs(varsPath(), &st); err != nil {
-		if os.IsNotExist(err) {
-			return ErrVarsUnavailable
-		}
-		return err
-	}
-	if st.Type != unix.EFIVARFS_MAGIC {
-		return ErrVarsUnavailable
-	}
-	return nil
-}
-
-// OpenVar opens the EFI variable with the specified name and GUID for reading using
-// efivarfs. On success, it returns the variable's attributes, and a io.ReadCloser
-// for reading the variable value.
-func OpenVar(name string, guid GUID) (io.ReadCloser, VariableAttributes, error) {
-	if err := checkAvailable(); err != nil {
-		return nil, 0, err
-	}
-
-	path := filepath.Join(varsPath(), fmt.Sprintf("%s-%s", name, guid))
-	f, err := openVarFile(path, os.O_RDONLY, 0)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, 0, ErrVariableNotFound
-		}
-		return nil, 0, err
-	}
-
-	var attrs VariableAttributes
-	if err := binary.Read(f, binary.LittleEndian, &attrs); err != nil {
-		f.Close()
-		switch err {
-		case io.EOF:
-			return nil, 0, ErrVariableNotFound
-		case io.ErrUnexpectedEOF:
-			return nil, 0, errors.New("invalid variable format: too short")
-		}
-		return nil, 0, err
-	}
-
-	return f, attrs, nil
-}
-
-// ReadVar returns the value and attributes of the EFI variable with the specified
-// name and GUID using efivarfs.
-func ReadVar(name string, guid GUID) ([]byte, VariableAttributes, error) {
-	f, attrs, err := OpenVar(name, guid)
-	if err != nil {
-		return nil, 0, err
-	}
-	defer f.Close()
-
-	val, err := ioutil.ReadAll(f)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	return val, attrs, nil
-}
-
-func maybeRetry(n int, fn func() (bool, error)) error {
-	for i := 1; ; i++ {
-		retry, err := fn()
-		switch {
-		case i > n:
-			return err
-		case !retry:
-			return err
-		case err == nil:
-			return nil
-		}
-	}
-}
-
-func writeVarFile(path string, attrs VariableAttributes, data []byte) (retry bool, err error) {
-	flags := os.O_WRONLY | os.O_CREATE
-	if attrs&AttributeAppendWrite != 0 {
-		flags |= os.O_APPEND
-	}
-
-	r, err := openVarFile(path, os.O_RDONLY, 0)
-	switch {
-	case os.IsNotExist(err):
-	case err != nil:
-		return false, err
-	default:
-		defer r.Close()
-
-		restoreImmutable, err := r.MakeImmutable()
-		if err != nil {
-			return false, err
-		}
-		defer restoreImmutable()
-	}
-
-	w, err := openVarFile(path, flags, 0644)
-	switch {
-	case os.IsPermission(err):
-		pe, ok := err.(*os.PathError)
-		if !ok {
-			return false, err
-		}
-		if pe.Err == syscall.EACCES {
-			// open will fail with EACCES if we lack the privileges
-			// to write to the file or the parent directory in the
-			// case where we need to create a new file. Don't retry
-			// in this case.
-			return false, err
-		}
-
-		// open will fail with EPERM if the file exists but we can't
-		// write to it because it is immutable. This might happen as a
-		// result of a race with another process that might have been
-		// writing to the variable or may have deleted and recreated
-		// it, making the underlying inode immutable again. Retry in
-		// this case.
-		return true, err
-	case err != nil:
-		return false, err
-	}
-	defer w.Close()
-
-	var buf bytes.Buffer
-	binary.Write(&buf, binary.LittleEndian, attrs)
-	buf.Write(data)
-
-	_, err = buf.WriteTo(w)
-	return false, err
-}
-
-// WriteVar writes the supplied data value with the specified attributes to the
-// EFI variable with the specified name and GUID using efivarfs.
-//
-// If the variable already exists, the specified attributes must match the existing
-// attributes with the exception of AttributeAppendWrite.
-//
-// If the variable does not exist, it will be created.
-//
-// If the variable already exists and the corresponding file in efivarfs is
-// immutable, this function will temporarily remove the immutable flag.
-func WriteVar(name string, guid GUID, attrs VariableAttributes, data []byte) error {
-	if err := checkAvailable(); err != nil {
-		return err
-	}
-
-	path := filepath.Join(varsPath(), fmt.Sprintf("%s-%s", name, guid))
-	return maybeRetry(4, func() (bool, error) { return writeVarFile(path, attrs, data) })
-}
 
 type VarEntry struct {
 	Name string
 	GUID GUID
 }
 
-var guidLength = len("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
-
-// ListVars returns a list of variables that can be accessed via efivarfs.
-func ListVars() ([]VarEntry, error) {
-	if err := checkAvailable(); err != nil {
-		return nil, err
-	}
-
-	f, err := openVarFile(varsPath(), os.O_RDONLY, 0)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	dirents, err := f.Readdir(-1)
-	if err != nil {
-		return nil, err
-	}
-
-	var entries []VarEntry
-
-	for _, dirent := range dirents {
-		if !dirent.Mode().IsRegular() {
-			// Skip non-regular files
-			continue
-		}
-		if len(dirent.Name()) < guidLength+1 {
-			// Skip files with a basename that isn't long enough
-			// to contain a GUID and a hyphen
-			continue
-		}
-		if dirent.Name()[len(dirent.Name())-guidLength-1] != '-' {
-			// Skip files where the basename doesn't contain a
-			// hyphen between the name and GUID
-			continue
-		}
-		if dirent.Size() == 0 {
-			// Skip files with zero size. These are variables that
-			// have been deleted by writing an empty payload
-			continue
-		}
-
-		name := dirent.Name()[:len(dirent.Name())-guidLength-1]
-		guid, err := DecodeGUIDString(dirent.Name()[len(name)+1:])
-		if err != nil {
-			continue
-		}
-
-		entries = append(entries, VarEntry{Name: name, GUID: guid})
-	}
-
-	sort.Slice(entries, func(i, j int) bool {
-		return fmt.Sprintf("%s-%v", entries[i].Name, entries[i].GUID) < fmt.Sprintf("%s-%v", entries[j].Name, entries[j].GUID)
-	})
-	return entries, nil
+type varsBackend interface {
+	Get(name string, guid GUID) (VariableAttributes, []byte, error)
+	Set(name string, guid GUID, attrs VariableAttributes, data []byte) error
+	List() ([]VarEntry, error)
 }
 
-func OpenEnhancedAuthenticatedVar(name string, guid GUID) (io.ReadCloser, VariableAuthentication3Descriptor, VariableAttributes, error) {
-	r, attrs, err := OpenVar(name, guid)
+type nullVarsBackend struct{}
+
+func (v nullVarsBackend) Get(name string, guid GUID) (VariableAttributes, []byte, error) {
+	return 0, nil, ErrVarsUnavailable
+}
+
+func (v nullVarsBackend) Set(name string, guid GUID, attrs VariableAttributes, data []byte) error {
+	return ErrVarsUnavailable
+}
+
+func (v nullVarsBackend) List() ([]VarEntry, error) {
+	return nil, ErrVarsUnavailable
+}
+
+var vars varsBackend = nullVarsBackend{}
+
+// ReadVar returns the value and attributes of the EFI variable with the specified
+// name and GUID.
+func ReadVar(name string, guid GUID) ([]byte, VariableAttributes, error) {
+	attrs, data, err := vars.Get(name, guid)
+	return data, attrs, err
+}
+
+// WriteVar writes the supplied data value with the specified attributes to the
+// EFI variable with the specified name and GUID.
+//
+// If the variable already exists, the specified attributes must match the existing
+// attributes with the exception of AttributeAppendWrite.
+//
+// If the variable does not exist, it will be created.
+func WriteVar(name string, guid GUID, attrs VariableAttributes, data []byte) error {
+	return vars.Set(name, guid, attrs, data)
+}
+
+// ListVars returns a list of variables that can be accessed.
+func ListVars() ([]VarEntry, error) {
+	return vars.List()
+}
+
+// ReadEnhancedAuthenticatedVar returns the value, attributes and authentication
+// descriptor of the EFI variable with the specified name and GUID. This will
+// return an error if the variable doesn't have the EFI_VARIABLE_ENHANCED_AUTHENTICATED_ACCESS
+// attribute set.
+func ReadEnhancedAuthenticatedVar(name string, guid GUID) ([]byte, VariableAuthentication3Descriptor, VariableAttributes, error) {
+	data, attrs, err := ReadVar(name, guid)
 	if err != nil {
 		return nil, nil, 0, err
 	}
-	defer r.Close()
 	if attrs&AttributeEnhancedAuthenticatedAccess == 0 {
 		return nil, nil, 0, errors.New("variable does not have the EFI_VARIABLE_ENHANCED_AUTHENTICATED_ACCESS attribute set")
 	}
 
+	r := bytes.NewReader(data)
 	auth, err := ReadEnhancedAuthenticationDescriptor(r)
 	if err != nil {
 		return nil, nil, 0, ioerr.EOFIsUnexpected("cannot decode authentication descriptor: %w", err)
 	}
 
-	return r, auth, attrs, nil
-}
-
-// ReadEnhancedAuthenticatedVar returns the value, attributes and authentication descriptor of the EFI variable with the specified
-// name and GUID. This will return an error if the variable doesn't have the EFI_VARIABLE_ENHANCED_AUTHENTICATED_ACCESS attribute
-// set.
-func ReadEnhancedAuthenticatedVar(name string, guid GUID) ([]byte, VariableAuthentication3Descriptor, VariableAttributes, error) {
-	r, auth, attrs, err := OpenEnhancedAuthenticatedVar(name, guid)
-	if err != nil {
-		return nil, nil, 0, err
-	}
-	defer r.Close()
-
-	val, err := ioutil.ReadAll(r)
-	if err != nil {
-		return nil, nil, 0, err
-	}
-
-	return val, auth, attrs, nil
+	data, _ = ioutil.ReadAll(r)
+	return data, auth, attrs, nil
 }
