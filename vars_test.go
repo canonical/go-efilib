@@ -11,7 +11,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
 	"syscall"
 	"time"
 
@@ -28,21 +27,34 @@ type mockDirent struct {
 	size int64
 }
 
-func (d mockDirent) Name() string { return string(d.name) }
-
-func (d mockDirent) IsDir() bool                { return d.mode.IsDir() }
-func (d mockDirent) Type() os.FileMode          { return d.mode }
-func (d mockDirent) Info() (os.FileInfo, error) { return d, nil }
-
+func (d mockDirent) Name() string       { return string(d.name) }
 func (d mockDirent) Size() int64        { return d.size }
 func (d mockDirent) Mode() os.FileMode  { return d.mode }
 func (d mockDirent) ModTime() time.Time { return time.Time{} }
+func (d mockDirent) IsDir() bool        { return d.mode.IsDir() }
 func (d mockDirent) Sys() interface{}   { return nil }
 
 type mockVarFile struct {
 	name   string
 	fs     *mockEfiVarfs
+	v      *mockEfiVar
 	closed bool
+}
+
+func (f *mockVarFile) Read(_ []byte) (int, error) {
+	if f.closed {
+		return 0, errors.New("file already closed")
+	}
+
+	return 0, f.pathErr("read", syscall.EBADF)
+}
+
+func (f *mockVarFile) Write(_ []byte) (int, error) {
+	if f.closed {
+		return 0, errors.New("file already closed")
+	}
+
+	return 0, f.pathErr("write", syscall.EBADF)
 }
 
 func (f *mockVarFile) Close() error {
@@ -54,14 +66,24 @@ func (f *mockVarFile) Close() error {
 	return nil
 }
 
+func (f *mockVarFile) Readdir(n int) ([]os.FileInfo, error) {
+	if f.closed {
+		return nil, errors.New("file already closed")
+	}
+	return nil, &os.PathError{Op: "readdirent", Path: f.name, Err: syscall.EBADF}
+}
+
 func (f *mockVarFile) MakeImmutable() (func() error, error) {
-	v := f.fs.vars[f.name]
-	if !v.immutable {
+	if f.closed {
+		return nil, errors.New("file already closed")
+	}
+
+	if !f.v.immutable {
 		return func() error { return nil }, nil
 	}
-	v.immutable = false
+	f.v.immutable = false
 	return func() error {
-		v.immutable = true
+		f.v.immutable = true
 		return nil
 	}, nil
 }
@@ -73,14 +95,6 @@ func (f *mockVarFile) pathErr(op string, err error) error {
 type mockVarWriterFile struct {
 	flags int
 	*mockVarFile
-}
-
-func (w *mockVarWriterFile) Read(_ []byte) (int, error) {
-	if w.closed {
-		return 0, errors.New("file already closed")
-	}
-
-	return 0, w.pathErr("read", syscall.EBADF)
 }
 
 func (w *mockVarWriterFile) Write(data []byte) (int, error) {
@@ -103,8 +117,7 @@ func (w *mockVarWriterFile) Write(data []byte) (int, error) {
 
 	attrs &^= AttributeAppendWrite
 
-	v := w.fs.vars[w.name]
-	if len(v.data) > 0 && VariableAttributes(binary.LittleEndian.Uint32(v.data)) != attrs {
+	if len(w.v.data) > 0 && VariableAttributes(binary.LittleEndian.Uint32(w.v.data)) != attrs {
 		return 0, w.pathErr("write", syscall.EINVAL)
 	}
 
@@ -112,14 +125,14 @@ func (w *mockVarWriterFile) Write(data []byte) (int, error) {
 
 	switch {
 	case w.flags&os.O_APPEND != 0:
-		if len(v.data) > 0 {
+		if len(w.v.data) > 0 {
 			data = data[4:]
 		}
-		v.data = append(v.data, data...)
+		w.v.data = append(w.v.data, data...)
 	case len(data) == 4:
-		v.data = nil
+		w.v.data = nil
 	default:
-		v.data = data
+		w.v.data = data
 	}
 
 	return n, nil
@@ -137,12 +150,40 @@ func (r *mockVarReaderFile) Read(data []byte) (int, error) {
 	return r.Reader.Read(data)
 }
 
-func (r *mockVarReaderFile) Write(_ []byte) (int, error) {
-	if r.closed {
+type mockVarDir struct {
+	*mockVarFile
+}
+
+func (f *mockVarDir) Read(_ []byte) (int, error) {
+	if f.closed {
 		return 0, errors.New("file already closed")
 	}
+	return 0, io.EOF
+}
 
-	return 0, r.pathErr("write", syscall.EBADF)
+func (f *mockVarDir) Readdir(n int) (out []os.FileInfo, err error) {
+	if f.closed {
+		return nil, errors.New("file already closed")
+	}
+	out = append(out, mockDirent{name: ".", mode: os.ModeDir | 0755})
+	out = append(out, mockDirent{name: "..", mode: os.ModeDir | 0755})
+	for k, v := range f.fs.vars {
+		out = append(out, mockDirent{filepath.Base(k), v.mode, int64(len(v.data))})
+	}
+	if n < 0 {
+		return out, nil
+	}
+	if n > len(out) {
+		n = len(out)
+	}
+	return out[:n], nil
+}
+
+func (f *mockVarDir) MakeImmutable() (func() error, error) {
+	if f.closed {
+		return nil, errors.New("file already closed")
+	}
+	return nil, errors.New("not supported")
 }
 
 type mockEfiVar struct {
@@ -163,12 +204,16 @@ func (m *mockEfiVarfs) Open(name string, flags int, perm os.FileMode) (VarFile, 
 
 	switch flags & (os.O_RDONLY | os.O_WRONLY) {
 	case os.O_RDONLY:
+		if name == "/sys/firmware/efi/efivars" {
+			m.openCount += 1
+			return &mockVarDir{mockVarFile: &mockVarFile{name: name, fs: m}}, nil
+		}
 		v, ok := m.vars[name]
 		if !ok {
 			return nil, &os.PathError{Op: "open", Path: name, Err: syscall.ENOENT}
 		}
 		m.openCount += 1
-		return &mockVarReaderFile{Reader: bytes.NewReader(v.data), mockVarFile: &mockVarFile{name: name, fs: m}}, nil
+		return &mockVarReaderFile{Reader: bytes.NewReader(v.data), mockVarFile: &mockVarFile{name: name, v: v, fs: m}}, nil
 	case os.O_WRONLY:
 		v, ok := m.vars[name]
 		switch {
@@ -183,20 +228,10 @@ func (m *mockEfiVarfs) Open(name string, flags int, perm os.FileMode) (VarFile, 
 			return nil, &os.PathError{Op: "open", Path: name, Err: syscall.EPERM}
 		}
 		m.openCount += 1
-		return &mockVarWriterFile{flags: flags, mockVarFile: &mockVarFile{name: name, fs: m}}, nil
+		return &mockVarWriterFile{flags: flags, mockVarFile: &mockVarFile{name: name, v: v, fs: m}}, nil
 	default:
 		return nil, syscall.EINVAL
 	}
-}
-
-func (m *mockEfiVarfs) List() (out []os.DirEntry) {
-	for k, v := range m.vars {
-		out = append(out, mockDirent{filepath.Base(k), v.mode, int64(len(v.data))})
-	}
-	sort.Slice(out, func(i, j int) bool {
-		return out[i].Name() < out[j].Name()
-	})
-	return out
 }
 
 func (m *mockEfiVarfs) Unlink(name string) error {
@@ -215,7 +250,6 @@ type varsSuite struct {
 	mockEfiVarfs *mockEfiVarfs
 
 	restoreOpenVarFile func()
-	restoreReadVarDir  func()
 	restoreVarsStatfs  func()
 }
 
@@ -226,13 +260,6 @@ func (s *varsSuite) SetUpTest(c *C) {
 	s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"] = &mockEfiVar{data: decodeHexString(c, "07000000a5a5a5a5"), immutable: true}
 
 	s.restoreOpenVarFile = MockOpenVarFile(s.mockEfiVarfs.Open)
-
-	s.restoreReadVarDir = MockReadVarDir(func(path string) ([]os.DirEntry, error) {
-		if path != "/sys/firmware/efi/efivars" {
-			return nil, &os.PathError{Op: "open", Path: path, Err: syscall.ENOENT}
-		}
-		return s.mockEfiVarfs.List(), nil
-	})
 
 	s.restoreVarsStatfs = MockVarsStatfs(func(path string, st *unix.Statfs_t) error {
 		if path != "/sys/firmware/efi/efivars" {
@@ -249,7 +276,6 @@ func (s *varsSuite) SetUpTest(c *C) {
 
 func (s *varsSuite) TearDownTest(c *C) {
 	s.restoreVarsStatfs()
-	s.restoreReadVarDir()
 	s.restoreOpenVarFile()
 
 	c.Check(s.mockEfiVarfs.openCount, Equals, 0)
@@ -454,15 +480,14 @@ func (s *varsSuite) TestListVars(c *C) {
 }
 
 func (s *varsSuite) TestListVarsInvalidNames(c *C) {
-	restore := MockReadVarDir(func(_ string) ([]os.DirEntry, error) {
-		return []os.DirEntry{
-			mockDirent{name: "Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520", mode: os.ModeDir | os.FileMode(0755), size: 10},
-			mockDirent{name: "e1f6e301-bcfc-4eff-bca1-54f1d6bd4520", mode: 0644, size: 10},
-			mockDirent{name: "Test+e1f6e301-bcfc-4eff-bca1-54f1d6bd4520", mode: 0644, size: 10},
-			mockDirent{name: "Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520", mode: 0644, size: 0},
-			mockDirent{name: "Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520", mode: 0644, size: 10},
-		}, nil
-	})
+	fs := &mockEfiVarfs{vars: make(map[string]*mockEfiVar)}
+	fs.vars["Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"] = &mockEfiVar{data: decodeHexString(c, "00000000000000000000"), mode: os.ModeDir | 0755}
+	fs.vars["e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"] = &mockEfiVar{data: decodeHexString(c, "00000000000000000000"), mode: 0644}
+	fs.vars["Test+e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"] = &mockEfiVar{data: decodeHexString(c, "00000000000000000000"), mode: 0644}
+	fs.vars["Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"] = &mockEfiVar{mode: 0644}
+	fs.vars["Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"] = &mockEfiVar{data: decodeHexString(c, "00000000000000000000"), mode: 0644}
+
+	restore := MockOpenVarFile(fs.Open)
 	defer restore()
 
 	ents, err := ListVars()

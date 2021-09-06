@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 	"syscall"
 
 	"golang.org/x/sys/unix"
@@ -40,6 +41,7 @@ var (
 
 type varFile interface {
 	io.ReadWriteCloser
+	Readdir(n int) ([]os.FileInfo, error)
 	MakeImmutable() (restore func() error, err error)
 }
 
@@ -79,7 +81,6 @@ func realOpenVarFile(path string, flags int, perm os.FileMode) (varFile, error) 
 
 var (
 	openVarFile = realOpenVarFile
-	readVarDir  = os.ReadDir
 	varsStatfs  = unix.Statfs
 )
 
@@ -252,7 +253,13 @@ func ListVars() ([]VarEntry, error) {
 		return nil, err
 	}
 
-	dirents, err := readVarDir(varsPath())
+	f, err := openVarFile(varsPath(), os.O_RDONLY, 0)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	dirents, err := f.Readdir(-1)
 	if err != nil {
 		return nil, err
 	}
@@ -260,7 +267,7 @@ func ListVars() ([]VarEntry, error) {
 	var entries []VarEntry
 
 	for _, dirent := range dirents {
-		if !dirent.Type().IsRegular() {
+		if !dirent.Mode().IsRegular() {
 			// Skip non-regular files
 			continue
 		}
@@ -274,12 +281,7 @@ func ListVars() ([]VarEntry, error) {
 			// hyphen between the name and GUID
 			continue
 		}
-
-		info, err := dirent.Info()
-		if err != nil {
-			continue
-		}
-		if info.Size() == 0 {
+		if dirent.Size() == 0 {
 			// Skip files with zero size. These are variables that
 			// have been deleted by writing an empty payload
 			continue
@@ -294,6 +296,9 @@ func ListVars() ([]VarEntry, error) {
 		entries = append(entries, VarEntry{Name: name, GUID: guid})
 	}
 
+	sort.Slice(entries, func(i, j int) bool {
+		return fmt.Sprintf("%s-%v", entries[i].Name, entries[i].GUID) < fmt.Sprintf("%s-%v", entries[j].Name, entries[j].GUID)
+	})
 	return entries, nil
 }
 
