@@ -56,11 +56,18 @@ type realVarFile struct {
 }
 
 func (f *realVarFile) GetInodeFlags() (uint32, error) {
-	return unix.IoctlGetUint32(int(f.Fd()), unix.FS_IOC_GETFLAGS)
+	flags, err := unix.IoctlGetUint32(int(f.Fd()), unix.FS_IOC_GETFLAGS)
+	if err != nil {
+		return 0, &os.PathError{Op: "ioctl", Path: f.Name(), Err: err}
+	}
+	return flags, nil
 }
 
 func (f *realVarFile) SetInodeFlags(flags uint32) error {
-	return unix.IoctlSetPointerInt(int(f.Fd()), unix.FS_IOC_SETFLAGS, int(flags))
+	if err := unix.IoctlSetPointerInt(int(f.Fd()), unix.FS_IOC_SETFLAGS, int(flags)); err != nil {
+		return &os.PathError{Op: "ioctl", Path: f.Name(), Err: err}
+	}
+	return nil
 }
 
 func realOpenVarFile(path string, flags int, perm os.FileMode) (varFile, error) {
@@ -112,13 +119,18 @@ func writeEfivarfsFile(path string, attrs VariableAttributes, data []byte) (retr
 	r, err := openVarFile(path, os.O_RDONLY, 0)
 	switch {
 	case os.IsNotExist(err):
+	case os.IsPermission(err):
+		return false, ErrVarPermission
 	case err != nil:
 		return false, err
 	default:
 		defer r.Close()
 
 		restoreImmutable, err := makeVarFileMutable(r)
-		if err != nil {
+		switch {
+		case os.IsPermission(err):
+			return false, ErrVarPermission
+		case err != nil:
 			return false, err
 		}
 		defer restoreImmutable()
@@ -136,7 +148,7 @@ func writeEfivarfsFile(path string, attrs VariableAttributes, data []byte) (retr
 			// to write to the file or the parent directory in the
 			// case where we need to create a new file. Don't retry
 			// in this case.
-			return false, err
+			return false, ErrVarPermission
 		}
 
 		// open will fail with EPERM if the file exists but we can't
@@ -145,7 +157,7 @@ func writeEfivarfsFile(path string, attrs VariableAttributes, data []byte) (retr
 		// writing to the variable or may have deleted and recreated
 		// it, making the underlying inode immutable again. Retry in
 		// this case.
-		return true, err
+		return true, ErrVarPermission
 	case err != nil:
 		return false, err
 	}
@@ -164,10 +176,12 @@ type efivarfsVarsBackend struct{}
 func (v efivarfsVarsBackend) Get(name string, guid GUID) (VariableAttributes, []byte, error) {
 	path := filepath.Join(efivarfsPath(), fmt.Sprintf("%s-%s", name, guid))
 	f, err := openVarFile(path, os.O_RDONLY, 0)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return 0, nil, ErrVarNotExist
-		}
+	switch {
+	case os.IsNotExist(err):
+		return 0, nil, ErrVarNotExist
+	case os.IsPermission(err):
+		return 0, nil, ErrVarPermission
+	case err != nil:
 		return 0, nil, err
 	}
 	defer f.Close()
@@ -194,7 +208,12 @@ func (v efivarfsVarsBackend) Set(name string, guid GUID, attrs VariableAttribute
 
 func (v efivarfsVarsBackend) List() ([]VarEntry, error) {
 	f, err := openVarFile(efivarfsPath(), os.O_RDONLY, 0)
-	if err != nil {
+	switch {
+	case os.IsNotExist(err):
+		return nil, ErrVarsUnavailable
+	case os.IsPermission(err):
+		return nil, ErrVarPermission
+	case err != nil:
 		return nil, err
 	}
 	defer f.Close()

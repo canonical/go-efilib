@@ -26,8 +26,9 @@ const (
 )
 
 var (
-	ErrVarsUnavailable  = errors.New("no variable backend is available")
-	ErrVarNotExist = errors.New("variable does not exist")
+	ErrVarsUnavailable = errors.New("no variable backend is available")
+	ErrVarNotExist     = errors.New("variable does not exist")
+	ErrVarPermission   = errors.New("permission denied")
 )
 
 type VarEntry struct {

@@ -408,7 +408,7 @@ func (s *varsLinuxSuite) TestWriteVarEACCES(c *C) {
 
 	err := WriteVar("BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}),
 		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, decodeHexString(c, "0001"))
-	c.Check(err, ErrorMatches, "open /sys/firmware/efi/efivars/BootOrder-8be4df61-93ca-11d2-aa0d-00e098032b8c: permission denied")
+	c.Check(err, Equals, ErrVarPermission)
 }
 
 func (s *varsLinuxSuite) TestWriteVarRace(c *C) {
@@ -450,7 +450,7 @@ func (s *varsLinuxSuite) TestWriteVarRaceGiveUp(c *C) {
 
 	err := WriteVar("BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}),
 		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, decodeHexString(c, "0001"))
-	c.Check(err, ErrorMatches, "open /sys/firmware/efi/efivars/BootOrder-8be4df61-93ca-11d2-aa0d-00e098032b8c: operation not permitted")
+	c.Check(err, Equals, ErrVarPermission)
 	c.Check(count, Equals, 5)
 }
 
