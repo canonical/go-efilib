@@ -27,7 +27,7 @@ const (
 
 var (
 	ErrVarsUnavailable  = errors.New("no variable backend is available")
-	ErrVariableNotFound = errors.New("a variable with the supplied name could not be found")
+	ErrVarNotExist = errors.New("variable does not exist")
 )
 
 type VarEntry struct {

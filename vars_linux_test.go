@@ -334,13 +334,13 @@ func (s *varsLinuxSuite) TestReadVar3(c *C) {
 
 func (s *varsLinuxSuite) TestReadVarNotFound1(c *C) {
 	_, _, err := ReadVar("NotFound", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}))
-	c.Check(err, Equals, ErrVariableNotFound)
+	c.Check(err, Equals, ErrVarNotExist)
 }
 
 func (s *varsLinuxSuite) TestReadVarNotFound2(c *C) {
 	s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/NotFound-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"] = &mockEfiVar{}
 	_, _, err := ReadVar("NotFound", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}))
-	c.Check(err, Equals, ErrVariableNotFound)
+	c.Check(err, Equals, ErrVarNotExist)
 }
 
 func (s *varsLinuxSuite) TestWriteVarImmutable(c *C) {

@@ -166,7 +166,7 @@ func (v efivarfsVarsBackend) Get(name string, guid GUID) (VariableAttributes, []
 	f, err := openVarFile(path, os.O_RDONLY, 0)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return 0, nil, ErrVariableNotFound
+			return 0, nil, ErrVarNotExist
 		}
 		return 0, nil, err
 	}
@@ -175,7 +175,7 @@ func (v efivarfsVarsBackend) Get(name string, guid GUID) (VariableAttributes, []
 	var attrs VariableAttributes
 	if err := binary.Read(f, binary.LittleEndian, &attrs); err != nil {
 		if err == io.EOF {
-			return 0, nil, ErrVariableNotFound
+			return 0, nil, ErrVarNotExist
 		}
 		return 0, nil, err
 	}
