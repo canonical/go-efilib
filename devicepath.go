@@ -12,6 +12,8 @@ import (
 	"io"
 	"io/ioutil"
 	"math"
+	"os"
+	"strings"
 
 	"github.com/canonical/go-efilib/internal/ioerr"
 	"github.com/canonical/go-efilib/internal/uefi"
@@ -229,6 +231,12 @@ func (d *ACPIDevicePathNode) String() string {
 			return fmt.Sprintf("PcieRoot(0x%x)", d.UID)
 		case 0x0604:
 			return fmt.Sprintf("Floppy(0x%x)", d.UID)
+		case 0x0301:
+			return fmt.Sprintf("Keyboard(0x%x)", d.UID)
+		case 0x0501:
+			return fmt.Sprintf("Serial(0x%x)", d.UID)
+		case 0x0401:
+			return fmt.Sprintf("ParallelPort(0x%x)", d.UID)
 		default:
 			return fmt.Sprintf("Acpi(PNP%04x,0x%x)", d.HID>>16, d.UID)
 		}
@@ -271,20 +279,6 @@ func (d *ACPIExtendedDevicePathNode) String() string {
 		uidStr = "<nil>"
 	}
 
-	if (d.HID>>16)&0xffff == 0x0a03 || ((d.CID>>16)&0xffff == 0x0a03 && (d.HID>>16)&0xffff != 0x0a08) {
-		if d.UID == 0 {
-			return fmt.Sprintf("PciRoot(%s)", uidStr)
-		}
-		return fmt.Sprintf("PciRoot(0x%x)", d.UID)
-	}
-
-	if (d.HID>>16)&0xffff == 0x0a08 || (d.CID>>16)&0xffff == 0x0a08 {
-		if d.UID == 0 {
-			return fmt.Sprintf("PcieRoot(%s)", uidStr)
-		}
-		return fmt.Sprintf("PcieRoot(0x%x)", d.UID)
-	}
-
 	hidText := fmt.Sprintf("%c%c%c%04x",
 		((d.HID>>10)&0x1f)+'A'-1,
 		((d.HID>>5)&0x1f)+'A'-1,
@@ -296,7 +290,21 @@ func (d *ACPIExtendedDevicePathNode) String() string {
 		(d.CID&0x1f)+'A'-1,
 		(d.CID>>16)&0xffff)
 
-	if d.HIDStr == "" && d.CIDStr == "" && d.UIDStr != "" {
+	switch {
+	case d.HID&0xffff == 0x41d0:
+		switch {
+		case (d.HID>>16)&0xffff == 0x0a03 || ((d.CID>>16)&0xffff == 0x0a03 && (d.HID>>16)&0xffff != 0x0a08):
+			if d.UID == 0 {
+				return fmt.Sprintf("PciRoot(%s)", uidStr)
+			}
+			return fmt.Sprintf("PciRoot(0x%x)", d.UID)
+		case (d.HID>>16)&0xffff == 0x0a08 || (d.CID>>16)&0xffff == 0x0a08:
+			if d.UID == 0 {
+				return fmt.Sprintf("PcieRoot(%s)", uidStr)
+			}
+			return fmt.Sprintf("PcieRoot(0x%x)", d.UID)
+		}
+	case d.HIDStr == "" && d.CIDStr == "" && d.UIDStr != "":
 		if d.CID == 0 {
 			return fmt.Sprintf("AcpiExp(%s,0,%s)", hidText, d.UIDStr)
 		}
@@ -404,8 +412,18 @@ func (d *USBDevicePathNode) Write(w io.Writer) error {
 type USBClass uint8
 
 const (
+	USBClassAudio       USBClass = 0x01
+	USBClassCDCControl  USBClass = 0x02
+	USBClassHID         USBClass = 0x03
+	USBClassImage       USBClass = 0x06
+	USBClassPrinter     USBClass = 0x07
 	USBClassMassStorage USBClass = 0x08
 	USBClassHub         USBClass = 0x09
+	USBClassCDCData     USBClass = 0x0a
+	USBClassSmartCard   USBClass = 0x0b
+	USBClassVideo       USBClass = 0x0e
+	USBClassDiagnostic  USBClass = 0xdc
+	USBClassWireless    USBClass = 0xe0
 )
 
 // USBClassDevicePathNode corresponds to a USB class device path node.
@@ -420,10 +438,30 @@ type USBClassDevicePathNode struct {
 func (d *USBClassDevicePathNode) String() string {
 	var builder bytes.Buffer
 	switch d.DeviceClass {
+	case USBClassAudio:
+		fmt.Fprintf(&builder, "UsbAudio")
+	case USBClassCDCControl:
+		fmt.Fprintf(&builder, "UsbCDCControl")
+	case USBClassHID:
+		fmt.Fprintf(&builder, "UsbHID")
+	case USBClassImage:
+		fmt.Fprintf(&builder, "UsbImage")
+	case USBClassPrinter:
+		fmt.Fprintf(&builder, "UsbPrinter")
 	case USBClassMassStorage:
 		fmt.Fprintf(&builder, "UsbMassStorage")
 	case USBClassHub:
 		fmt.Fprintf(&builder, "UsbHub")
+	case USBClassCDCData:
+		fmt.Fprintf(&builder, "UsbCDCData")
+	case USBClassSmartCard:
+		fmt.Fprintf(&builder, "UsbSmartCard")
+	case USBClassVideo:
+		fmt.Fprintf(&builder, "UsbVideo")
+	case USBClassDiagnostic:
+		fmt.Fprintf(&builder, "UsbDiagnostic")
+	case USBClassWireless:
+		fmt.Fprintf(&builder, "UsbWireless")
 	default:
 		return fmt.Sprintf("UsbClass(0x%x,0x%x,0x%x,0x%x,0x%x)", d.VendorId, d.ProductId, d.DeviceClass, d.DeviceSubClass, d.DeviceProtocol)
 	}
@@ -530,7 +568,7 @@ type NVMENamespaceDevicePathNode struct {
 func (d *NVMENamespaceDevicePathNode) String() string {
 	var uuid [8]uint8
 	binary.BigEndian.PutUint64(uuid[:], d.NamespaceUUID)
-	return fmt.Sprintf("NVMe(0x%x-0x%02x-0x%02x-0x%02x-0x%02x-0x%02x-0x%02x-0x%02x-0x%02x)", d.NamespaceID,
+	return fmt.Sprintf("NVMe(0x%x-%02x-%02x-%02x-%02x-%02x-%02x-%02x-%02x)", d.NamespaceID,
 		uuid[0], uuid[1], uuid[2], uuid[3], uuid[4], uuid[5], uuid[6], uuid[7])
 }
 
@@ -563,20 +601,16 @@ type HardDriveDevicePathNode struct {
 }
 
 func (d *HardDriveDevicePathNode) String() string {
-	var builder bytes.Buffer
 	switch sig := d.Signature.(type) {
 	case nil:
-		fmt.Fprintf(&builder, "HD(%d,0,0,", d.PartitionNumber)
+		return fmt.Sprintf("HD(%d,0,0)", d.PartitionNumber)
 	case uint32:
-		fmt.Fprintf(&builder, "HD(%d,MBR,0x%08x,", d.PartitionNumber, sig)
+		return fmt.Sprintf("HD(%d,MBR,0x%08x)", d.PartitionNumber, sig)
 	case GUID:
-		fmt.Fprintf(&builder, "HD(%d,GPT,%s,", d.PartitionNumber, sig)
+		return fmt.Sprintf("HD(%d,GPT,%s)", d.PartitionNumber, sig)
 	default:
 		panic("invalid signature type")
 	}
-
-	fmt.Fprintf(&builder, "0x%016x,0x%016x)", d.PartitionStart, d.PartitionSize)
-	return builder.String()
 }
 
 func (d *HardDriveDevicePathNode) Write(w io.Writer) error {
@@ -616,7 +650,7 @@ type CDROMDevicePathNode struct {
 }
 
 func (d *CDROMDevicePathNode) String() string {
-	return fmt.Sprintf("CDROM(0x%x,0x%x,0x%x)", d.BootEntry, d.PartitionStart, d.PartitionSize)
+	return fmt.Sprintf("CDROM(0x%x)", d.BootEntry)
 }
 
 func (d *CDROMDevicePathNode) Write(w io.Writer) error {
@@ -651,6 +685,11 @@ func (d FilePathDevicePathNode) Write(w io.Writer) error {
 	data.Header.Length = uint16(binary.Size(data.Header) + binary.Size(data.PathName))
 
 	return data.Write(w)
+}
+
+func NewFilePathDevicePathNode(path string) FilePathDevicePathNode {
+	components := strings.Split(path, string(os.PathSeparator))
+	return FilePathDevicePathNode("\\" + strings.Join(components, "\\"))
 }
 
 // MediaFvFileDevicePathNode corresponds to a firmware volume file device path node.

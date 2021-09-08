@@ -22,8 +22,8 @@ func (s *dpSuite) TestReadDevicePath(c *C) {
 		"300680069006d007800360034002e0065006600690000007fff0400"))
 	path, err := ReadDevicePath(r)
 	c.Assert(err, IsNil)
-	c.Check(path.String(), Equals, "\\PciRoot(0x0)\\Pci(0x1d,0x0)\\Pci(0x0,0x0)\\NVMe(0x1-0x00-0x00-0x00-0x00-0x00-0x00-0x00-0x00)"+
-		"\\HD(1,GPT,66de947b-fdb2-4525-b752-30d66bb2b960,0x0000000000000800,0x0000000000100000)\\\\EFI\\ubuntu\\shimx64.efi")
+	c.Check(path.String(), Equals, "\\PciRoot(0x0)\\Pci(0x1d,0x0)\\Pci(0x0,0x0)\\NVMe(0x1-00-00-00-00-00-00-00-00)"+
+		"\\HD(1,GPT,66de947b-fdb2-4525-b752-30d66bb2b960)\\\\EFI\\ubuntu\\shimx64.efi")
 
 	expected := DevicePath{
 		&ACPIDevicePathNode{
@@ -57,8 +57,7 @@ func (s *dpSuite) TestReadDevicePathUnrecognizedType(c *C) {
 	c.Assert(err, IsNil)
 	c.Check(path.String(), Equals, "\\AcpiPath(255,000000000000000000000000564d427573000000)"+
 		"\\HardwarePath(85,a2e5179b9108dd42b65380b5c22809bad96361baa104294db60572e2ffb1dc7f5a80e5d23e369c4494ed50c0a0cd8656)"+
-		"\\Scsi(0x0,0x0)\\HD(15,GPT,8933fedb-2f53-490b-a245-5c7fa1f98632,0x0000000000002800,0x0000000000035000)"+
-		"\\\\EFI\\ubuntu\\shimx64.efi")
+		"\\Scsi(0x0,0x0)\\HD(15,GPT,8933fedb-2f53-490b-a245-5c7fa1f98632)\\\\EFI\\ubuntu\\shimx64.efi")
 
 	expected := DevicePath{
 		&RawDevicePathNode{
@@ -91,8 +90,7 @@ func (s *dpSuite) TestReadDevicePath2(c *C) {
 	c.Assert(err, IsNil)
 	c.Check(path.String(), Equals, "\\AcpiEx(VMBus,<nil>,<nil>)"+
 		"\\VenHw(9b17e5a2-0891-42dd-b653-80b5c22809ba,d96361baa104294db60572e2ffb1dc7f5a80e5d23e369c4494ed50c0a0cd8656)"+
-		"\\Scsi(0x0,0x0)\\HD(15,GPT,8933fedb-2f53-490b-a245-5c7fa1f98632,0x0000000000002800,0x0000000000035000)"+
-		"\\\\EFI\\ubuntu\\shimx64.efi")
+		"\\Scsi(0x0,0x0)\\HD(15,GPT,8933fedb-2f53-490b-a245-5c7fa1f98632)\\\\EFI\\ubuntu\\shimx64.efi")
 
 	expected := DevicePath{
 		&ACPIExtendedDevicePathNode{HIDStr: "VMBus"},
@@ -123,4 +121,9 @@ func (s *dpSuite) TestWriteDevicePath(c *C) {
 	w := new(bytes.Buffer)
 	c.Check(path.Write(w), IsNil)
 	c.Check(w.Bytes(), DeepEquals, src)
+}
+
+func (d *dpSuite) TestNewFilePathDevicePathNode(c *C) {
+	p := NewFilePathDevicePathNode("EFI/ubuntu/shimx64.efi")
+	c.Check(p, Equals, FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi"))
 }
