@@ -266,7 +266,7 @@ func (s *varsLinuxSuite) TestProbeEfivarfs(c *C) {
 		if err := unix.Statfs("testdata", st); err != nil {
 			return err
 		}
-		st.Type = unix.EFIVARFS_MAGIC
+		st.Type = EFIVARFS_MAGIC
 		return nil
 	})
 	defer restore()
