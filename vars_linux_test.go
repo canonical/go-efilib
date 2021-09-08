@@ -75,14 +75,14 @@ func (f *mockEfivarfsFile) Readdir(n int) ([]os.FileInfo, error) {
 	return nil, &os.PathError{Op: "readdirent", Path: f.name, Err: syscall.EBADF}
 }
 
-func (f *mockEfivarfsFile) GetInodeFlags() (uint32, error) {
+func (f *mockEfivarfsFile) GetInodeFlags() (uint, error) {
 	if f.closed {
 		return 0, errors.New("file already closed")
 	}
 	return f.v.flags, nil
 }
 
-func (f *mockEfivarfsFile) SetInodeFlags(flags uint32) error {
+func (f *mockEfivarfsFile) SetInodeFlags(flags uint) error {
 	if f.closed {
 		return errors.New("file already closed")
 	}
@@ -181,14 +181,14 @@ func (f *mockEfivarfsDir) Readdir(n int) (out []os.FileInfo, err error) {
 	return out[:n], nil
 }
 
-func (f *mockEfivarfsDir) SetInodeFlags(flags uint32) error {
+func (f *mockEfivarfsDir) SetInodeFlags(flags uint) error {
 	return errors.New("unsupported")
 }
 
 type mockEfiVar struct {
 	data  []byte
 	mode  os.FileMode
-	flags uint32
+	flags uint
 }
 
 type mockEfiVarfs struct {
@@ -351,7 +351,7 @@ func (s *varsLinuxSuite) TestWriteVarImmutable(c *C) {
 	v, ok := s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"]
 	c.Check(ok, Equals, true)
 	c.Check(v.data, DeepEquals, decodeHexString(c, "07000000080808080808"))
-	c.Check(v.flags, Equals, uint32(immutableFlag))
+	c.Check(v.flags, Equals, uint(immutableFlag))
 }
 
 func (s *varsLinuxSuite) TestWriteVarMutable(c *C) {
@@ -362,7 +362,7 @@ func (s *varsLinuxSuite) TestWriteVarMutable(c *C) {
 	v, ok := s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/BootOrder-8be4df61-93ca-11d2-aa0d-00e098032b8c"]
 	c.Check(ok, Equals, true)
 	c.Check(v.data, DeepEquals, decodeHexString(c, "070000000001"))
-	c.Check(v.flags, Equals, uint32(0))
+	c.Check(v.flags, Equals, uint(0))
 }
 
 func (s *varsLinuxSuite) TestWriteVarAppend(c *C) {
@@ -374,7 +374,7 @@ func (s *varsLinuxSuite) TestWriteVarAppend(c *C) {
 	v, ok := s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/BootOrder-8be4df61-93ca-11d2-aa0d-00e098032b8c"]
 	c.Check(ok, Equals, true)
 	c.Check(v.data, DeepEquals, decodeHexString(c, "0700000000000001"))
-	c.Check(v.flags, Equals, uint32(0))
+	c.Check(v.flags, Equals, uint(0))
 }
 
 func (s *varsLinuxSuite) TestCreateVar(c *C) {

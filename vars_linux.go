@@ -16,6 +16,8 @@ import (
 	"syscall"
 
 	"golang.org/x/sys/unix"
+
+	internal_unix "github.com/canonical/go-efilib/internal/unix"
 )
 
 func efivarfsPath() string {
@@ -25,8 +27,8 @@ func efivarfsPath() string {
 type varFile interface {
 	io.ReadWriteCloser
 	Readdir(n int) ([]os.FileInfo, error)
-	GetInodeFlags() (uint32, error)
-	SetInodeFlags(flags uint32) error
+	GetInodeFlags() (uint, error)
+	SetInodeFlags(flags uint) error
 }
 
 func makeVarFileMutable(f varFile) (restore func() error, err error) {
@@ -55,16 +57,16 @@ type realVarFile struct {
 	*os.File
 }
 
-func (f *realVarFile) GetInodeFlags() (uint32, error) {
-	flags, err := unix.IoctlGetUint32(int(f.Fd()), unix.FS_IOC_GETFLAGS)
+func (f *realVarFile) GetInodeFlags() (uint, error) {
+	flags, err := internal_unix.IoctlGetUint(int(f.Fd()), unix.FS_IOC_GETFLAGS)
 	if err != nil {
 		return 0, &os.PathError{Op: "ioctl", Path: f.Name(), Err: err}
 	}
 	return flags, nil
 }
 
-func (f *realVarFile) SetInodeFlags(flags uint32) error {
-	if err := unix.IoctlSetPointerInt(int(f.Fd()), unix.FS_IOC_SETFLAGS, int(flags)); err != nil {
+func (f *realVarFile) SetInodeFlags(flags uint) error {
+	if err := internal_unix.IoctlSetPointerUint(int(f.Fd()), unix.FS_IOC_SETFLAGS, flags); err != nil {
 		return &os.PathError{Op: "ioctl", Path: f.Name(), Err: err}
 	}
 	return nil
