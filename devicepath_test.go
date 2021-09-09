@@ -6,6 +6,7 @@ package efi_test
 
 import (
 	"bytes"
+	"os"
 
 	. "github.com/canonical/go-efilib"
 
@@ -132,4 +133,96 @@ func (d *dpSuite) TestEISAID(c *C) {
 	id := EISAID(0xa5a541d0)
 	c.Check(id.Vendor(), Equals, "PNP")
 	c.Check(id.Product(), DeepEquals, uint16(0xa5a5))
+}
+
+func (d *dpSuite) TestNewEISAID(c *C) {
+	id, err := NewEISAID("PNP", 0x0a08)
+	c.Check(err, IsNil)
+	c.Check(id, Equals, EISAID(0x0a0841d0))
+}
+
+type testNewHardDriveDevicePathNodeFromDeviceData struct {
+	part     int
+	expected *HardDriveDevicePathNode
+}
+
+func (d *dpSuite) testNewHardDriveDevicePathNodeFromDevice(c *C, data *testNewHardDriveDevicePathNodeFromDeviceData) {
+	f, err := os.Open("testdata/partitiontables/cloudimg")
+	c.Assert(err, IsNil)
+	defer f.Close()
+
+	fi, err := f.Stat()
+	c.Assert(err, IsNil)
+
+	node, err := NewHardDriveDevicePathNodeFromDevice(f, fi.Size(), 512, data.part)
+	c.Assert(err, IsNil)
+	c.Check(node, DeepEquals, data.expected)
+}
+
+func (d *dpSuite) TestNewHardDriveDevicePathNodeFromDevice1(c *C) {
+	d.testNewHardDriveDevicePathNodeFromDevice(c, &testNewHardDriveDevicePathNodeFromDeviceData{
+		part: 1,
+		expected: &HardDriveDevicePathNode{
+			PartitionNumber: 1,
+			PartitionStart:  0x37800,
+			PartitionSize:   0x42e7df,
+			Signature:       MakeGUID(0x15eae969, 0x91f2, 0x437b, 0x95cc, [...]uint8{0xec, 0x11, 0xd3, 0x40, 0x95, 0x9b}),
+			MBRType:         GPT}})
+}
+
+func (d *dpSuite) TestNewHardDriveDevicePathNodeFromDevice2(c *C) {
+	d.testNewHardDriveDevicePathNodeFromDevice(c, &testNewHardDriveDevicePathNodeFromDeviceData{
+		part: 14,
+		expected: &HardDriveDevicePathNode{
+			PartitionNumber: 14,
+			PartitionStart:  0x800,
+			PartitionSize:   0x2000,
+			Signature:       MakeGUID(0x71c94a7b, 0xfa01, 0x416c, 0x9cdd, [...]uint8{0x60, 0x02, 0x5b, 0x54, 0xd8, 0xd2}),
+			MBRType:         GPT}})
+}
+
+type testNewHardDriveDevicePathNodeFromDeviceErrorData struct {
+	path string
+	part int
+	err  string
+}
+
+func (d *dpSuite) testNewHardDriveDevicePathNodeFromDeviceError(c *C, data *testNewHardDriveDevicePathNodeFromDeviceErrorData) {
+	f, err := os.Open(data.path)
+	c.Assert(err, IsNil)
+	defer f.Close()
+
+	fi, err := f.Stat()
+	c.Assert(err, IsNil)
+
+	_, err = NewHardDriveDevicePathNodeFromDevice(f, fi.Size(), 512, data.part)
+	c.Check(err, ErrorMatches, data.err)
+}
+
+func (d *dpSuite) TestNewHardDriveDevicePathNodeFromDeviceInvalidPart1(c *C) {
+	d.testNewHardDriveDevicePathNodeFromDeviceError(c, &testNewHardDriveDevicePathNodeFromDeviceErrorData{
+		path: "testdata/partitiontables/cloudimg",
+		part: 0,
+		err:  "invalid partition number"})
+}
+
+func (d *dpSuite) TestNewHardDriveDevicePathNodeFromDeviceInvalidPart2(c *C) {
+	d.testNewHardDriveDevicePathNodeFromDeviceError(c, &testNewHardDriveDevicePathNodeFromDeviceErrorData{
+		path: "testdata/partitiontables/cloudimg",
+		part: 300,
+		err:  "invalid partition number 300: device only has 128 partitions"})
+}
+
+func (d *dpSuite) TestNewHardDriveDevicePathNodeFromDeviceInvalidPart3(c *C) {
+	d.testNewHardDriveDevicePathNodeFromDeviceError(c, &testNewHardDriveDevicePathNodeFromDeviceErrorData{
+		path: "testdata/partitiontables/cloudimg",
+		part: 2,
+		err:  "requested partition is unused"})
+}
+
+func (d *dpSuite) TestNewHardDriveDevicePathNodeFromDeviceInvalidHeader(c *C) {
+	d.testNewHardDriveDevicePathNodeFromDeviceError(c, &testNewHardDriveDevicePathNodeFromDeviceErrorData{
+		path: "testdata/partitiontables/cloudimg-invalid-hdr-checksum",
+		part: 1,
+		err:  "cannot read GPT header: CRC check failed"})
 }

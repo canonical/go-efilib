@@ -236,6 +236,20 @@ func (id EISAID) String() string {
 	return fmt.Sprintf("%s%04x", id.Vendor(), id.Product())
 }
 
+func NewEISAID(vendor string, product uint16) (EISAID, error) {
+	if len(vendor) != 3 {
+		return 0, errors.New("invalid vendor length")
+	}
+
+	var out EISAID
+	out |= EISAID((vendor[0]-'A'+1)&0x1f) << 10
+	out |= EISAID((vendor[1]-'A'+1)&0x1f) << 5
+	out |= EISAID((vendor[2] - 'A' + 1) & 0x1f)
+	out |= EISAID(product) << 16
+
+	return out, nil
+}
+
 // ACPIDevicePathNode corresponds to an ACPI device path node.
 type ACPIDevicePathNode struct {
 	HID EISAID
@@ -688,6 +702,38 @@ func (d *HardDriveDevicePathNode) Write(w io.Writer) error {
 	return binary.Write(w, binary.LittleEndian, &data)
 }
 
+// NewHardDriveDevicePathNodeFromDevice constructs a HardDriveDevicePathNode for the
+// specified partition on the supplied device reader. This requires that the underlying
+// device has a valid primary GPT. The device's total size and logical block size must
+// be supplied.
+func NewHardDriveDevicePathNodeFromDevice(r io.ReaderAt, totalSz, blockSz int64, part int) (*HardDriveDevicePathNode, error) {
+	if part < 1 {
+		return nil, errors.New("invalid partition number")
+	}
+
+	table, err := ReadPartitionTable(r, totalSz, blockSz, PrimaryPartitionTable, true)
+	if err != nil {
+		return nil, err
+	}
+
+	if part > len(table.Entries) {
+		return nil, fmt.Errorf("invalid partition number %d: device only has %d partitions", part, len(table.Entries))
+	}
+
+	entry := table.Entries[part-1]
+
+	if entry.PartitionTypeGUID == UnusedPartitionType {
+		return nil, errors.New("requested partition is unused")
+	}
+
+	return &HardDriveDevicePathNode{
+		PartitionNumber: uint32(part),
+		PartitionStart:  uint64(entry.StartingLBA),
+		PartitionSize:   uint64(entry.EndingLBA - entry.StartingLBA + 1),
+		Signature:       entry.UniquePartitionGUID,
+		MBRType:         GPT}, nil
+}
+
 // CDROMDevicePathNode corresponds to a CDROM device path node.
 type CDROMDevicePathNode struct {
 	BootEntry      uint32
@@ -733,6 +779,9 @@ func (d FilePathDevicePathNode) Write(w io.Writer) error {
 	return data.Write(w)
 }
 
+// NewFilePathDevicePathNode constructs a new FilePathDevicePathNode from the supplied
+// path, converting the OS native separators to EFI separators ("\") and prepending
+// a separator to the start of the path if one doesn't already exist.
 func NewFilePathDevicePathNode(path string) FilePathDevicePathNode {
 	components := strings.Split(path, string(os.PathSeparator))
 	return FilePathDevicePathNode("\\" + strings.Join(components, "\\"))

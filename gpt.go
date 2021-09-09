@@ -18,6 +18,9 @@ import (
 	"github.com/canonical/go-efilib/internal/uefi"
 )
 
+// UnusedPartitionType is the type GUID of an unused partition entry.
+var UnusedPartitionType GUID
+
 // PartitionTableHeader correponds to the EFI_PARTITION_TABLE_HEADER type.
 type PartitionTableHeader struct {
 	HeaderSize               uint32
