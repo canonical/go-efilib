@@ -29,6 +29,7 @@ const (
 	ACPI_DP          = 0x01
 	ACPI_EXTENDED_DP = 0x02
 
+	MSG_ATAPI_DP               = 0x01
 	MSG_SCSI_DP                = 0x02
 	MSG_USB_DP                 = 0x05
 	MSG_USB_CLASS_DP           = 0x0f
@@ -77,6 +78,13 @@ type ACPI_EXTENDED_HID_DEVICE_PATH struct {
 	HID    uint32
 	UID    uint32
 	CID    uint32
+}
+
+type ATAPI_DEVICE_PATH struct {
+	Header           EFI_DEVICE_PATH_PROTOCOL
+	PrimarySecondary uint8
+	SlaveMaster      uint8
+	Lun              uint16
 }
 
 type SCSI_DEVICE_PATH struct {

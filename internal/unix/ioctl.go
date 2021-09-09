@@ -18,6 +18,15 @@ func IoctlGetUint(fd int, req uint) (uint, error) {
 	return value, nil
 }
 
+func IoctlGetUint64(fd int, req uint) (uint64, error) {
+	var value uint64
+	_, _, err := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), uintptr(req), uintptr(unsafe.Pointer(&value)))
+	if err != 0 {
+		return 0, err
+	}
+	return value, nil
+}
+
 func IoctlSetPointerUint(fd int, req, value uint) error {
 	v := value
 	_, _, err := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), uintptr(req), uintptr(unsafe.Pointer(&v)))

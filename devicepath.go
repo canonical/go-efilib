@@ -216,15 +216,35 @@ func readVendorDevicePathNode(r io.Reader) (out *VendorDevicePathNode, err error
 	return out, nil
 }
 
+// EISAID represents a compressed EISA PNP ID
+type EISAID uint32
+
+// Vendor returns the 3-letter vendor ID.
+func (id EISAID) Vendor() string {
+	return fmt.Sprintf("%c%c%c",
+		((id>>10)&0x1f)+'A'-1,
+		((id>>5)&0x1f)+'A'-1,
+		(id&0x1f)+'A'-1)
+}
+
+// Product returns the product ID.
+func (id EISAID) Product() uint16 {
+	return uint16(id >> 16)
+}
+
+func (id EISAID) String() string {
+	return fmt.Sprintf("%s%04x", id.Vendor(), id.Product())
+}
+
 // ACPIDevicePathNode corresponds to an ACPI device path node.
 type ACPIDevicePathNode struct {
-	HID uint32
+	HID EISAID
 	UID uint32
 }
 
 func (d *ACPIDevicePathNode) String() string {
-	if d.HID&0xffff == 0x41d0 {
-		switch d.HID >> 16 {
+	if d.HID.Vendor() == "PNP" {
+		switch d.HID.Product() {
 		case 0x0a03:
 			return fmt.Sprintf("PciRoot(0x%x)", d.UID)
 		case 0x0a08:
@@ -241,7 +261,7 @@ func (d *ACPIDevicePathNode) String() string {
 			return fmt.Sprintf("Acpi(PNP%04x,0x%x)", d.HID>>16, d.UID)
 		}
 	}
-	return fmt.Sprintf("Acpi(0x%08x,0x%x)", d.HID, d.UID)
+	return fmt.Sprintf("Acpi(0x%08x,0x%x)", uint32(d.HID), d.UID)
 }
 
 func (d *ACPIDevicePathNode) Write(w io.Writer) error {
@@ -249,17 +269,17 @@ func (d *ACPIDevicePathNode) Write(w io.Writer) error {
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.ACPI_DEVICE_PATH),
 			SubType: uint8(uefi.ACPI_DP)},
-		HID: d.HID,
-		UID: d.UID}
+		HID: uint32(d.HID),
+		UID: uint32(d.UID)}
 	data.Header.Length = uint16(binary.Size(data))
 
 	return binary.Write(w, binary.LittleEndian, &data)
 }
 
 type ACPIExtendedDevicePathNode struct {
-	HID    uint32
+	HID    EISAID
 	UID    uint32
-	CID    uint32
+	CID    EISAID
 	HIDStr string
 	UIDStr string
 	CIDStr string
@@ -274,33 +294,21 @@ func (d *ACPIExtendedDevicePathNode) String() string {
 	if cidStr == "" {
 		cidStr = "<nil>"
 	}
-	uidStr := d.UIDStr
-	if uidStr == "" {
-		uidStr = "<nil>"
-	}
 
-	hidText := fmt.Sprintf("%c%c%c%04x",
-		((d.HID>>10)&0x1f)+'A'-1,
-		((d.HID>>5)&0x1f)+'A'-1,
-		(d.HID&0x1f)+'A'-1,
-		(d.HID>>16)&0xffff)
-	cidText := fmt.Sprintf("%c%c%c%04x",
-		((d.CID>>10)&0x1f)+'A'-1,
-		((d.CID>>5)&0x1f)+'A'-1,
-		(d.CID&0x1f)+'A'-1,
-		(d.CID>>16)&0xffff)
+	hidText := d.HID.String()
+	cidText := d.CID.String()
 
 	switch {
-	case d.HID&0xffff == 0x41d0:
+	case d.HID.Vendor() == "PNP":
 		switch {
-		case (d.HID>>16)&0xffff == 0x0a03 || ((d.CID>>16)&0xffff == 0x0a03 && (d.HID>>16)&0xffff != 0x0a08):
-			if d.UID == 0 {
-				return fmt.Sprintf("PciRoot(%s)", uidStr)
+		case d.HID.Product() == 0x0a03 || (d.CID.Product() == 0x0a03 && d.HID.Product() != 0x0a08):
+			if d.UIDStr != "" {
+				return fmt.Sprintf("PciRoot(%s)", d.UIDStr)
 			}
 			return fmt.Sprintf("PciRoot(0x%x)", d.UID)
-		case (d.HID>>16)&0xffff == 0x0a08 || (d.CID>>16)&0xffff == 0x0a08:
-			if d.UID == 0 {
-				return fmt.Sprintf("PcieRoot(%s)", uidStr)
+		case d.HID.Product() == 0x0a08 || d.CID.Product() == 0x0a08:
+			if d.UIDStr != "" {
+				return fmt.Sprintf("PcieRoot(%s)", d.UIDStr)
 			}
 			return fmt.Sprintf("PcieRoot(0x%x)", d.UID)
 		}
@@ -320,8 +328,8 @@ func (d *ACPIExtendedDevicePathNode) String() string {
 
 	var s bytes.Buffer
 	fmt.Fprintf(&s, "AcpiEx(%s,%s,", hidText, cidText)
-	if d.UID == 0 {
-		fmt.Fprintf(&s, "%s)", uidStr)
+	if d.UIDStr != "" {
+		fmt.Fprintf(&s, "%s)", d.UIDStr)
 	} else {
 		fmt.Fprintf(&s, "0x%x)", d.UID)
 	}
@@ -334,9 +342,9 @@ func (d *ACPIExtendedDevicePathNode) Write(w io.Writer) error {
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.ACPI_DEVICE_PATH),
 			SubType: uint8(uefi.ACPI_EXTENDED_DP)},
-		HID: d.HID,
+		HID: uint32(d.HID),
 		UID: d.UID,
-		CID: d.CID}
+		CID: uint32(d.CID)}
 	// Set a reasonable limit on each string field
 	for _, s := range []string{d.HIDStr, d.UIDStr, d.CIDStr} {
 		if len(s) > math.MaxUint16-(binary.Size(data)+3) {
@@ -363,6 +371,44 @@ func (d *ACPIExtendedDevicePathNode) Write(w io.Writer) error {
 	}
 
 	return nil
+}
+
+type ATAPIControllerRole uint8
+
+const (
+	ATAPIControllerPrimary   ATAPIControllerRole = 0
+	ATAPIControllerSecondary ATAPIControllerRole = 1
+)
+
+type ATAPIDriveRole uint8
+
+const (
+	ATAPIDriveMaster ATAPIDriveRole = 0
+	ATAPIDriveSlave  ATAPIDriveRole = 1
+)
+
+// ATAPIDevicePathNode corresponds to an ATA device path node.
+type ATAPIDevicePathNode struct {
+	Controller ATAPIControllerRole
+	Drive      ATAPIDriveRole
+	LUN        uint16
+}
+
+func (d *ATAPIDevicePathNode) String() string {
+	return fmt.Sprintf("Ata(%d)", d.LUN)
+}
+
+func (d *ATAPIDevicePathNode) Write(w io.Writer) error {
+	data := uefi.ATAPI_DEVICE_PATH{
+		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
+			Type:    uint8(uefi.MESSAGING_DEVICE_PATH),
+			SubType: uint8(uefi.MSG_ATAPI_DP)},
+		PrimarySecondary: uint8(d.Controller),
+		SlaveMaster:      uint8(d.Drive),
+		Lun:              d.LUN}
+	data.Header.Length = uint16(binary.Size(data))
+
+	return binary.Write(w, binary.LittleEndian, &data)
 }
 
 // SCSIDevicePathNode corresponds to a SCSI device path node.
@@ -797,13 +843,13 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
-			return &ACPIDevicePathNode{HID: n.HID, UID: n.UID}, nil
+			return &ACPIDevicePathNode{HID: EISAID(n.HID), UID: n.UID}, nil
 		case uefi.ACPI_EXTENDED_DP:
 			var n uefi.ACPI_EXTENDED_HID_DEVICE_PATH
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
-			node := &ACPIExtendedDevicePathNode{HID: n.HID, UID: n.UID, CID: n.CID}
+			node := &ACPIExtendedDevicePathNode{HID: EISAID(n.HID), UID: n.UID, CID: EISAID(n.CID)}
 			for _, s := range []*string{&node.HIDStr, &node.UIDStr, &node.CIDStr} {
 				v, err := buf.ReadString('\x00')
 				if err != nil {
@@ -815,6 +861,15 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 		}
 	case uefi.MESSAGING_DEVICE_PATH:
 		switch h.SubType {
+		case uefi.MSG_ATAPI_DP:
+			var n uefi.ATAPI_DEVICE_PATH
+			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
+				return nil, err
+			}
+			return &ATAPIDevicePathNode{
+				Controller: ATAPIControllerRole(n.PrimarySecondary),
+				Drive:      ATAPIDriveRole(n.SlaveMaster),
+				LUN:        n.Lun}, nil
 		case uefi.MSG_SCSI_DP:
 			var n uefi.SCSI_DEVICE_PATH
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {

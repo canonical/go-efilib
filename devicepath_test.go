@@ -88,7 +88,7 @@ func (s *dpSuite) TestReadDevicePath2(c *C) {
 		"00680069006d007800360034002e0065006600690000007fff0400"))
 	path, err := ReadDevicePath(r)
 	c.Assert(err, IsNil)
-	c.Check(path.String(), Equals, "\\AcpiEx(VMBus,<nil>,<nil>)"+
+	c.Check(path.String(), Equals, "\\AcpiEx(VMBus,<nil>,0x0)"+
 		"\\VenHw(9b17e5a2-0891-42dd-b653-80b5c22809ba,d96361baa104294db60572e2ffb1dc7f5a80e5d23e369c4494ed50c0a0cd8656)"+
 		"\\Scsi(0x0,0x0)\\HD(15,GPT,8933fedb-2f53-490b-a245-5c7fa1f98632)\\\\EFI\\ubuntu\\shimx64.efi")
 
@@ -126,4 +126,10 @@ func (s *dpSuite) TestWriteDevicePath(c *C) {
 func (d *dpSuite) TestNewFilePathDevicePathNode(c *C) {
 	p := NewFilePathDevicePathNode("EFI/ubuntu/shimx64.efi")
 	c.Check(p, Equals, FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi"))
+}
+
+func (d *dpSuite) TestEISAID(c *C) {
+	id := EISAID(0xa5a541d0)
+	c.Check(id.Vendor(), Equals, "PNP")
+	c.Check(id.Product(), DeepEquals, uint16(0xa5a5))
 }
