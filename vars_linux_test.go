@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"syscall"
 	"time"
+	"unsafe"
 
 	"golang.org/x/sys/unix"
 
@@ -266,7 +267,7 @@ func (s *varsLinuxSuite) TestProbeEfivarfs(c *C) {
 		if err := unix.Statfs("testdata", st); err != nil {
 			return err
 		}
-		st.Type = unix.EFIVARFS_MAGIC
+		*(*uint)(unsafe.Pointer(&st.Type)) = uint(unix.EFIVARFS_MAGIC)
 		return nil
 	})
 	defer restore()
