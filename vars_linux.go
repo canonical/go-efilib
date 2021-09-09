@@ -92,7 +92,7 @@ func probeEfivarfs() bool {
 	if err := varsStatfs(efivarfsPath(), &st); err != nil {
 		return false
 	}
-	if st.Type != unix.EFIVARFS_MAGIC {
+	if uint(st.Type) != uint(unix.EFIVARFS_MAGIC) {
 		return false
 	}
 	return true
