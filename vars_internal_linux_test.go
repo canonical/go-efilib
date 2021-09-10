@@ -13,11 +13,11 @@ import (
 	. "gopkg.in/check.v1"
 )
 
-func mockVarsStatfs(fn func(string, *unix.Statfs_t) error) (restore func()) {
-	orig := varsStatfs
-	varsStatfs = fn
+func mockUnixStatfs(fn func(string, *unix.Statfs_t) error) (restore func()) {
+	orig := unixStatfs
+	unixStatfs = fn
 	return func() {
-		varsStatfs = orig
+		unixStatfs = orig
 	}
 }
 
@@ -26,7 +26,7 @@ type varsLinuxSuite struct{}
 var _ = Suite(&varsLinuxSuite{})
 
 func (s *varsLinuxSuite) TestProbeEfivarfs(c *C) {
-	restore := mockVarsStatfs(func(path string, st *unix.Statfs_t) error {
+	restore := mockUnixStatfs(func(path string, st *unix.Statfs_t) error {
 		if path != "/sys/firmware/efi/efivars" {
 			return syscall.ENOENT
 		}
@@ -43,7 +43,7 @@ func (s *varsLinuxSuite) TestProbeEfivarfs(c *C) {
 }
 
 func (s *varsLinuxSuite) TestProbeEfivarfsNOENT(c *C) {
-	restore := mockVarsStatfs(func(path string, st *unix.Statfs_t) error {
+	restore := mockUnixStatfs(func(path string, st *unix.Statfs_t) error {
 		return syscall.ENOENT
 	})
 	defer restore()
@@ -52,7 +52,7 @@ func (s *varsLinuxSuite) TestProbeEfivarfsNOENT(c *C) {
 }
 
 func (s *varsLinuxSuite) TestProbeEfivarfsBadFS(c *C) {
-	restore := mockVarsStatfs(func(path string, st *unix.Statfs_t) error {
+	restore := mockUnixStatfs(func(path string, st *unix.Statfs_t) error {
 		unix.Statfs("testdata", st)
 		st.Type = unix.SYSFS_MAGIC
 		return nil

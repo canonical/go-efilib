@@ -80,16 +80,11 @@ func realOpenVarFile(path string, flags int, perm os.FileMode) (varFile, error) 
 	return &realVarFile{f}, nil
 }
 
-var (
-	guidLength = len("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
-
-	openVarFile = realOpenVarFile
-	varsStatfs  = unix.Statfs
-)
+var guidLength = len("xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx")
 
 func probeEfivarfs() bool {
 	var st unix.Statfs_t
-	if err := varsStatfs(efivarfsPath(), &st); err != nil {
+	if err := unixStatfs(efivarfsPath(), &st); err != nil {
 		return false
 	}
 	if uint(st.Type) != uint(unix.EFIVARFS_MAGIC) {
