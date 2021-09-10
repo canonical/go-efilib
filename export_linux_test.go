@@ -18,7 +18,6 @@ type (
 
 var (
 	Defer         = errors.New("")
-	ProbeEfivarfs = probeEfivarfs
 )
 
 func MockOpenVarFile(fn func(string, int, os.FileMode) (VarFile, error)) (restore func()) {

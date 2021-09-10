@@ -13,9 +13,6 @@ import (
 	"path/filepath"
 	"syscall"
 	"time"
-	"unsafe"
-
-	"golang.org/x/sys/unix"
 
 	. "gopkg.in/check.v1"
 
@@ -257,43 +254,6 @@ func (s *varsLinuxSuite) TearDownTest(c *C) {
 }
 
 var _ = Suite(&varsLinuxSuite{})
-
-func (s *varsLinuxSuite) TestProbeEfivarfs(c *C) {
-	restore := MockVarsStatfs(func(path string, st *unix.Statfs_t) error {
-		if path != "/sys/firmware/efi/efivars" {
-			return syscall.ENOENT
-		}
-
-		if err := unix.Statfs("testdata", st); err != nil {
-			return err
-		}
-		*(*uint)(unsafe.Pointer(&st.Type)) = uint(unix.EFIVARFS_MAGIC)
-		return nil
-	})
-	defer restore()
-
-	c.Check(ProbeEfivarfs(), Equals, true)
-}
-
-func (s *varsLinuxSuite) TestProbeEfivarfsNOENT(c *C) {
-	restore := MockVarsStatfs(func(path string, st *unix.Statfs_t) error {
-		return syscall.ENOENT
-	})
-	defer restore()
-
-	c.Check(ProbeEfivarfs(), Equals, false)
-}
-
-func (s *varsLinuxSuite) TestProbeEfivarfsBadFS(c *C) {
-	restore := MockVarsStatfs(func(path string, st *unix.Statfs_t) error {
-		unix.Statfs("testdata", st)
-		st.Type = unix.SYSFS_MAGIC
-		return nil
-	})
-	defer restore()
-
-	c.Check(ProbeEfivarfs(), Equals, false)
-}
 
 type testReadVarData struct {
 	name          string
