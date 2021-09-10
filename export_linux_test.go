@@ -7,8 +7,6 @@ package efi
 import (
 	"errors"
 	"os"
-
-	"golang.org/x/sys/unix"
 )
 
 type (
@@ -17,7 +15,7 @@ type (
 )
 
 var (
-	Defer         = errors.New("")
+	Defer = errors.New("")
 )
 
 func MockOpenVarFile(fn func(string, int, os.FileMode) (VarFile, error)) (restore func()) {
@@ -33,13 +31,5 @@ func MockOpenVarFile(fn func(string, int, os.FileMode) (VarFile, error)) (restor
 
 	return func() {
 		openVarFile = orig
-	}
-}
-
-func MockVarsStatfs(fn func(string, *unix.Statfs_t) error) (restore func()) {
-	orig := varsStatfs
-	varsStatfs = fn
-	return func() {
-		varsStatfs = orig
 	}
 }
