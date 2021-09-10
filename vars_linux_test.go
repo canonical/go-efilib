@@ -239,9 +239,9 @@ type varsLinuxSuite struct {
 
 func (s *varsLinuxSuite) SetUpTest(c *C) {
 	s.mockEfiVarfs = &mockEfiVarfs{vars: make(map[string]*mockEfiVar)}
-	s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c"] = &mockEfiVar{data: decodeHexString(c, "0600000001"), flags: immutableFlag}
-	s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/BootOrder-8be4df61-93ca-11d2-aa0d-00e098032b8c"] = &mockEfiVar{data: decodeHexString(c, "070000000000")}
-	s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"] = &mockEfiVar{data: decodeHexString(c, "07000000a5a5a5a5"), flags: immutableFlag}
+	s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c"] = &mockEfiVar{data: DecodeHexString(c, "0600000001"), flags: immutableFlag}
+	s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/BootOrder-8be4df61-93ca-11d2-aa0d-00e098032b8c"] = &mockEfiVar{data: DecodeHexString(c, "070000000000")}
+	s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"] = &mockEfiVar{data: DecodeHexString(c, "07000000a5a5a5a5"), flags: immutableFlag}
 
 	s.restoreBackend = MockVarsBackend(EfivarfsVarsBackend{})
 	s.restoreOpenVarFile = MockOpenVarFile(s.mockEfiVarfs.Open)
@@ -289,7 +289,7 @@ func (s *varsLinuxSuite) TestReadVar3(c *C) {
 	s.testReadVar(c, &testReadVarData{
 		name:          "Test",
 		guid:          MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}),
-		expectedData:  decodeHexString(c, "a5a5a5a5"),
+		expectedData:  DecodeHexString(c, "a5a5a5a5"),
 		expectedAttrs: AttributeNonVolatile | AttributeBootserviceAccess | AttributeRuntimeAccess})
 }
 
@@ -306,46 +306,46 @@ func (s *varsLinuxSuite) TestReadVarNotFound2(c *C) {
 
 func (s *varsLinuxSuite) TestWriteVarImmutable(c *C) {
 	err := WriteVar("Test", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}),
-		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, decodeHexString(c, "080808080808"))
+		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, DecodeHexString(c, "080808080808"))
 	c.Check(err, IsNil)
 
 	v, ok := s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"]
 	c.Check(ok, Equals, true)
-	c.Check(v.data, DeepEquals, decodeHexString(c, "07000000080808080808"))
+	c.Check(v.data, DeepEquals, DecodeHexString(c, "07000000080808080808"))
 	c.Check(v.flags, Equals, uint(immutableFlag))
 }
 
 func (s *varsLinuxSuite) TestWriteVarMutable(c *C) {
 	err := WriteVar("BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}),
-		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, decodeHexString(c, "0001"))
+		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, DecodeHexString(c, "0001"))
 	c.Check(err, IsNil)
 
 	v, ok := s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/BootOrder-8be4df61-93ca-11d2-aa0d-00e098032b8c"]
 	c.Check(ok, Equals, true)
-	c.Check(v.data, DeepEquals, decodeHexString(c, "070000000001"))
+	c.Check(v.data, DeepEquals, DecodeHexString(c, "070000000001"))
 	c.Check(v.flags, Equals, uint(0))
 }
 
 func (s *varsLinuxSuite) TestWriteVarAppend(c *C) {
 	err := WriteVar("BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}),
 		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess|AttributeAppendWrite,
-		decodeHexString(c, "0001"))
+		DecodeHexString(c, "0001"))
 	c.Check(err, IsNil)
 
 	v, ok := s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/BootOrder-8be4df61-93ca-11d2-aa0d-00e098032b8c"]
 	c.Check(ok, Equals, true)
-	c.Check(v.data, DeepEquals, decodeHexString(c, "0700000000000001"))
+	c.Check(v.data, DeepEquals, DecodeHexString(c, "0700000000000001"))
 	c.Check(v.flags, Equals, uint(0))
 }
 
 func (s *varsLinuxSuite) TestCreateVar(c *C) {
 	err := WriteVar("Test2", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}),
-		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, decodeHexString(c, "a5a5a5a5"))
+		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, DecodeHexString(c, "a5a5a5a5"))
 	c.Assert(err, IsNil)
 
 	v, ok := s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/Test2-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"]
 	c.Check(ok, Equals, true)
-	c.Check(v.data, DeepEquals, decodeHexString(c, "07000000a5a5a5a5"))
+	c.Check(v.data, DeepEquals, DecodeHexString(c, "07000000a5a5a5a5"))
 	c.Check(v.mode, Equals, os.FileMode(0644))
 }
 
@@ -368,7 +368,7 @@ func (s *varsLinuxSuite) TestWriteVarEACCES(c *C) {
 	}()
 
 	err := WriteVar("BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}),
-		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, decodeHexString(c, "0001"))
+		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, DecodeHexString(c, "0001"))
 	c.Check(err, Equals, ErrVarPermission)
 }
 
@@ -392,7 +392,7 @@ func (s *varsLinuxSuite) TestWriteVarRace(c *C) {
 	}()
 
 	err := WriteVar("BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}),
-		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, decodeHexString(c, "0001"))
+		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, DecodeHexString(c, "0001"))
 	c.Check(err, IsNil)
 }
 
@@ -410,7 +410,7 @@ func (s *varsLinuxSuite) TestWriteVarRaceGiveUp(c *C) {
 	defer restore()
 
 	err := WriteVar("BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}),
-		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, decodeHexString(c, "0001"))
+		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, DecodeHexString(c, "0001"))
 	c.Check(err, Equals, ErrVarPermission)
 	c.Check(count, Equals, 5)
 }
@@ -426,11 +426,11 @@ func (s *varsLinuxSuite) TestListVars(c *C) {
 
 func (s *varsLinuxSuite) TestListVarsInvalidNames(c *C) {
 	fs := &mockEfiVarfs{vars: make(map[string]*mockEfiVar)}
-	fs.vars["Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"] = &mockEfiVar{data: decodeHexString(c, "00000000000000000000"), mode: os.ModeDir | 0755}
-	fs.vars["e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"] = &mockEfiVar{data: decodeHexString(c, "00000000000000000000"), mode: 0644}
-	fs.vars["Test+e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"] = &mockEfiVar{data: decodeHexString(c, "00000000000000000000"), mode: 0644}
+	fs.vars["Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"] = &mockEfiVar{data: DecodeHexString(c, "00000000000000000000"), mode: os.ModeDir | 0755}
+	fs.vars["e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"] = &mockEfiVar{data: DecodeHexString(c, "00000000000000000000"), mode: 0644}
+	fs.vars["Test+e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"] = &mockEfiVar{data: DecodeHexString(c, "00000000000000000000"), mode: 0644}
 	fs.vars["Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"] = &mockEfiVar{mode: 0644}
-	fs.vars["Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"] = &mockEfiVar{data: decodeHexString(c, "00000000000000000000"), mode: 0644}
+	fs.vars["Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"] = &mockEfiVar{data: DecodeHexString(c, "00000000000000000000"), mode: 0644}
 
 	restore := MockOpenVarFile(fs.Open)
 	defer restore()

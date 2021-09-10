@@ -38,7 +38,7 @@ func (s *gptSuite) testReadPartitionTableHeader(c *C, data *testReadPartitionTab
 
 func (s *gptSuite) TestReadPartitionTableHeader1(c *C) {
 	s.testReadPartitionTableHeader(c, &testReadPartitionTableHeaderData{
-		r: bytes.NewReader(decodeHexString(c, "4546492050415254000001005c000000edeb4e64000000000100000000000000af5277ee000000002200000000"+
+		r: bytes.NewReader(DecodeHexString(c, "4546492050415254000001005c000000edeb4e64000000000100000000000000af5277ee000000002200000000"+
 			"0000008e5277ee00000000c273aea42f0e1345bd3c456da7f7f0fd02000000000000008000000080000000f628450b")),
 		checkCrc: true,
 		expected: &PartitionTableHeader{
@@ -56,7 +56,7 @@ func (s *gptSuite) TestReadPartitionTableHeader1(c *C) {
 
 func (s *gptSuite) TestReadPartitionTableHeader2(c *C) {
 	s.testReadPartitionTableHeader(c, &testReadPartitionTableHeaderData{
-		r: bytes.NewReader(decodeHexString(c, "4546492050415254000001005c000000edeb4e64000000000100000000000000af5277ee000000002200000000"+
+		r: bytes.NewReader(DecodeHexString(c, "4546492050415254000001005c000000edeb4e64000000000100000000000000af5277ee000000002200000000"+
 			"0000008e5277ee00000000c273aea42f0e1345bd3c456da7f7f0fd02000000000000008000000080000000f628450ba5a5a5a5a5a5a5a5")),
 		checkCrc: true,
 		expected: &PartitionTableHeader{
@@ -74,7 +74,7 @@ func (s *gptSuite) TestReadPartitionTableHeader2(c *C) {
 
 func (s *gptSuite) TestReadPartitionTableHeader3(c *C) {
 	s.testReadPartitionTableHeader(c, &testReadPartitionTableHeaderData{
-		r: bytes.NewReader(decodeHexString(c, "4546492050415254000001005c000000edeb4e65000000000100000000000000af5277ee000000002200000000"+
+		r: bytes.NewReader(DecodeHexString(c, "4546492050415254000001005c000000edeb4e65000000000100000000000000af5277ee000000002200000000"+
 			"0000008e5277ee00000000c273aea42f0e1345bd3c456da7f7f0fd02000000000000008000000080000000f628450b")),
 		checkCrc: true,
 		errMatch: "CRC check failed"})
@@ -82,7 +82,7 @@ func (s *gptSuite) TestReadPartitionTableHeader3(c *C) {
 
 func (s *gptSuite) TestReadPartitionTableHeader4(c *C) {
 	s.testReadPartitionTableHeader(c, &testReadPartitionTableHeaderData{
-		r: bytes.NewReader(decodeHexString(c, "4546492050415254000001005c000000edeb4e65000000000100000000000000af5277ee000000002200000000"+
+		r: bytes.NewReader(DecodeHexString(c, "4546492050415254000001005c000000edeb4e65000000000100000000000000af5277ee000000002200000000"+
 			"0000008e5277ee00000000c273aea42f0e1345bd3c456da7f7f0fd02000000000000008000000080000000f628450b")),
 		expected: &PartitionTableHeader{
 			HeaderSize:               92,
@@ -112,7 +112,7 @@ func (s *gptSuite) TestWritePartitionTableHeader(c *C) {
 
 	w := new(bytes.Buffer)
 	c.Check(header.Write(w), IsNil)
-	c.Check(w.Bytes(), DeepEquals, decodeHexString(c, "4546492050415254000001005c000000edeb4e64000000000100000000000000af5277ee00000000"+
+	c.Check(w.Bytes(), DeepEquals, DecodeHexString(c, "4546492050415254000001005c000000edeb4e64000000000100000000000000af5277ee00000000"+
 		"22000000000000008e5277ee00000000c273aea42f0e1345bd3c456da7f7f0fd02000000000000008000000080000000f628450b"))
 }
 
@@ -133,7 +133,7 @@ func (s *gptSuite) testDecodePartitionEntries(c *C, data *testDecodePartitionEnt
 
 func (s *gptSuite) TestDecodePartitionEntries1(c *C) {
 	s.testDecodePartitionEntries(c, &testDecodePartitionEntriesData{
-		r: bytes.NewReader(decodeHexString(c, "28732ac11ff8d211ba4b00a0c93ec93b7b94de66b2fd2545b75230d66bb2b9600008000000000000ff071000"+
+		r: bytes.NewReader(DecodeHexString(c, "28732ac11ff8d211ba4b00a0c93ec93b7b94de66b2fd2545b75230d66bb2b9600008000000000000ff071000"+
 			"0000000000000000000000004500460049002000530079007300740065006d00200050006100720074006900740069006f006e00000000000000000000000000"+
 			"0000000000000000000000000000000000000000")),
 		num: 1,
@@ -149,7 +149,7 @@ func (s *gptSuite) TestDecodePartitionEntries1(c *C) {
 
 func (s *gptSuite) TestDecodePartitionEntries2(c *C) {
 	s.testDecodePartitionEntries(c, &testDecodePartitionEntriesData{
-		r: bytes.NewReader(decodeHexString(c, "af3dc60f838472478e793d69d8477de4dc171b63b7ed1d4da7616dce3efce4150008100000000000ffe72600000"+
+		r: bytes.NewReader(DecodeHexString(c, "af3dc60f838472478e793d69d8477de4dc171b63b7ed1d4da7616dce3efce4150008100000000000ffe72600000"+
 			"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"+
 			"0000000000000000000000000000000000000")),
 		num: 1,
@@ -165,7 +165,7 @@ func (s *gptSuite) TestDecodePartitionEntries2(c *C) {
 
 func (s *gptSuite) TestDecodePartitionEntries3(c *C) {
 	s.testDecodePartitionEntries(c, &testDecodePartitionEntriesData{
-		r: bytes.NewReader(decodeHexString(c, "af3dc60f838472478e793d69d8477de4dc171b63b7ed1d4da7616dce3efce4150008100000000000ffe72600000"+
+		r: bytes.NewReader(DecodeHexString(c, "af3dc60f838472478e793d69d8477de4dc171b63b7ed1d4da7616dce3efce4150008100000000000ffe72600000"+
 			"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"+
 			"000000000000000000000000000000000000028732ac11ff8d211ba4b00a0c93ec93b7b94de66b2fd2545b75230d66bb2b9600008000000000000ff071000000"+
 			"0000000000000000000004500460049002000530079007300740065006d00200050006100720074006900740069006f006e00000000000000000000000000000"+
@@ -209,7 +209,7 @@ func (s *gptSuite) TestWritePartitionEntry1(c *C) {
 			EndingLBA:           1050623,
 			Attributes:          0,
 			PartitionName:       "EFI System Partition"},
-		expected: decodeHexString(c, "28732ac11ff8d211ba4b00a0c93ec93b7b94de66b2fd2545b75230d66bb2b9600008000000000000ff071000"+
+		expected: DecodeHexString(c, "28732ac11ff8d211ba4b00a0c93ec93b7b94de66b2fd2545b75230d66bb2b9600008000000000000ff071000"+
 			"0000000000000000000000004500460049002000530079007300740065006d00200050006100720074006900740069006f006e00000000000000000000000000"+
 			"0000000000000000000000000000000000000000"),
 	})
@@ -224,7 +224,7 @@ func (s *gptSuite) TestWritePartitionEntry2(c *C) {
 			EndingLBA:           2549759,
 			Attributes:          0,
 			PartitionName:       ""},
-		expected: decodeHexString(c, "af3dc60f838472478e793d69d8477de4dc171b63b7ed1d4da7616dce3efce4150008100000000000ffe72600000"+
+		expected: DecodeHexString(c, "af3dc60f838472478e793d69d8477de4dc171b63b7ed1d4da7616dce3efce4150008100000000000ffe72600000"+
 			"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"+
 			"0000000000000000000000000000000000000"),
 	})

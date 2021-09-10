@@ -77,7 +77,7 @@ func (s *dbSuite) TestReadSignatureList1(c *C) {
 				Signatures: []*SignatureData{
 					{
 						Owner: dellOwnerGuid,
-						Data:  readFile(c, "testdata/sigdbs/1/cert-0.der"),
+						Data:  ReadFile(c, "testdata/sigdbs/1/cert-0.der"),
 					},
 				},
 			},
@@ -95,7 +95,7 @@ func (s *dbSuite) TestReadSignatureList2(c *C) {
 				Signatures: []*SignatureData{
 					{
 						Owner: dellOwnerGuid,
-						Data:  readFile(c, "testdata/sigdbs/2/cert-0.der"),
+						Data:  ReadFile(c, "testdata/sigdbs/2/cert-0.der"),
 					},
 				},
 			},
@@ -105,7 +105,7 @@ func (s *dbSuite) TestReadSignatureList2(c *C) {
 				Signatures: []*SignatureData{
 					{
 						Owner: microsoftOwnerGuid,
-						Data:  readFile(c, "testdata/sigdbs/2/cert-1.der"),
+						Data:  ReadFile(c, "testdata/sigdbs/2/cert-1.der"),
 					},
 				},
 			},
@@ -123,7 +123,7 @@ func (s *dbSuite) TestReadSignatureList3(c *C) {
 				Signatures: []*SignatureData{
 					{
 						Owner: dellOwnerGuid,
-						Data:  readFile(c, "testdata/sigdbs/3/cert-0.der"),
+						Data:  ReadFile(c, "testdata/sigdbs/3/cert-0.der"),
 					},
 				},
 			},
@@ -133,7 +133,7 @@ func (s *dbSuite) TestReadSignatureList3(c *C) {
 				Signatures: []*SignatureData{
 					{
 						Owner: microsoftOwnerGuid,
-						Data:  readFile(c, "testdata/sigdbs/3/cert-1.der"),
+						Data:  ReadFile(c, "testdata/sigdbs/3/cert-1.der"),
 					},
 				},
 			},
@@ -143,7 +143,7 @@ func (s *dbSuite) TestReadSignatureList3(c *C) {
 				Signatures: []*SignatureData{
 					{
 						Owner: microsoftOwnerGuid,
-						Data:  readFile(c, "testdata/sigdbs/3/cert-2.der"),
+						Data:  ReadFile(c, "testdata/sigdbs/3/cert-2.der"),
 					},
 				},
 			},
@@ -158,7 +158,7 @@ func (s *dbSuite) TestReadSignatureList4(c *C) {
 		Header: []byte{},
 		Signatures: []*SignatureData{
 			{
-				Data: readFile(c, "testdata/sigdbs/4/cert-0.der"),
+				Data: ReadFile(c, "testdata/sigdbs/4/cert-0.der"),
 			},
 		},
 	})
@@ -167,7 +167,7 @@ func (s *dbSuite) TestReadSignatureList4(c *C) {
 	for i := 1; i < 78; i++ {
 		hashes.Signatures = append(hashes.Signatures, &SignatureData{
 			Owner: microsoftOwnerGuid,
-			Data:  readFile(c, fmt.Sprintf("testdata/sigdbs/4/cert-%d.hash", i)),
+			Data:  ReadFile(c, fmt.Sprintf("testdata/sigdbs/4/cert-%d.hash", i)),
 		})
 	}
 	db = append(db, &hashes)
@@ -202,7 +202,7 @@ func (s *dbSuite) TestReadSignatureDatabase1(c *C) {
 				Signatures: []*SignatureData{
 					{
 						Owner: dellOwnerGuid,
-						Data:  readFile(c, "testdata/sigdbs/1/cert-0.der"),
+						Data:  ReadFile(c, "testdata/sigdbs/1/cert-0.der"),
 					},
 				},
 			},
@@ -220,7 +220,7 @@ func (s *dbSuite) TestReadSignatureDatabase2(c *C) {
 				Signatures: []*SignatureData{
 					{
 						Owner: dellOwnerGuid,
-						Data:  readFile(c, "testdata/sigdbs/2/cert-0.der"),
+						Data:  ReadFile(c, "testdata/sigdbs/2/cert-0.der"),
 					},
 				},
 			},
@@ -230,7 +230,7 @@ func (s *dbSuite) TestReadSignatureDatabase2(c *C) {
 				Signatures: []*SignatureData{
 					{
 						Owner: microsoftOwnerGuid,
-						Data:  readFile(c, "testdata/sigdbs/2/cert-1.der"),
+						Data:  ReadFile(c, "testdata/sigdbs/2/cert-1.der"),
 					},
 				},
 			},
@@ -248,7 +248,7 @@ func (s *dbSuite) TestReadSignatureDatabase3(c *C) {
 				Signatures: []*SignatureData{
 					{
 						Owner: dellOwnerGuid,
-						Data:  readFile(c, "testdata/sigdbs/3/cert-0.der"),
+						Data:  ReadFile(c, "testdata/sigdbs/3/cert-0.der"),
 					},
 				},
 			},
@@ -258,7 +258,7 @@ func (s *dbSuite) TestReadSignatureDatabase3(c *C) {
 				Signatures: []*SignatureData{
 					{
 						Owner: microsoftOwnerGuid,
-						Data:  readFile(c, "testdata/sigdbs/3/cert-1.der"),
+						Data:  ReadFile(c, "testdata/sigdbs/3/cert-1.der"),
 					},
 				},
 			},
@@ -268,7 +268,7 @@ func (s *dbSuite) TestReadSignatureDatabase3(c *C) {
 				Signatures: []*SignatureData{
 					{
 						Owner: microsoftOwnerGuid,
-						Data:  readFile(c, "testdata/sigdbs/3/cert-2.der"),
+						Data:  ReadFile(c, "testdata/sigdbs/3/cert-2.der"),
 					},
 				},
 			},
@@ -283,7 +283,7 @@ func (s *dbSuite) TestReadSignatureDatabase4(c *C) {
 		Header: []byte{},
 		Signatures: []*SignatureData{
 			{
-				Data: readFile(c, "testdata/sigdbs/4/cert-0.der"),
+				Data: ReadFile(c, "testdata/sigdbs/4/cert-0.der"),
 			},
 		},
 	})
@@ -292,7 +292,7 @@ func (s *dbSuite) TestReadSignatureDatabase4(c *C) {
 	for i := 1; i < 78; i++ {
 		hashes.Signatures = append(hashes.Signatures, &SignatureData{
 			Owner: microsoftOwnerGuid,
-			Data:  readFile(c, fmt.Sprintf("testdata/sigdbs/4/cert-%d.hash", i)),
+			Data:  ReadFile(c, fmt.Sprintf("testdata/sigdbs/4/cert-%d.hash", i)),
 		})
 	}
 	db = append(db, &hashes)
@@ -356,10 +356,10 @@ func (s *dbSuite) TestWriteSignatureWithWrongSize(c *C) {
 			Type: CertX509Guid,
 			Signatures: []*SignatureData{
 				{
-					Data: readFile(c, "testdata/sigdbs/3/cert-1.der"),
+					Data: ReadFile(c, "testdata/sigdbs/3/cert-1.der"),
 				},
 				{
-					Data: readFile(c, "testdata/sigdbs/3/cert-2.der"),
+					Data: ReadFile(c, "testdata/sigdbs/3/cert-2.der"),
 				},
 			},
 		},
@@ -371,7 +371,7 @@ func (s *dbSuite) TestWriteSignatureWithWrongSize(c *C) {
 func (s *dbSuite) TestWriteSignatureData(c *C) {
 	d := SignatureData{
 		Owner: dellOwnerGuid,
-		Data:  readFile(c, "testdata/sigdbs/1/cert-0.der")}
+		Data:  ReadFile(c, "testdata/sigdbs/1/cert-0.der")}
 
 	var b bytes.Buffer
 	c.Check(d.Write(&b), IsNil)

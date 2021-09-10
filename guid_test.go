@@ -35,13 +35,13 @@ func (s *guidSuite) testMakeGUID(c *C, data *testMakeGUIDData) {
 func (s *guidSuite) TestMakeGUID1(c *C) {
 	s.testMakeGUID(c, &testMakeGUIDData{
 		a: 0x8be4df61, b: 0x93ca, c: 0x11d2, d: 0xaa0d, e: [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c},
-		expected: decodeHexString(c, "61dfe48bca93d211aa0d00e098032b8c")})
+		expected: DecodeHexString(c, "61dfe48bca93d211aa0d00e098032b8c")})
 }
 
 func (s *guidSuite) TestMakeGUID2(c *C) {
 	s.testMakeGUID(c, &testMakeGUIDData{
 		a: 0xd719b2cb, b: 0x3d3a, c: 0x4596, d: 0xa3bc, e: [...]uint8{0xda, 0xd0, 0x0e, 0x67, 0x65, 0x6f},
-		expected: decodeHexString(c, "cbb219d73a3d9645a3bcdad00e67656f")})
+		expected: DecodeHexString(c, "cbb219d73a3d9645a3bcdad00e67656f")})
 }
 
 type testGUIDStringData struct {
@@ -57,13 +57,13 @@ func (s *guidSuite) testGUIDString(c *C, data *testGUIDStringData) {
 
 func (s *guidSuite) TestGUIDString1(c *C) {
 	s.testGUIDString(c, &testGUIDStringData{
-		x:        decodeHexString(c, "61dfe48bca93d211aa0d00e098032b8c"),
+		x:        DecodeHexString(c, "61dfe48bca93d211aa0d00e098032b8c"),
 		expected: "8be4df61-93ca-11d2-aa0d-00e098032b8c"})
 }
 
 func (s *guidSuite) TestGUIDString2(c *C) {
 	s.testGUIDString(c, &testGUIDStringData{
-		x:        decodeHexString(c, "cbb219d73a3d9645a3bcdad00e67656f"),
+		x:        DecodeHexString(c, "cbb219d73a3d9645a3bcdad00e67656f"),
 		expected: "d719b2cb-3d3a-4596-a3bc-dad00e67656f"})
 }
 
@@ -84,20 +84,20 @@ func (s *guidSuite) testReadGUID(c *C, data *testReadGUIDData) {
 
 func (s *guidSuite) TestReadGUID1(c *C) {
 	s.testReadGUID(c, &testReadGUIDData{
-		r:        bytes.NewReader(decodeHexString(c, "61dfe48bca93d211aa0d00e098032b8c")),
-		expected: decodeHexString(c, "61dfe48bca93d211aa0d00e098032b8c")})
+		r:        bytes.NewReader(DecodeHexString(c, "61dfe48bca93d211aa0d00e098032b8c")),
+		expected: DecodeHexString(c, "61dfe48bca93d211aa0d00e098032b8c")})
 }
 
 func (s *guidSuite) TestReadGUID2(c *C) {
 	s.testReadGUID(c, &testReadGUIDData{
-		r:        bytes.NewReader(decodeHexString(c, "cbb219d73a3d9645a3bcdad00e67656f")),
-		expected: decodeHexString(c, "cbb219d73a3d9645a3bcdad00e67656f")})
+		r:        bytes.NewReader(DecodeHexString(c, "cbb219d73a3d9645a3bcdad00e67656f")),
+		expected: DecodeHexString(c, "cbb219d73a3d9645a3bcdad00e67656f")})
 }
 
 func (s *guidSuite) TestReadGUID3(c *C) {
 	s.testReadGUID(c, &testReadGUIDData{
-		r:        bytes.NewReader(decodeHexString(c, "61dfe48bca93d211aa0d00e098032b8caaaaaaaaaaaaaa")),
-		expected: decodeHexString(c, "61dfe48bca93d211aa0d00e098032b8c")})
+		r:        bytes.NewReader(DecodeHexString(c, "61dfe48bca93d211aa0d00e098032b8caaaaaaaaaaaaaa")),
+		expected: DecodeHexString(c, "61dfe48bca93d211aa0d00e098032b8c")})
 }
 
 type testDecodeGUIDStringData struct {

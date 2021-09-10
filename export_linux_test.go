@@ -4,32 +4,7 @@
 
 package efi
 
-import (
-	"errors"
-	"os"
-)
-
 type (
 	EfivarfsVarsBackend = efivarfsVarsBackend
 	VarFile             = varFile
 )
-
-var (
-	Defer = errors.New("")
-)
-
-func MockOpenVarFile(fn func(string, int, os.FileMode) (VarFile, error)) (restore func()) {
-	orig := openVarFile
-
-	openVarFile = func(path string, flags int, perm os.FileMode) (VarFile, error) {
-		f, err := fn(path, flags, perm)
-		if err == Defer {
-			return orig(path, flags, perm)
-		}
-		return f, err
-	}
-
-	return func() {
-		openVarFile = orig
-	}
-}

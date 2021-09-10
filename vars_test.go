@@ -31,7 +31,7 @@ func (s *varsSuite) TestNullReadVar(c *C) {
 
 func (s *varsSuite) TestNullWriteVar(c *C) {
 	err := WriteVar("BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}),
-		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, decodeHexString(c, "0001"))
+		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, DecodeHexString(c, "0001"))
 	c.Check(err, Equals, ErrVarsUnavailable)
 }
 
