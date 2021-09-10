@@ -273,8 +273,17 @@ func ReadPartitionTable(r io.ReaderAt, totalSz, blockSz int64, role PartitionTab
 		offset = blockSz
 		whence = io.SeekStart
 	case BackupPartitionTable:
-		offset = -blockSz
-		whence = io.SeekEnd
+		if _, err := r2.Seek(blockSz, io.SeekStart); err != nil {
+			return nil, err
+		}
+		hdr, err := ReadPartitionTableHeader(r2, checkCrc)
+		if err != nil {
+			offset = -blockSz
+			whence = io.SeekEnd
+		} else {
+			offset = int64(hdr.AlternateLBA) * blockSz
+			whence = io.SeekStart
+		}
 	default:
 		panic("invalid role")
 	}
