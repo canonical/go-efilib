@@ -76,7 +76,7 @@ func getDeviceSize(f *os.File) (int64, error) {
 // specified partition on the device or file at the supplied path. This requires that the
 // device or file has a valid primary GPT.
 func NewHardDriveDevicePathNodeFromDevice(dev string, part int) (*efi.HardDriveDevicePathNode, error) {
-	f, err := os.Open(dev)
+	f, err := osOpen(dev)
 	if err != nil {
 		return nil, err
 	}

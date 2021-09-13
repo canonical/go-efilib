@@ -2,13 +2,19 @@
 // Licensed under the LGPLv3 with static-linking exception.
 // See LICENCE file for details.
 
-package efi
+package linux
 
 import (
+	"os"
+
 	"golang.org/x/sys/unix"
 )
 
 var (
-	openVarFile = realOpenVarFile
-	unixStatfs  = unix.Statfs
+	mountsPath = "/proc/self/mounts"
+	sysfsPath  = "/sys"
+
+	osOpen   = os.Open
+	osStat   = os.Stat
+	unixStat = unix.Stat
 )
