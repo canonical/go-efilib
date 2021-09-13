@@ -302,14 +302,16 @@ func NewFileDevicePath(path string, mode FileDevicePathMode) (out efi.DevicePath
 		return nil, err
 	}
 
-	for !builder.done() {
-		if err := builder.processNextComponent(); err != nil {
-			return nil, xerrors.Errorf("cannot process %s: %w", builder.next(-1), err)
+	if mode == FullPath {
+		for !builder.done() {
+			if err := builder.processNextComponent(); err != nil {
+				return nil, xerrors.Errorf("cannot process %s: %w", builder.next(-1), err)
+			}
 		}
-	}
 
-	if mode == FullPath && !fp.dev.devPathIsFull {
-		return nil, errors.New("cannot construct full path")
+		if !fp.dev.devPathIsFull {
+			return nil, errors.New("cannot construct full path")
+		}
 	}
 
 	out = fp.dev.devPath
