@@ -31,7 +31,7 @@ func (s *filepathSuite) mockOsOpen(m map[string]string) (restore func()) {
 var _ = Suite(&filepathSuite{})
 
 func (s *filepathSuite) TestNewFileDevicePathShortFormFile(c *C) {
-	restoreMounts := MockMountsPath("testdata/mounts")
+	restoreMounts := MockMountsPath("testdata/mounts-nvme")
 	defer restoreMounts()
 
 	restoreOsStat := s.MockOsStat()
@@ -54,7 +54,7 @@ func (s *filepathSuite) TestNewFileDevicePathShortFormFile(c *C) {
 }
 
 func (s *filepathSuite) TestNewFileDevicePathShortFormHD(c *C) {
-	restoreMounts := MockMountsPath("testdata/mounts")
+	restoreMounts := MockMountsPath("testdata/mounts-nvme")
 	defer restoreMounts()
 
 	restoreOsOpen := s.mockOsOpen(map[string]string{"/dev/nvme0n1": "testdata/disk.img"})
@@ -77,6 +77,81 @@ func (s *filepathSuite) TestNewFileDevicePathShortFormHD(c *C) {
 	path, err := NewFileDevicePath("/boot/efi/EFI/ubuntu/shimx64.efi", ShortFormPathHD)
 	c.Check(err, IsNil)
 	c.Check(path, DeepEquals, efi.DevicePath{
+		&efi.HardDriveDevicePathNode{
+			PartitionNumber: 1,
+			PartitionStart:  34,
+			PartitionSize:   64,
+			Signature:       efi.MakeGUID(0xc7a2907e, 0xd8c9, 0x4a41, 0x8b99, [...]uint8{0x3e, 0xf3, 0x24, 0x5f, 0xaf, 0x2a}),
+			MBRType:         efi.GPT},
+		efi.FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")})
+}
+
+func (s *filepathSuite) TestNewFileDevicePathFullNVME(c *C) {
+	restoreMounts := MockMountsPath("testdata/mounts-nvme")
+	defer restoreMounts()
+
+	restoreOsOpen := s.mockOsOpen(map[string]string{"/dev/nvme0n1": "testdata/disk.img"})
+	defer restoreOsOpen()
+
+	restoreOsStat := s.MockOsStat()
+	defer restoreOsStat()
+
+	restoreSysfs := MockSysfsPath("testdata/sys")
+	defer restoreSysfs()
+
+	restoreUnixStat := s.MockUnixStat(
+		[]MockMountPoint{{Dev: "/dev/nvme0n1p1", Root: "/boot/efi"}},
+		map[string]uint64{
+			"/dev/nvme0n1":   unix.Mkdev(259, 0),
+			"/dev/nvme0n1p1": unix.Mkdev(259, 1)},
+		[]string{"/boot/efi/EFI/ubuntu/shimx64.efi"})
+	defer restoreUnixStat()
+
+	path, err := NewFileDevicePath("/boot/efi/EFI/ubuntu/shimx64.efi", FullPath)
+	c.Check(err, IsNil)
+	c.Check(path, DeepEquals, efi.DevicePath{
+		&efi.ACPIDevicePathNode{HID: 0x0a0341d0},
+		&efi.PCIDevicePathNode{Function: 0, Device: 0x1d},
+		&efi.PCIDevicePathNode{Function: 0, Device: 0x0},
+		&efi.NVMENamespaceDevicePathNode{NamespaceID: 1},
+		&efi.HardDriveDevicePathNode{
+			PartitionNumber: 1,
+			PartitionStart:  34,
+			PartitionSize:   64,
+			Signature:       efi.MakeGUID(0xc7a2907e, 0xd8c9, 0x4a41, 0x8b99, [...]uint8{0x3e, 0xf3, 0x24, 0x5f, 0xaf, 0x2a}),
+			MBRType:         efi.GPT},
+		efi.FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")})
+}
+
+func (s *filepathSuite) TestNewFileDevicePathFullSATA(c *C) {
+	restoreMounts := MockMountsPath("testdata/mounts-sata")
+	defer restoreMounts()
+
+	restoreOsOpen := s.mockOsOpen(map[string]string{"/dev/sda": "testdata/disk.img"})
+	defer restoreOsOpen()
+
+	restoreOsStat := s.MockOsStat()
+	defer restoreOsStat()
+
+	restoreSysfs := MockSysfsPath("testdata/sys")
+	defer restoreSysfs()
+
+	restoreUnixStat := s.MockUnixStat(
+		[]MockMountPoint{{Dev: "/dev/sda1", Root: "/boot/efi"}},
+		map[string]uint64{
+			"/dev/sda":  unix.Mkdev(8, 0),
+			"/dev/sda1": unix.Mkdev(8, 1)},
+		[]string{"/boot/efi/EFI/ubuntu/shimx64.efi"})
+	defer restoreUnixStat()
+
+	path, err := NewFileDevicePath("/boot/efi/EFI/ubuntu/shimx64.efi", FullPath)
+	c.Check(err, IsNil)
+	c.Check(path, DeepEquals, efi.DevicePath{
+		&efi.ACPIDevicePathNode{HID: 0x0a0341d0},
+		&efi.PCIDevicePathNode{Function: 2, Device: 0x1f},
+		&efi.SATADevicePathNode{
+			HBAPortNumber:            0,
+			PortMultiplierPortNumber: 0xffff},
 		&efi.HardDriveDevicePathNode{
 			PartitionNumber: 1,
 			PartitionStart:  34,

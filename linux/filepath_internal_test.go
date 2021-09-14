@@ -95,7 +95,7 @@ type filepathSuite struct {
 var _ = Suite(&filepathSuite{})
 
 func (s *filepathSuite) TestScanBlockDeviceMounts(c *C) {
-	restoreMounts := MockMountsPath("testdata/mounts")
+	restoreMounts := MockMountsPath("testdata/mounts-nvme")
 	defer restoreMounts()
 	restoreStat := s.MockOsStat()
 	defer restoreStat()
@@ -113,7 +113,7 @@ func (s *filepathSuite) TestScanBlockDeviceMounts(c *C) {
 }
 
 func (s *filepathSuite) TestGetFileMockMountPoint(c *C) {
-	restoreMounts := MockMountsPath("testdata/mounts")
+	restoreMounts := MockMountsPath("testdata/mounts-nvme")
 	defer restoreMounts()
 
 	restoreOsStat := s.MockOsStat()
@@ -131,7 +131,7 @@ func (s *filepathSuite) TestGetFileMockMountPoint(c *C) {
 }
 
 func (s *filepathSuite) TestNewFilePath(c *C) {
-	restoreMounts := MockMountsPath("testdata/mounts")
+	restoreMounts := MockMountsPath("testdata/mounts-nvme")
 	defer restoreMounts()
 
 	restoreOsStat := s.MockOsStat()
@@ -156,7 +156,7 @@ func (s *filepathSuite) TestNewFilePath(c *C) {
 }
 
 func (s *filepathSuite) TestNewFilePathNotPartitioned(c *C) {
-	restoreMounts := MockMountsPath("testdata/mounts")
+	restoreMounts := MockMountsPath("testdata/mounts-nvme")
 	defer restoreMounts()
 
 	restoreOsStat := s.MockOsStat()
