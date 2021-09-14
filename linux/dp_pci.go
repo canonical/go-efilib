@@ -49,7 +49,7 @@ func handlePCIDevicePathNode(builder devicePathBuilder, dev *dev) error {
 	builder.advance(1)
 
 	switch {
-	case bytes.HasPrefix(class, []byte{0x00}):
+	case bytes.HasPrefix(class, []byte{0x01, 0x00}):
 		dev.interfaceType = interfaceTypeSCSI
 	case bytes.HasPrefix(class, []byte{0x01, 0x01}):
 		dev.interfaceType = interfaceTypeIDE

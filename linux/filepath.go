@@ -46,7 +46,6 @@ type interfaceType int
 const (
 	interfaceTypeUnknown = iota
 	interfaceTypePCI
-	interfaceTypeVirtio
 	interfaceTypeUSB
 	interfaceTypeSCSI
 	interfaceTypeIDE
