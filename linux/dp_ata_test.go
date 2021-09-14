@@ -68,7 +68,7 @@ func (s *ataSuite) TestHandleATADevicePathNodeSATA2(c *C) {
 	c.Check(builder.dev.devPathIsFull, Equals, true)
 }
 
-func (s *ataSuite) TestHandleATADevicePathNodeIDE(c *C) {
+func (s *ataSuite) TestHandleATADevicePathNodeIDE1(c *C) {
 	restoreSysfs := MockSysfsPath("testdata/sys")
 	defer restoreSysfs()
 
@@ -92,5 +92,32 @@ func (s *ataSuite) TestHandleATADevicePathNodeIDE(c *C) {
 		&efi.ATAPIDevicePathNode{
 			Controller: efi.ATAPIControllerPrimary,
 			Drive:      efi.ATAPIDriveMaster}})
+	c.Check(builder.dev.devPathIsFull, Equals, true)
+}
+
+func (s *ataSuite) TestHandleATADevicePathNodeIDE2(c *C) {
+	restoreSysfs := MockSysfsPath("testdata/sys")
+	defer restoreSysfs()
+
+	builder := &devicePathBuilderImpl{
+		dev: &dev{
+			node: "/dev/sdc", part: 1,
+			interfaceType: interfaceTypeIDE,
+			devPath: efi.DevicePath{
+				&efi.ACPIDevicePathNode{HID: 0x0a0341d0},
+				&efi.PCIDevicePathNode{Function: 1, Device: 0x01}},
+			devPathIsFull: true},
+		processed: []string{"pci0000:00", "0000:00:01.1"},
+		remaining: []string{"ata8", "host4", "target4:0:1", "4:0:1:0", "block", "sdd"}}
+	c.Check(handleATADevicePathNode(builder, builder.dev), IsNil)
+	c.Check(builder.processed, DeepEquals, []string{"pci0000:00", "0000:00:01.1", "ata8", "host4", "target4:0:1", "4:0:1:0", "block", "sdd"})
+	c.Check(builder.remaining, DeepEquals, []string{})
+	c.Check(builder.dev.interfaceType, Equals, interfaceType(interfaceTypeIDE))
+	c.Check(builder.dev.devPath, DeepEquals, efi.DevicePath{
+		&efi.ACPIDevicePathNode{HID: 0x0a0341d0},
+		&efi.PCIDevicePathNode{Function: 1, Device: 0x01},
+		&efi.ATAPIDevicePathNode{
+			Controller: efi.ATAPIControllerSecondary,
+			Drive:      efi.ATAPIDriveSlave}})
 	c.Check(builder.dev.devPathIsFull, Equals, true)
 }
