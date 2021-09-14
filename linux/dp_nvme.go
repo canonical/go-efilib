@@ -19,7 +19,7 @@ import (
 	"github.com/canonical/go-efilib"
 )
 
-// nvmeNSRe matches "nvme/nvme<ctrl_id>/nvme<ctrl_id>n<ns_id>"
+// nvmeNSRe matches "nvme/nvme<ctrl_id>/nvme<ctrl_id>n<ns_id>", capturing ns_id
 var nvmeNSRe = regexp.MustCompile(`^nvme\/nvme[[:digit:]]+\/nvme[[:digit:]]+n([[:digit:]]+)$`)
 
 func handleNVMEDevicePathNode(builder devicePathBuilder, dev *dev) error {

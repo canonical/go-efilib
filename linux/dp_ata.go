@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -18,7 +19,15 @@ import (
 	"github.com/canonical/go-efilib"
 )
 
-var ataRE = regexp.MustCompile(`^ata([[:digit:]]+)\/host[[:digit:]]+\/target[[:digit:]]+\:[[:digit:]]+\:[[:digit:]]+\/[[:digit:]]+\:[[:digit:]]+\:[[:digit:]]+\:[[:digit:]]+\/block\/s[dr][[:alpha:]]$`)
+// ataRE matches an ATA path including the components from the SCSI subsystem,
+// capturing the ATA print ID, SCSI channel, SCSI target and SCSI LUN.
+//
+// The kernel creates one ata%d device per port (see
+// drivers/ata/libata-core.c:ata_host_register). Each ATA device is represented
+// in the SCSI layer by setting the SCSI channel to the port multiplier port
+// number, the SCSI target to the device number (0 for SATA, 0 or 1 for PATA),
+// and the SCSI LUN as the LUN (see drivers/ata/libata-scsi.c:ata_scsi_scan_host).
+var ataRE = regexp.MustCompile(`^ata([[:digit:]]+)\/host[[:digit:]]+\/target[[:digit:]]+\:[[:digit:]]+\:[[:digit:]]+\/[[:digit:]]+\:([[:digit:]]+)\:([[:digit:]])+\:([[:digit:]])+\/block\/s[dr][[:alpha:]]$`)
 
 var ataDevRE = regexp.MustCompile(`^dev[[:digit:]]+\.([[:digit:]]+)\.?([[:digit:]]*)`)
 
@@ -31,58 +40,90 @@ func handleATADevicePathNode(builder devicePathBuilder, dev *dev) error {
 	if len(m) == 0 {
 		return fmt.Errorf("invalid path components: %s", builder.next(6))
 	}
-	printId, _ := strconv.Atoi(m[1])
 
-	node := new(efi.SATADevicePathNode)
-
+	// Obtain the ATA port number local to this ATA controller.
 	portBytes, err := ioutil.ReadFile(filepath.Join(builder.absPath(builder.next(1)), "ata_port", builder.next(1), "port_no"))
 	if err != nil {
 		return xerrors.Errorf("cannot obtain port ID: %w", err)
 	}
 
-	port, err := strconv.ParseUint(strings.TrimSpace(string(portBytes)), 10, 16)
+	lun, err := strconv.ParseUint(m[4], 10, 16)
 	if err != nil {
-		return xerrors.Errorf("invalid port ID: %w", err)
+		return xerrors.Errorf("invalid LUN: %w", err)
 	}
-	// The kernel provides a one-indexed number and the firmware is zero-indexed.
-	node.HBAPortNumber = uint16(port) - 1
 
-	paths, err := filepath.Glob(filepath.Join(builder.absPath(builder.next(1)), fmt.Sprintf("link[0-9]*/dev%d.[0-9]*", printId)))
-	switch {
-	case err != nil:
-		return err
-	case len(paths) == 0:
-		paths, err = filepath.Glob(filepath.Join(builder.absPath(builder.next(1)), fmt.Sprintf("link[0-9]*/dev%d.[0-9]*.0", printId)))
+	var node efi.DevicePathNode
+
+	switch dev.interfaceType {
+	case interfaceTypeIDE:
+		controller, err := strconv.Atoi(strings.TrimSpace(string(portBytes)))
 		if err != nil {
-			return err
+			return xerrors.Errorf("invalid controller: %w", err)
 		}
-	}
-
-	if len(paths) != 1 {
-		return errors.New("cannot determine PMP")
-	}
-
-	m = ataDevRE.FindStringSubmatch(filepath.Base(paths[0]))
-	switch {
-	case len(m) == 0:
-		return errors.New("cannot determine PMP: invalid format")
-	case m[2] == "":
-		if m[1] != "0" {
-			return errors.New("invalid LUN")
+		// PATA has a maximum of 2 ports.
+		if controller < 1 || controller > 2 {
+			return fmt.Errorf("invalid controller: %d", controller)
 		}
-		node.PortMultiplierPortNumber = 0xffff
-	default:
+		// The channel is always 0 for PATA devices (no port multiplier).
 		if m[2] != "0" {
-			return errors.New("invalid LUN")
+			return errors.New("invalid channel")
 		}
-		pmp, err := strconv.ParseUint(m[1], 10, 16)
+		// The target corresponds to the PATA device.
+		drive, err := strconv.ParseUint(m[3], 10, 1)
+		if err != nil {
+			return xerrors.Errorf("invalid drive: %w", err)
+		}
+
+		node = &efi.ATAPIDevicePathNode{
+			Controller: efi.ATAPIControllerRole(controller - 1),
+			Drive:      efi.ATAPIDriveRole(drive),
+			LUN:        uint16(lun)}
+	case interfaceTypeSATA:
+		port, err := strconv.ParseUint(strings.TrimSpace(string(portBytes)), 10, 16)
+		if err != nil {
+			return xerrors.Errorf("invalid port ID: %w", err)
+		}
+
+		printId, _ := strconv.Atoi(m[1])
+
+		// The channel indicates the port multiplier port number for SATA devices.
+		pmp, err := strconv.ParseUint(m[2], 10, 15)
 		if err != nil {
 			return xerrors.Errorf("invalid PMP: %w", err)
 		}
-		if pmp > 0x7fff {
-			return errors.New("invalid LUN")
+		// SATA ports only have a single device, so the target should be zero.
+		if m[3] != "0" {
+			return errors.New("invalid target")
 		}
-		node.PortMultiplierPortNumber = uint16(pmp)
+
+		// We need to determine if the device is connected via a port
+		// multiplier because we have to set the PMP address to 0xffff
+		// if it isn't. Unfortunately, it is zero indexed so checking
+		// that it is zero isn't sufficient.
+		//
+		// The kernel will expose a single host link%d device if there
+		// is no port multiplier, or one of more PMP link%d.%d devices
+		// if there is a port multiplier attached (see
+		// drivers/ata/libata-pmp.c:sata_pmp_init_links and
+		// drivers/ata/libata-transport.c:ata_tlink_add).
+		_, err = os.Stat(filepath.Join(builder.next(1), fmt.Sprintf("link%d.%d", printId, pmp)))
+		switch {
+		case os.IsNotExist(err):
+			// No port multiplier is connected.
+			pmp = 0xffff
+		case err != nil:
+			return err
+		default:
+			// A port multiplier is connected.
+		}
+
+		node = &efi.SATADevicePathNode{
+			// The kernel provides a one-indexed number and the firmware is zero-indexed.
+			HBAPortNumber:            uint16(port) - 1,
+			PortMultiplierPortNumber: uint16(pmp),
+			LUN:                      uint16(lun)}
+	default:
+		return errors.New("invalid interface type")
 	}
 
 	builder.advance(6)
@@ -91,5 +132,5 @@ func handleATADevicePathNode(builder devicePathBuilder, dev *dev) error {
 }
 
 func init() {
-	registerDevicePathNodeHandler("ata", handleATADevicePathNode, []interfaceType{interfaceTypeSATA})
+	registerDevicePathNodeHandler("ata", handleATADevicePathNode, []interfaceType{interfaceTypeIDE, interfaceTypeSATA})
 }

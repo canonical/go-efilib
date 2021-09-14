@@ -21,7 +21,8 @@ import (
 var classRE = regexp.MustCompile(`^0x([[:xdigit:]]+)$`)
 
 // pciRE matches "nnnn:bb:dd:f" where "nnnn" is the domain, "bb" is the bus number,
-// "dd" is the device number and "f" is the function.
+// "dd" is the device number and "f" is the function. It captures the device and
+// function.
 var pciRE = regexp.MustCompile(`^[[:xdigit:]]{4}:[[:xdigit:]]{2}:([[:xdigit:]]{2})\.([[:digit:]]{1})$`)
 
 func handlePCIDevicePathNode(builder devicePathBuilder, dev *dev) error {
