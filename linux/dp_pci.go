@@ -29,15 +29,11 @@ func handlePCIDevicePathNode(builder devicePathBuilder, dev *dev) error {
 
 	m := pciRE.FindStringSubmatch(component)
 	if len(m) == 0 {
-		return errSkipDevicePathNodeHandler
+		return fmt.Errorf("invalid component: %s", component)
 	}
 
 	devNum, _ := strconv.ParseUint(m[1], 16, 8)
 	fun, _ := strconv.ParseUint(m[2], 10, 8)
-
-	if dev.interfaceType != interfaceTypeUnknown {
-		return errors.New("unexpected node")
-	}
 
 	classBytes, err := ioutil.ReadFile(filepath.Join(builder.absPath(component), "class"))
 	if err != nil {
@@ -60,6 +56,10 @@ func handlePCIDevicePathNode(builder devicePathBuilder, dev *dev) error {
 		dev.interfaceType = interfaceTypeSATA
 	case bytes.HasPrefix(class, []byte{0x01, 0x08}):
 		dev.interfaceType = interfaceTypeNVME
+	case bytes.HasPrefix(class, []byte{0x06, 0x04}):
+		dev.interfaceType = interfaceTypePCI
+	default:
+		dev.interfaceType = interfaceTypeUnknown
 	}
 
 	dev.devPath = append(dev.devPath, &efi.PCIDevicePathNode{
@@ -69,5 +69,5 @@ func handlePCIDevicePathNode(builder devicePathBuilder, dev *dev) error {
 }
 
 func init() {
-	registerDevicePathNodeHandler("pci", handlePCIDevicePathNode)
+	registerDevicePathNodeHandler("pci", handlePCIDevicePathNode, []interfaceType{interfaceTypePCI})
 }

@@ -15,7 +15,7 @@ import (
 
 func Test(t *testing.T) { TestingT(t) }
 
-func MockDevicePathNodeHandlers(handlers []registeredDpHandler) (restore func()) {
+func MockDevicePathNodeHandlers(handlers map[interfaceType][]registeredDpHandler) (restore func()) {
 	orig := devicePathNodeHandlers
 	devicePathNodeHandlers = handlers
 	return func() {

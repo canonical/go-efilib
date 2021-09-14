@@ -45,13 +45,14 @@ type interfaceType int
 
 const (
 	interfaceTypeUnknown = iota
+	interfaceTypePCI
+	interfaceTypeVirtio
+	interfaceTypeUSB
 	interfaceTypeSCSI
 	interfaceTypeIDE
 	interfaceTypeSATA
 	interfaceTypeNVME
 )
-
-type devicePathNodeHandlerFlags int
 
 var errSkipDevicePathNodeHandler = errors.New("")
 
@@ -62,10 +63,15 @@ type registeredDpHandler struct {
 	fn   devicePathNodeHandler
 }
 
-var devicePathNodeHandlers []registeredDpHandler
+var devicePathNodeHandlers = make(map[interfaceType][]registeredDpHandler)
 
-func registerDevicePathNodeHandler(name string, fn devicePathNodeHandler) {
-	devicePathNodeHandlers = append(devicePathNodeHandlers, registeredDpHandler{name, fn})
+func registerDevicePathNodeHandler(name string, fn devicePathNodeHandler, interfaces []interfaceType) {
+	if len(interfaces) == 0 {
+		interfaces = []interfaceType{interfaceTypeUnknown}
+	}
+	for _, i := range interfaces {
+		devicePathNodeHandlers[i] = append(devicePathNodeHandlers[i], registeredDpHandler{name, fn})
+	}
 }
 
 type devicePathBuilder interface {
@@ -118,7 +124,7 @@ func (b *devicePathBuilderImpl) done() bool {
 }
 
 func (b *devicePathBuilderImpl) processNextComponent() error {
-	for _, handler := range devicePathNodeHandlers {
+	for _, handler := range devicePathNodeHandlers[b.dev.interfaceType] {
 		p := len(b.processed)
 		r := b.remaining
 
@@ -134,6 +140,7 @@ func (b *devicePathBuilderImpl) processNextComponent() error {
 		return nil
 	}
 
+	b.dev.interfaceType = interfaceTypeUnknown
 	b.dev.devPath = nil
 	b.dev.devPathIsFull = false
 	b.advance(1)

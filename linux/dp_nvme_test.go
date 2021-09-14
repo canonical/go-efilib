@@ -14,11 +14,6 @@ type nvmeSuite struct{}
 
 var _ = Suite(&nvmeSuite{})
 
-func (s *nvmeSuite) TestHandleNVMEDevicePathNodeSkip(c *C) {
-	builder := &devicePathBuilderImpl{remaining: []string{"pci0000:00", "0000:00:1d.0", "0000:3d:00.0"}}
-	c.Check(handleNVMEDevicePathNode(builder, nil), Equals, errSkipDevicePathNodeHandler)
-}
-
 func (s *nvmeSuite) TestHandleNVMEDevicePathNode(c *C) {
 	restoreSysfs := MockSysfsPath("testdata/sys")
 	defer restoreSysfs()

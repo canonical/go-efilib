@@ -23,10 +23,6 @@ import (
 var nvmeNSRe = regexp.MustCompile(`^nvme\/nvme[[:digit:]]+\/nvme[[:digit:]]+n([[:digit:]]+)$`)
 
 func handleNVMEDevicePathNode(builder devicePathBuilder, dev *dev) error {
-	if builder.next(1) != "nvme" {
-		return errSkipDevicePathNodeHandler
-	}
-
 	if builder.numRemaining() < 3 {
 		return errors.New("invalid path: not enough components")
 	}
@@ -73,5 +69,5 @@ func handleNVMEDevicePathNode(builder devicePathBuilder, dev *dev) error {
 }
 
 func init() {
-	registerDevicePathNodeHandler("nvme", handleNVMEDevicePathNode)
+	registerDevicePathNodeHandler("nvme", handleNVMEDevicePathNode, []interfaceType{interfaceTypeNVME})
 }

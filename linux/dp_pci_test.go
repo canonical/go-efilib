@@ -14,11 +14,6 @@ type pciSuite struct{}
 
 var _ = Suite(&pciSuite{})
 
-func (s *pciSuite) TestHandlePCIDevicePathNodeSkip(c *C) {
-	builder := &devicePathBuilderImpl{remaining: []string{"pci0000:00"}}
-	c.Check(handlePCIDevicePathNode(builder, nil), Equals, errSkipDevicePathNodeHandler)
-}
-
 func (s *pciSuite) TestHandlePCIDevicePathNodeBridge(c *C) {
 	restoreSysfs := MockSysfsPath("testdata/sys")
 	defer restoreSysfs()
@@ -33,7 +28,7 @@ func (s *pciSuite) TestHandlePCIDevicePathNodeBridge(c *C) {
 	c.Check(handlePCIDevicePathNode(builder, builder.dev), IsNil)
 	c.Check(builder.processed, DeepEquals, []string{"pci0000:00", "0000:00:1d.0"})
 	c.Check(builder.remaining, DeepEquals, []string{})
-	c.Check(builder.dev.interfaceType, Equals, interfaceType(interfaceTypeUnknown))
+	c.Check(builder.dev.interfaceType, Equals, interfaceType(interfaceTypePCI))
 	c.Check(builder.dev.devPath, DeepEquals, efi.DevicePath{
 		&efi.ACPIDevicePathNode{HID: 0x0a0341d0},
 		&efi.PCIDevicePathNode{Function: 0, Device: 0x1d}})

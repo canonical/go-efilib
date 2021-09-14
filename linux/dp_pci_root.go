@@ -39,6 +39,7 @@ func handlePCIRootDevicePathNode(builder devicePathBuilder, dev *dev) error {
 
 	builder.advance(1)
 
+	dev.interfaceType = interfaceTypePCI
 	dev.devPath = append(dev.devPath, maybeUseSimpleACPIDevicePathNode(node))
 	dev.devPathIsFull = true
 
@@ -46,5 +47,5 @@ func handlePCIRootDevicePathNode(builder devicePathBuilder, dev *dev) error {
 }
 
 func init() {
-	registerDevicePathNodeHandler("pci-root", handlePCIRootDevicePathNode)
+	registerDevicePathNodeHandler("pci-root", handlePCIRootDevicePathNode, nil)
 }

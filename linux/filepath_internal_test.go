@@ -265,19 +265,24 @@ func (s *filepathSuite) TestDevicePathBuilderProcessNextComponent(c *C) {
 		return errSkipDevicePathNodeHandler
 	}
 	realHandler := func(builder devicePathBuilder, dev *dev) error {
+		dev.interfaceType = interfaceTypePCI
 		dev.devPath = append(dev.devPath, &efi.ACPIDevicePathNode{HID: hid})
 		dev.devPathIsFull = true
 		builder.advance(1)
 		return nil
 	}
-	restore := MockDevicePathNodeHandlers([]registeredDpHandler{
-		{name: "skip1", fn: skipHandler},
-		{name: "skip2", fn: skipHandler},
-		{name: "acpi", fn: realHandler}})
+	restore := MockDevicePathNodeHandlers(map[interfaceType][]registeredDpHandler{
+		interfaceTypeUnknown: []registeredDpHandler{
+			{name: "skip1", fn: skipHandler},
+			{name: "skip2", fn: skipHandler},
+			{name: "acpi", fn: realHandler}},
+		interfaceTypePCI: []registeredDpHandler{
+			{name: "pci", fn: skipHandler}}})
 	defer restore()
 
 	c.Check(builder.processNextComponent(), IsNil)
 	c.Check(skipped, Equals, 2)
+	c.Check(builder.dev.interfaceType, Equals, interfaceType(interfaceTypePCI))
 	c.Check(builder.dev.devPath, DeepEquals, efi.DevicePath{&efi.ACPIDevicePathNode{HID: hid}})
 	c.Check(builder.dev.devPathIsFull, Equals, true)
 	c.Check(builder.remaining, DeepEquals, []string{"0000:00:1d.0", "0000:3d:00.0", "nvme", "nvme0", "nvme0n1"})
@@ -290,6 +295,7 @@ func (s *filepathSuite) TestDevicePathBuilderProcessNextComponentUnhandled(c *C)
 	builder := &devicePathBuilderImpl{
 		dev: &dev{
 			node: "/dev/nvme0n1", part: 1,
+			interfaceType: interfaceTypePCI,
 			devPath:       efi.DevicePath{&efi.ACPIDevicePathNode{HID: hid}},
 			devPathIsFull: true},
 		processed: []string{"pci0000:00"},
@@ -301,13 +307,17 @@ func (s *filepathSuite) TestDevicePathBuilderProcessNextComponentUnhandled(c *C)
 		builder.advance(2)
 		return errSkipDevicePathNodeHandler
 	}
-	restore := MockDevicePathNodeHandlers([]registeredDpHandler{
-		{name: "skip1", fn: skipHandler},
-		{name: "skip2", fn: skipHandler}})
+	restore := MockDevicePathNodeHandlers(map[interfaceType][]registeredDpHandler{
+		interfaceTypeUnknown: []registeredDpHandler{
+			{name: "acpi-skip", fn: skipHandler}},
+		interfaceTypePCI: []registeredDpHandler{
+			{name: "skip1", fn: skipHandler},
+			{name: "skip2", fn: skipHandler}}})
 	defer restore()
 
 	c.Check(builder.processNextComponent(), IsNil)
 	c.Check(skipped, Equals, 2)
+	c.Check(builder.dev.interfaceType, Equals, interfaceType(interfaceTypeUnknown))
 	c.Check(builder.dev.devPath, IsNil)
 	c.Check(builder.dev.devPathIsFull, Equals, false)
 	c.Check(builder.remaining, DeepEquals, []string{"0000:3d:00.0", "nvme", "nvme0", "nvme0n1"})
