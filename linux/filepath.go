@@ -273,9 +273,20 @@ func newFilePath(path string) (*filePath, error) {
 	}
 
 	parentDev := filepath.Dir(childDev)
-	if filepath.Base(parentDev) == "block" {
+	parentSubsystem, err := filepath.EvalSymlinks(filepath.Join(parentDev, "subsystem"))
+	switch {
+	case os.IsNotExist(err):
+		// No subsystem link, could be the block/ directory
+	case err != nil:
+		return nil, err
+	}
+
+	if parentSubsystem != filepath.Join(sysfsPath, "class", "block") {
+		// Parent device is not a block device
 		out.dev.node = filepath.Join("/dev", filepath.Base(childDev))
 	} else {
+		// Parent device is a block device, so this is a partitioned
+		// device.
 		out.dev.node = filepath.Join("/dev", filepath.Base(parentDev))
 		b, err := ioutil.ReadFile(filepath.Join(childDev, "partition"))
 		if err != nil {
