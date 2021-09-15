@@ -86,6 +86,27 @@ func (s *filepathSuite) TestNewFileDevicePathShortFormHD(c *C) {
 		efi.FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")})
 }
 
+func (s *filepathSuite) TestNewFileDevicePathShortFormHDUnpartitioned(c *C) {
+	restoreMounts := MockMountsPath("testdata/mounts-nvme")
+	defer restoreMounts()
+
+	restoreOsStat := s.MockOsStat()
+	defer restoreOsStat()
+
+	restoreSysfs := MockSysfsPath("testdata/sys")
+	defer restoreSysfs()
+
+	restoreUnixStat := s.MockUnixStat(
+		[]MockMountPoint{{Dev: "/dev/loop1", Root: "/snap/core/11606"}},
+		map[string]uint64{
+			"/dev/loop1": unix.Mkdev(7, 1)},
+		[]string{"/snap/core/11606/bin/ls"})
+	defer restoreUnixStat()
+
+	_, err := NewFileDevicePath("/snap/core/11606/bin/ls", ShortFormPathHD)
+	c.Check(err, Equals, ErrNoDevicePath)
+}
+
 func (s *filepathSuite) TestNewFileDevicePathFullNVME(c *C) {
 	restoreMounts := MockMountsPath("testdata/mounts-nvme")
 	defer restoreMounts()
@@ -159,4 +180,25 @@ func (s *filepathSuite) TestNewFileDevicePathFullSATA(c *C) {
 			Signature:       efi.MakeGUID(0xc7a2907e, 0xd8c9, 0x4a41, 0x8b99, [...]uint8{0x3e, 0xf3, 0x24, 0x5f, 0xaf, 0x2a}),
 			MBRType:         efi.GPT},
 		efi.FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")})
+}
+
+func (s *filepathSuite) TestNewFileDevicePathFullNoDevicePath(c *C) {
+	restoreMounts := MockMountsPath("testdata/mounts-nvme")
+	defer restoreMounts()
+
+	restoreOsStat := s.MockOsStat()
+	defer restoreOsStat()
+
+	restoreSysfs := MockSysfsPath("testdata/sys")
+	defer restoreSysfs()
+
+	restoreUnixStat := s.MockUnixStat(
+		[]MockMountPoint{{Dev: "/dev/loop1", Root: "/snap/core/11606"}},
+		map[string]uint64{
+			"/dev/loop1": unix.Mkdev(7, 1)},
+		[]string{"/snap/core/11606/bin/ls"})
+	defer restoreUnixStat()
+
+	_, err := NewFileDevicePath("/snap/core/11606/bin/ls", FullPath)
+	c.Check(err, Equals, ErrNoDevicePath)
 }

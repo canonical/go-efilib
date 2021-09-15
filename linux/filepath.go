@@ -36,10 +36,10 @@ const (
 	ShortFormPathFile
 )
 
-// ErrDeviceUnpartitioned is returned from NewFileDevicePath if it is called
-// with mode set to ShortFormPathHD but the file is not stored inside a partitioned
-// device.
-var ErrDeviceUnpartitioned = errors.New("device is not partitioned")
+// ErrNoDevicePath is returned from NewFileDevicePath if the device in
+// which a file is stored cannot be mapped to a device path with the
+// specified mode.
+var ErrNoDevicePath = errors.New("cannot map device to a device path")
 
 type interfaceType int
 
@@ -302,8 +302,25 @@ func newFilePath(path string) (*filePath, error) {
 	return out, nil
 }
 
-// NewFileDevicePath creates an EFI device path from the supplied filepath usin the
-// specified mode.
+// NewFileDevicePath creates an EFI device path from the supplied filepath.
+//
+// If mode is FullPath, this will attempt to create a full device path which
+// requires the use of sysfs. If the device in which the file is stored cannot be
+// mapped to a device path, a ErrNoDevicePath error is returned. This could be
+// because the device is not recognized by this package, or because the device
+// genuinely cannot be mapped to a device path (eg, it is a device-mapper or loop
+// device). In this case, one of the ShortForm modes can be used.
+//
+// If mode is ShortFormPathHD, this will attempt to create a short-form device
+// path beginning with a HD() component. If the file is stored inside an
+// unpartitioned device, a ErrNoDevicePath error will be returned. In this case,
+// ShortFormPathFile can be used.
+//
+// When mode is ShortFormPathHD or FullPath and the file is stored inside a
+// partitoned device, read access is required on the underlying block device.
+//
+// If mode is ShortFormPathFile, this will attempt to create a short-form device
+// path consisting only of the file path relative to the device.
 func NewFileDevicePath(path string, mode FileDevicePathMode) (out efi.DevicePath, err error) {
 	fp, err := newFilePath(path)
 	if err != nil {
@@ -311,7 +328,7 @@ func NewFileDevicePath(path string, mode FileDevicePathMode) (out efi.DevicePath
 	}
 
 	if mode == ShortFormPathHD && fp.part == 0 {
-		return nil, errors.New("cannot specify ShortFormPathHD for a file on an unpartitioned device")
+		return nil, ErrNoDevicePath
 	}
 
 	builder, err := newDevicePathBuilder(&fp.dev)
@@ -322,12 +339,13 @@ func NewFileDevicePath(path string, mode FileDevicePathMode) (out efi.DevicePath
 	if mode == FullPath {
 		for !builder.done() {
 			if err := builder.processNextComponent(); err != nil {
-				return nil, xerrors.Errorf("cannot process %s: %w", builder.next(-1), err)
+				return nil, xerrors.Errorf("cannot process components %s from device path %s: %w",
+					builder.next(-1), builder.absPath(builder.next(-1)), err)
 			}
 		}
 
 		if !fp.dev.devPathIsFull {
-			return nil, errors.New("cannot construct full path")
+			return nil, ErrNoDevicePath
 		}
 	}
 
