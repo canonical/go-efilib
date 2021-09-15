@@ -321,6 +321,8 @@ func newFilePath(path string) (*filePath, error) {
 //
 // If mode is ShortFormPathFile, this will attempt to create a short-form device
 // path consisting only of the file path relative to the device.
+//
+// In all modes, read access to the file's directory is required.
 func NewFileDevicePath(path string, mode FileDevicePathMode) (out efi.DevicePath, err error) {
 	fp, err := newFilePath(path)
 	if err != nil {
