@@ -6,6 +6,7 @@ package linux
 
 import (
 	"os"
+	"os/exec"
 	"testing"
 
 	"golang.org/x/sys/unix"
@@ -14,6 +15,17 @@ import (
 )
 
 func Test(t *testing.T) { TestingT(t) }
+
+type TarFileMixin struct{}
+
+func (m *TarFileMixin) UnpackTar(c *C, path string) string {
+	dir := c.MkDir()
+
+	cmd := exec.Command("tar", "-xaf", path, "-C", dir)
+	c.Assert(cmd.Run(), IsNil)
+
+	return dir
+}
 
 func MockDevicePathNodeHandlers(handlers map[interfaceType][]registeredDpHandler) (restore func()) {
 	orig := devicePathNodeHandlers

@@ -6,6 +6,7 @@ package linux_test
 
 import (
 	"os"
+	"path/filepath"
 
 	"golang.org/x/sys/unix"
 
@@ -17,6 +18,7 @@ import (
 
 type filepathSuite struct {
 	FilepathMockMixin
+	TarFileMixin
 }
 
 func (s *filepathSuite) mockOsOpen(m map[string]string) (restore func()) {
@@ -37,7 +39,7 @@ func (s *filepathSuite) TestNewFileDevicePathShortFormFile(c *C) {
 	restoreOsStat := s.MockOsStat()
 	defer restoreOsStat()
 
-	restoreSysfs := MockSysfsPath("testdata/sys")
+	restoreSysfs := MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restoreSysfs()
 
 	restoreUnixStat := s.MockUnixStat(
@@ -63,7 +65,7 @@ func (s *filepathSuite) TestNewFileDevicePathShortFormHD(c *C) {
 	restoreOsStat := s.MockOsStat()
 	defer restoreOsStat()
 
-	restoreSysfs := MockSysfsPath("testdata/sys")
+	restoreSysfs := MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restoreSysfs()
 
 	restoreUnixStat := s.MockUnixStat(
@@ -93,7 +95,7 @@ func (s *filepathSuite) TestNewFileDevicePathShortFormHDUnpartitioned(c *C) {
 	restoreOsStat := s.MockOsStat()
 	defer restoreOsStat()
 
-	restoreSysfs := MockSysfsPath("testdata/sys")
+	restoreSysfs := MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restoreSysfs()
 
 	restoreUnixStat := s.MockUnixStat(
@@ -117,7 +119,7 @@ func (s *filepathSuite) TestNewFileDevicePathFullNVME(c *C) {
 	restoreOsStat := s.MockOsStat()
 	defer restoreOsStat()
 
-	restoreSysfs := MockSysfsPath("testdata/sys")
+	restoreSysfs := MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restoreSysfs()
 
 	restoreUnixStat := s.MockUnixStat(
@@ -154,7 +156,7 @@ func (s *filepathSuite) TestNewFileDevicePathFullSATA(c *C) {
 	restoreOsStat := s.MockOsStat()
 	defer restoreOsStat()
 
-	restoreSysfs := MockSysfsPath("testdata/sys")
+	restoreSysfs := MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restoreSysfs()
 
 	restoreUnixStat := s.MockUnixStat(
@@ -189,7 +191,7 @@ func (s *filepathSuite) TestNewFileDevicePathFullNoDevicePath(c *C) {
 	restoreOsStat := s.MockOsStat()
 	defer restoreOsStat()
 
-	restoreSysfs := MockSysfsPath("testdata/sys")
+	restoreSysfs := MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restoreSysfs()
 
 	restoreUnixStat := s.MockUnixStat(

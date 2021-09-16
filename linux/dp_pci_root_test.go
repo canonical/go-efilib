@@ -5,12 +5,16 @@
 package linux
 
 import (
+	"path/filepath"
+
 	. "gopkg.in/check.v1"
 
 	"github.com/canonical/go-efilib"
 )
 
-type pciRootSuite struct{}
+type pciRootSuite struct {
+	TarFileMixin
+}
 
 var _ = Suite(&pciRootSuite{})
 
@@ -20,7 +24,7 @@ func (s *pciRootSuite) TestHandlePCIRootDevicePathNodeSkip(c *C) {
 }
 
 func (s *pciRootSuite) TestHandlePCIRootDevicePathNode(c *C) {
-	restoreSysfs := MockSysfsPath("testdata/sys")
+	restoreSysfs := MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restoreSysfs()
 
 	builder := &devicePathBuilderImpl{

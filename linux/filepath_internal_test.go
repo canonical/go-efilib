@@ -90,6 +90,7 @@ func (s *FilepathMockMixin) MockUnixStat(mounts []MockMountPoint, devs map[strin
 
 type filepathSuite struct {
 	FilepathMockMixin
+	TarFileMixin
 }
 
 var _ = Suite(&filepathSuite{})
@@ -137,7 +138,7 @@ func (s *filepathSuite) TestNewFilePath(c *C) {
 	restoreOsStat := s.MockOsStat()
 	defer restoreOsStat()
 
-	restoreSysfs := MockSysfsPath("testdata/sys")
+	restoreSysfs := MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restoreSysfs()
 
 	restoreUnixStat := s.MockUnixStat(
@@ -162,7 +163,7 @@ func (s *filepathSuite) TestNewFilePathNotPartitioned(c *C) {
 	restoreOsStat := s.MockOsStat()
 	defer restoreOsStat()
 
-	restoreSysfs := MockSysfsPath("testdata/sys")
+	restoreSysfs := MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restoreSysfs()
 
 	restoreUnixStat := s.MockUnixStat(
@@ -181,7 +182,7 @@ func (s *filepathSuite) TestNewFilePathNotPartitioned(c *C) {
 }
 
 func (s *filepathSuite) TestDevSysfsPath(c *C) {
-	restoreSysfs := MockSysfsPath("testdata/sys")
+	restoreSysfs := MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restoreSysfs()
 
 	restoreUnixStat := s.MockUnixStat(nil, map[string]uint64{"/dev/nvme0n1": unix.Mkdev(259, 0)}, nil)
@@ -190,11 +191,11 @@ func (s *filepathSuite) TestDevSysfsPath(c *C) {
 	dev := &dev{node: "/dev/nvme0n1", part: 1}
 	sysfsPath, err := dev.sysfsPath()
 	c.Check(err, IsNil)
-	c.Check(sysfsPath, Equals, "testdata/sys/devices/pci0000:00/0000:00:1d.0/0000:3d:00.0/nvme/nvme0/nvme0n1")
+	c.Check(sysfsPath, Matches, `.*\/sys\/devices\/pci0000:00\/0000:00:1d\.0\/0000:3d:00\.0\/nvme\/nvme0\/nvme0n1$`)
 }
 
 func (s *filepathSuite) TestNewDevicePathBuilder(c *C) {
-	restoreSysfs := MockSysfsPath("testdata/sys")
+	restoreSysfs := MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restoreSysfs()
 
 	restoreUnixStat := s.MockUnixStat(nil, map[string]uint64{"/dev/nvme0n1": unix.Mkdev(259, 0)}, nil)

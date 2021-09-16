@@ -5,12 +5,16 @@
 package linux
 
 import (
+	"path/filepath"
+
 	. "gopkg.in/check.v1"
 
 	"github.com/canonical/go-efilib"
 )
 
-type acpiSuite struct{}
+type acpiSuite struct {
+	TarFileMixin
+}
 
 var _ = Suite(&acpiSuite{})
 
@@ -78,10 +82,9 @@ func (s *acpiSuite) TestMaybeUseSimpleACPIDevicePathNode3(c *C) {
 }
 
 func (s *acpiSuite) TestNewACPIExtendedDevicePathNode(c *C) {
-	restoreSysfs := MockSysfsPath("testdata/sys")
-	defer restoreSysfs()
+	sysfs := filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys")
 
-	node, err := newACPIExtendedDevicePathNode("testdata/sys/devices/pci0000:00")
+	node, err := newACPIExtendedDevicePathNode(filepath.Join(sysfs, "devices/pci0000:00"))
 	c.Assert(err, IsNil)
 	c.Check(node, DeepEquals, &efi.ACPIExtendedDevicePathNode{
 		HID: 0x0a0841d0,

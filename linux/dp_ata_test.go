@@ -5,17 +5,21 @@
 package linux
 
 import (
+	"path/filepath"
+
 	. "gopkg.in/check.v1"
 
 	"github.com/canonical/go-efilib"
 )
 
-type ataSuite struct{}
+type ataSuite struct {
+	TarFileMixin
+}
 
 var _ = Suite(&ataSuite{})
 
 func (s *ataSuite) TestHandleATADevicePathNodeSATA1(c *C) {
-	restoreSysfs := MockSysfsPath("testdata/sys")
+	restoreSysfs := MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restoreSysfs()
 
 	builder := &devicePathBuilderImpl{
@@ -42,7 +46,7 @@ func (s *ataSuite) TestHandleATADevicePathNodeSATA1(c *C) {
 }
 
 func (s *ataSuite) TestHandleATADevicePathNodeSATA2(c *C) {
-	restoreSysfs := MockSysfsPath("testdata/sys")
+	restoreSysfs := MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restoreSysfs()
 
 	builder := &devicePathBuilderImpl{
@@ -69,7 +73,7 @@ func (s *ataSuite) TestHandleATADevicePathNodeSATA2(c *C) {
 }
 
 func (s *ataSuite) TestHandleATADevicePathNodeIDE1(c *C) {
-	restoreSysfs := MockSysfsPath("testdata/sys")
+	restoreSysfs := MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restoreSysfs()
 
 	builder := &devicePathBuilderImpl{
@@ -96,7 +100,7 @@ func (s *ataSuite) TestHandleATADevicePathNodeIDE1(c *C) {
 }
 
 func (s *ataSuite) TestHandleATADevicePathNodeIDE2(c *C) {
-	restoreSysfs := MockSysfsPath("testdata/sys")
+	restoreSysfs := MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restoreSysfs()
 
 	builder := &devicePathBuilderImpl{
