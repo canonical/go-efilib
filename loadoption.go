@@ -62,8 +62,10 @@ func (o *LoadOption) Write(w io.Writer) error {
 	return opt.Write(w)
 }
 
-// ReadLoadOption reads a LoadOption from the supplied io.Reader.
-// This function will consume all of the bytes available.
+// ReadLoadOption reads a LoadOption from the supplied io.Reader. Due to the
+// way that EFI_LOAD_OPTION is defined, where there is no size encoded for the
+// OptionalData field, this function will consume all of the bytes available
+// from the supplied reader.
 func ReadLoadOption(r io.Reader) (out *LoadOption, err error) {
 	opt, err := uefi.Read_EFI_LOAD_OPTION(r)
 	if err != nil {
