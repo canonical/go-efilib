@@ -220,8 +220,8 @@ const (
 
 // PartitionTable describes a complete GUID partition table.
 type PartitionTable struct {
-	Hdr     *PartitionTableHeader
-	Entries []*PartitionEntry
+	DiskGUID GUID
+	Entries  []*PartitionEntry
 }
 
 // ReadPartitionTable reads a complete GUID partition table from the supplied
@@ -303,5 +303,5 @@ func ReadPartitionTable(r io.ReaderAt, totalSz, blockSz int64, role PartitionTab
 		return nil, err
 	}
 
-	return &PartitionTable{hdr, entries}, nil
+	return &PartitionTable{hdr.DiskGUID, entries}, nil
 }
