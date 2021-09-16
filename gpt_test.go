@@ -308,7 +308,7 @@ func (s *gptSuite) TestReadPartitionTable2(c *C) {
 		path:     "testdata/partitiontables/cloudimg-invalid-hdr-checksum",
 		role:     PrimaryPartitionTable,
 		checkCrc: true,
-		errMatch: "cannot read GPT header: CRC check failed",
+		errMatch: "CRC check failed",
 	})
 }
 
@@ -317,7 +317,7 @@ func (s *gptSuite) TestReadPartitionTable3(c *C) {
 		path:     "testdata/partitiontables/cloudimg-invalid-array-checksum",
 		role:     PrimaryPartitionTable,
 		checkCrc: true,
-		errMatch: "cannot read GPT entries: CRC check failed",
+		errMatch: "CRC check failed",
 	})
 }
 
@@ -399,6 +399,6 @@ func (s *gptSuite) TestReadPartitionTable6(c *C) {
 		path:     "testdata/partitiontables/backup",
 		role:     PrimaryPartitionTable,
 		checkCrc: true,
-		errMatch: "cannot read GPT header: CRC check failed",
+		errMatch: "CRC check failed",
 	})
 }

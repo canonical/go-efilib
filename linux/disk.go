@@ -73,8 +73,7 @@ func getDeviceSize(f *os.File) (int64, error) {
 }
 
 // NewHardDriveDevicePathNodeFromDevice constructs a HardDriveDevicePathNode for the
-// specified partition on the device or file at the supplied path. This requires that the
-// device or file has a valid primary GPT.
+// specified partition on the device or file at the supplied path.
 func NewHardDriveDevicePathNodeFromDevice(dev string, part int) (*efi.HardDriveDevicePathNode, error) {
 	f, err := osOpen(dev)
 	if err != nil {

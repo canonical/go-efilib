@@ -14,12 +14,23 @@ import (
 
 	"golang.org/x/xerrors"
 
-	"github.com/canonical/go-efilib/internal/ioerr"
 	"github.com/canonical/go-efilib/internal/uefi"
+	"github.com/canonical/go-efilib/mbr"
 )
 
-// UnusedPartitionType is the type GUID of an unused partition entry.
-var UnusedPartitionType GUID
+var (
+	ErrCRCCheck        = errors.New("CRC check failed")
+	ErrNoProtectiveMBR = errors.New("no protective master boot record found")
+
+	// UnusedPartitionType is the type GUID of an unused partition entry.
+	UnusedPartitionType GUID
+)
+
+type InvalidGPTHeaderError string
+
+func (e InvalidGPTHeaderError) Error() string {
+	return "invalid GPT header: " + string(e)
+}
 
 // PartitionTableHeader correponds to the EFI_PARTITION_TABLE_HEADER type.
 type PartitionTableHeader struct {
@@ -83,13 +94,13 @@ func ReadPartitionTableHeader(r io.Reader, checkCrc bool) (*PartitionTableHeader
 		return nil, err
 	}
 	if hdr.Hdr.Signature != uefi.EFI_PTAB_HEADER_ID {
-		return nil, errors.New("invalid signature")
+		return nil, InvalidGPTHeaderError("invalid signature")
 	}
 	if hdr.Hdr.Revision != 0x10000 {
-		return nil, errors.New("unexpected revision")
+		return nil, InvalidGPTHeaderError("unexpected revision")
 	}
 	if checkCrc && hdr.Hdr.CRC != crc {
-		return nil, errors.New("CRC check failed")
+		return nil, ErrCRCCheck
 	}
 
 	return &PartitionTableHeader{
@@ -184,7 +195,7 @@ func readPartitionEntries(r io.Reader, num, sz, expectedCrc uint32, checkCrc boo
 	}
 
 	if checkCrc && crc.Sum32() != expectedCrc {
-		return nil, errors.New("CRC check failed")
+		return nil, ErrCRCCheck
 	}
 
 	return out, nil
@@ -198,23 +209,6 @@ func ReadPartitionEntries(r io.Reader, num, sz uint32) ([]*PartitionEntry, error
 }
 
 var emptyPartitionType GUID
-
-type chsAddress [3]uint8
-
-type mbrPartitionEntry struct {
-	Flag         uint8
-	StartAddress chsAddress
-	Type         uint8
-	EndAddress   chsAddress
-	StartingLBA  uint32
-	Length       uint32
-}
-
-type mbr struct {
-	Code       [446]byte
-	Partitions [4]mbrPartitionEntry
-	Signature  uint16
-}
 
 // PartitionTableRole describes the role of a partition table.
 type PartitionTableRole int
@@ -247,23 +241,20 @@ type PartitionTable struct {
 func ReadPartitionTable(r io.ReaderAt, totalSz, blockSz int64, role PartitionTableRole, checkCrc bool) (*PartitionTable, error) {
 	r2 := io.NewSectionReader(r, 0, totalSz)
 
-	var mbr mbr
-	if err := binary.Read(r2, binary.LittleEndian, &mbr); err != nil {
+	record, err := mbr.ReadRecord(r2)
+	if err != nil {
 		return nil, err
-	}
-	if mbr.Signature != 0xaa55 {
-		return nil, errors.New("invalid MBR signature")
 	}
 
 	validPmbr := false
-	for _, p := range mbr.Partitions {
+	for _, p := range record.Partitions {
 		if p.Type == 0xee {
 			validPmbr = true
 			break
 		}
 	}
 	if !validPmbr {
-		return nil, errors.New("no valid PMBR detected")
+		return nil, ErrNoProtectiveMBR
 	}
 
 	var offset int64
@@ -293,8 +284,11 @@ func ReadPartitionTable(r io.ReaderAt, totalSz, blockSz int64, role PartitionTab
 	}
 
 	hdr, err := ReadPartitionTableHeader(r2, checkCrc)
-	if err != nil {
-		return nil, ioerr.EOFIsUnexpected("cannot read GPT header: %w", err)
+	switch {
+	case err == io.EOF:
+		return nil, io.ErrUnexpectedEOF
+	case err != nil:
+		return nil, err
 	}
 
 	if _, err := r2.Seek(int64(hdr.PartitionEntryLBA)*blockSz, io.SeekStart); err != nil {
@@ -302,8 +296,11 @@ func ReadPartitionTable(r io.ReaderAt, totalSz, blockSz int64, role PartitionTab
 	}
 
 	entries, err := readPartitionEntries(r2, hdr.NumberOfPartitionEntries, hdr.SizeOfPartitionEntry, hdr.PartitionEntryArrayCRC32, checkCrc)
-	if err != nil {
-		return nil, ioerr.EOFIsUnexpected("cannot read GPT entries: %w", err)
+	switch {
+	case err == io.EOF:
+		return nil, io.ErrUnexpectedEOF
+	case err != nil:
+		return nil, err
 	}
 
 	return &PartitionTable{hdr, entries}, nil

@@ -17,6 +17,7 @@ import (
 
 	"github.com/canonical/go-efilib/internal/ioerr"
 	"github.com/canonical/go-efilib/internal/uefi"
+	"github.com/canonical/go-efilib/mbr"
 
 	"golang.org/x/xerrors"
 )
@@ -703,35 +704,52 @@ func (d *HardDriveDevicePathNode) Write(w io.Writer) error {
 }
 
 // NewHardDriveDevicePathNodeFromDevice constructs a HardDriveDevicePathNode for the
-// specified partition on the supplied device reader. This requires that the underlying
-// device has a valid primary GPT. The device's total size and logical block size must
-// be supplied.
+// specified partition on the supplied device reader. The device's total size and
+// logical block size must be supplied.
 func NewHardDriveDevicePathNodeFromDevice(r io.ReaderAt, totalSz, blockSz int64, part int) (*HardDriveDevicePathNode, error) {
 	if part < 1 {
 		return nil, errors.New("invalid partition number")
 	}
 
 	table, err := ReadPartitionTable(r, totalSz, blockSz, PrimaryPartitionTable, true)
-	if err != nil {
+	switch {
+	case err == ErrNoProtectiveMBR:
+		record, err := mbr.ReadRecord(io.NewSectionReader(r, 0, totalSz))
+		if err != nil {
+			return nil, err
+		}
+		if part > 4 {
+			return nil, fmt.Errorf("invalid partition number %d for MBR", part)
+		}
+
+		entry := record.Partitions[part-1]
+
+		return &HardDriveDevicePathNode{
+			PartitionNumber: uint32(part),
+			PartitionStart:  uint64(entry.StartingLBA),
+			PartitionSize:   uint64(entry.NumberOfSectors),
+			Signature:       record.UniqueSignature,
+			MBRType:         LegacyMBR}, nil
+	case err != nil:
 		return nil, err
+	default:
+		if part > len(table.Entries) {
+			return nil, fmt.Errorf("invalid partition number %d: device only has %d partitions", part, len(table.Entries))
+		}
+
+		entry := table.Entries[part-1]
+
+		if entry.PartitionTypeGUID == UnusedPartitionType {
+			return nil, errors.New("requested partition is unused")
+		}
+
+		return &HardDriveDevicePathNode{
+			PartitionNumber: uint32(part),
+			PartitionStart:  uint64(entry.StartingLBA),
+			PartitionSize:   uint64(entry.EndingLBA - entry.StartingLBA + 1),
+			Signature:       entry.UniquePartitionGUID,
+			MBRType:         GPT}, nil
 	}
-
-	if part > len(table.Entries) {
-		return nil, fmt.Errorf("invalid partition number %d: device only has %d partitions", part, len(table.Entries))
-	}
-
-	entry := table.Entries[part-1]
-
-	if entry.PartitionTypeGUID == UnusedPartitionType {
-		return nil, errors.New("requested partition is unused")
-	}
-
-	return &HardDriveDevicePathNode{
-		PartitionNumber: uint32(part),
-		PartitionStart:  uint64(entry.StartingLBA),
-		PartitionSize:   uint64(entry.EndingLBA - entry.StartingLBA + 1),
-		Signature:       entry.UniquePartitionGUID,
-		MBRType:         GPT}, nil
 }
 
 // CDROMDevicePathNode corresponds to a CDROM device path node.

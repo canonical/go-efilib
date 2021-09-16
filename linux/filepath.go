@@ -318,8 +318,7 @@ func newFilePath(path string) (*filePath, error) {
 //
 // When mode is ShortFormPathHD or FullPath and the file is stored inside a
 // partitoned device, read access is required on the underlying block device
-// in order to decode the partition table. The device must be partitioned using
-// GPT.
+// in order to decode the partition table.
 //
 // If mode is ShortFormPathFile, this will attempt to create a short-form device
 // path consisting only of the file path relative to the device.

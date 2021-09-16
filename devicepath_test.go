@@ -224,5 +224,23 @@ func (d *dpSuite) TestNewHardDriveDevicePathNodeFromDeviceInvalidHeader(c *C) {
 	d.testNewHardDriveDevicePathNodeFromDeviceError(c, &testNewHardDriveDevicePathNodeFromDeviceErrorData{
 		path: "testdata/partitiontables/cloudimg-invalid-hdr-checksum",
 		part: 1,
-		err:  "cannot read GPT header: CRC check failed"})
+		err:  "CRC check failed"})
+}
+
+func (d *dpSuite) TestNewHardDriveDevicePathNodeFromMBRDevice(c *C) {
+	f, err := os.Open("testdata/partitiontables/mbr")
+	c.Assert(err, IsNil)
+	defer f.Close()
+
+	fi, err := f.Stat()
+	c.Assert(err, IsNil)
+
+	node, err := NewHardDriveDevicePathNodeFromDevice(f, fi.Size(), 512, 1)
+	c.Assert(err, IsNil)
+	c.Check(node, DeepEquals, &HardDriveDevicePathNode{
+		PartitionNumber: 1,
+		PartitionStart:  2048,
+		PartitionSize:   19922944,
+		Signature:       uint32(0xa773bf3f),
+		MBRType:         LegacyMBR})
 }
