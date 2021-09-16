@@ -16,9 +16,23 @@ import (
 	"github.com/canonical/go-efilib/internal/uefi"
 )
 
+type LoadOptionAttributes uint32
+
+func (a LoadOptionAttributes) Category() uint32 {
+	return uint32(a & uefi.LOAD_OPTION_CATEGORY)
+}
+
+const (
+	LoadOptionActive         = uefi.LOAD_OPTION_ACTIVE
+	LoadOptionForceReconnect = uefi.LOAD_OPTION_FORCE_RECONNECT
+	LoadOptionHidden         = uefi.LOAD_OPTION_HIDDEN
+	LoadOptionCategoryBoot   = uefi.LOAD_OPTION_CATEGORY_BOOT
+	LoadOptionCategoryApp    = uefi.LOAD_OPTION_CATEGORY_APP
+)
+
 // LoadOption corresponds to the EFI_LOAD_OPTION type.
 type LoadOption struct {
-	Attributes   uint32
+	Attributes   LoadOptionAttributes
 	Description  string
 	FilePath     DevicePath
 	OptionalData []byte
@@ -31,7 +45,7 @@ func (o *LoadOption) String() string {
 
 func (o *LoadOption) Write(w io.Writer) error {
 	opt := uefi.EFI_LOAD_OPTION{
-		Attributes:   o.Attributes,
+		Attributes:   uint32(o.Attributes),
 		Description:  ConvertUTF8ToUTF16(o.Description + "\x00"),
 		OptionalData: o.OptionalData}
 
@@ -57,7 +71,7 @@ func ReadLoadOption(r io.Reader) (out *LoadOption, err error) {
 	}
 
 	out = &LoadOption{
-		Attributes:   opt.Attributes,
+		Attributes:   LoadOptionAttributes(opt.Attributes),
 		Description:  ConvertUTF16ToUTF8(opt.Description),
 		OptionalData: opt.OptionalData}
 

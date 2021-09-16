@@ -12,6 +12,15 @@ import (
 	"github.com/canonical/go-efilib/internal/ioerr"
 )
 
+const (
+	LOAD_OPTION_ACTIVE          = 0x00000001
+	LOAD_OPTION_FORCE_RECONNECT = 0x00000002
+	LOAD_OPTION_HIDDEN          = 0x00000008
+	LOAD_OPTION_CATEGORY        = 0x00001f00
+	LOAD_OPTION_CATEGORY_BOOT   = 0x00000000
+	LOAD_OPTION_CATEGORY_APP    = 0x00000100
+)
+
 type EFI_LOAD_OPTION struct {
 	Attributes         uint32
 	FilePathListLength uint16
