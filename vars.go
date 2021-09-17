@@ -5,11 +5,7 @@
 package efi
 
 import (
-	"bytes"
 	"errors"
-	"io/ioutil"
-
-	"github.com/canonical/go-efilib/internal/ioerr"
 )
 
 type VariableAttributes uint32
@@ -79,27 +75,4 @@ func WriteVariable(name string, guid GUID, attrs VariableAttributes, data []byte
 // ListVariables returns a list of variables that can be accessed.
 func ListVariables() ([]VarDescriptor, error) {
 	return vars.List()
-}
-
-// ReadEnhancedAuthenticatedVariable returns the value, attributes and authentication
-// descriptor of the EFI variable with the specified name and GUID. This will
-// return an error if the variable doesn't have the EFI_VARIABLE_ENHANCED_AUTHENTICATED_ACCESS
-// attribute set.
-func ReadEnhancedAuthenticatedVariable(name string, guid GUID) ([]byte, VariableAuthentication3Descriptor, VariableAttributes, error) {
-	data, attrs, err := ReadVariable(name, guid)
-	if err != nil {
-		return nil, nil, 0, err
-	}
-	if attrs&AttributeEnhancedAuthenticatedAccess == 0 {
-		return nil, nil, 0, errors.New("variable does not have the EFI_VARIABLE_ENHANCED_AUTHENTICATED_ACCESS attribute set")
-	}
-
-	r := bytes.NewReader(data)
-	auth, err := ReadEnhancedAuthenticationDescriptor(r)
-	if err != nil {
-		return nil, nil, 0, ioerr.EOFIsUnexpected("cannot decode authentication descriptor: %w", err)
-	}
-
-	data, _ = ioutil.ReadAll(r)
-	return data, auth, attrs, nil
 }
