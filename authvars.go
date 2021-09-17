@@ -235,7 +235,7 @@ func ReadEnhancedVariableAuthentication(r io.Reader) (VariableAuthentication3, e
 type VariableAuthentication3Descriptor interface{}
 
 const (
-	VariableAuthentication3CertIDSHA256 = 1
+	VariableAuthentication3CertIDSHA256 = uefi.EFI_VARIABLE_AUTHENTICATION_3_CERT_ID_SHA256
 )
 
 type VariableAuthentication3CertId struct {
