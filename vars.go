@@ -31,7 +31,7 @@ var (
 	ErrVarPermission   = errors.New("permission denied")
 )
 
-type VarEntry struct {
+type VarDescriptor struct {
 	Name string
 	GUID GUID
 }
@@ -39,7 +39,7 @@ type VarEntry struct {
 type varsBackend interface {
 	Get(name string, guid GUID) (VariableAttributes, []byte, error)
 	Set(name string, guid GUID, attrs VariableAttributes, data []byte) error
-	List() ([]VarEntry, error)
+	List() ([]VarDescriptor, error)
 }
 
 type nullVarsBackend struct{}
@@ -52,41 +52,41 @@ func (v nullVarsBackend) Set(name string, guid GUID, attrs VariableAttributes, d
 	return ErrVarsUnavailable
 }
 
-func (v nullVarsBackend) List() ([]VarEntry, error) {
+func (v nullVarsBackend) List() ([]VarDescriptor, error) {
 	return nil, ErrVarsUnavailable
 }
 
 var vars varsBackend = nullVarsBackend{}
 
-// ReadVar returns the value and attributes of the EFI variable with the specified
+// ReadVariable returns the value and attributes of the EFI variable with the specified
 // name and GUID.
-func ReadVar(name string, guid GUID) ([]byte, VariableAttributes, error) {
+func ReadVariable(name string, guid GUID) ([]byte, VariableAttributes, error) {
 	attrs, data, err := vars.Get(name, guid)
 	return data, attrs, err
 }
 
-// WriteVar writes the supplied data value with the specified attributes to the
+// WriteVariable writes the supplied data value with the specified attributes to the
 // EFI variable with the specified name and GUID.
 //
 // If the variable already exists, the specified attributes must match the existing
 // attributes with the exception of AttributeAppendWrite.
 //
 // If the variable does not exist, it will be created.
-func WriteVar(name string, guid GUID, attrs VariableAttributes, data []byte) error {
+func WriteVariable(name string, guid GUID, attrs VariableAttributes, data []byte) error {
 	return vars.Set(name, guid, attrs, data)
 }
 
-// ListVars returns a list of variables that can be accessed.
-func ListVars() ([]VarEntry, error) {
+// ListVariables returns a list of variables that can be accessed.
+func ListVariables() ([]VarDescriptor, error) {
 	return vars.List()
 }
 
-// ReadEnhancedAuthenticatedVar returns the value, attributes and authentication
+// ReadEnhancedAuthenticatedVariable returns the value, attributes and authentication
 // descriptor of the EFI variable with the specified name and GUID. This will
 // return an error if the variable doesn't have the EFI_VARIABLE_ENHANCED_AUTHENTICATED_ACCESS
 // attribute set.
-func ReadEnhancedAuthenticatedVar(name string, guid GUID) ([]byte, VariableAuthentication3Descriptor, VariableAttributes, error) {
-	data, attrs, err := ReadVar(name, guid)
+func ReadEnhancedAuthenticatedVariable(name string, guid GUID) ([]byte, VariableAuthentication3Descriptor, VariableAttributes, error) {
+	data, attrs, err := ReadVariable(name, guid)
 	if err != nil {
 		return nil, nil, 0, err
 	}

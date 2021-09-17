@@ -255,57 +255,57 @@ func (s *varsLinuxSuite) TearDownTest(c *C) {
 
 var _ = Suite(&varsLinuxSuite{})
 
-type testReadVarData struct {
+type testReadVariableData struct {
 	name          string
 	guid          GUID
 	expectedData  []byte
 	expectedAttrs VariableAttributes
 }
 
-func (s *varsLinuxSuite) testReadVar(c *C, data *testReadVarData) {
-	val, attrs, err := ReadVar(data.name, data.guid)
+func (s *varsLinuxSuite) testReadVariable(c *C, data *testReadVariableData) {
+	val, attrs, err := ReadVariable(data.name, data.guid)
 	c.Check(err, IsNil)
 	c.Check(val, DeepEquals, data.expectedData)
 	c.Check(attrs, Equals, data.expectedAttrs)
 }
 
-func (s *varsLinuxSuite) TestReadVar1(c *C) {
-	s.testReadVar(c, &testReadVarData{
+func (s *varsLinuxSuite) TestReadVariable1(c *C) {
+	s.testReadVariable(c, &testReadVariableData{
 		name:          "SecureBoot",
 		guid:          MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}),
 		expectedData:  []byte{0x01},
 		expectedAttrs: AttributeBootserviceAccess | AttributeRuntimeAccess})
 }
 
-func (s *varsLinuxSuite) TestReadVar2(c *C) {
-	s.testReadVar(c, &testReadVarData{
+func (s *varsLinuxSuite) TestReadVariable2(c *C) {
+	s.testReadVariable(c, &testReadVariableData{
 		name:          "BootOrder",
 		guid:          MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}),
 		expectedData:  []byte{0x00, 0x00},
 		expectedAttrs: AttributeNonVolatile | AttributeBootserviceAccess | AttributeRuntimeAccess})
 }
 
-func (s *varsLinuxSuite) TestReadVar3(c *C) {
-	s.testReadVar(c, &testReadVarData{
+func (s *varsLinuxSuite) TestReadVariable3(c *C) {
+	s.testReadVariable(c, &testReadVariableData{
 		name:          "Test",
 		guid:          MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}),
 		expectedData:  DecodeHexString(c, "a5a5a5a5"),
 		expectedAttrs: AttributeNonVolatile | AttributeBootserviceAccess | AttributeRuntimeAccess})
 }
 
-func (s *varsLinuxSuite) TestReadVarNotFound1(c *C) {
-	_, _, err := ReadVar("NotFound", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}))
+func (s *varsLinuxSuite) TestReadVariableNotFound1(c *C) {
+	_, _, err := ReadVariable("NotFound", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}))
 	c.Check(err, Equals, ErrVarNotExist)
 }
 
-func (s *varsLinuxSuite) TestReadVarNotFound2(c *C) {
+func (s *varsLinuxSuite) TestReadVariableNotFound2(c *C) {
 	s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/NotFound-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"] = &mockEfiVar{}
-	_, _, err := ReadVar("NotFound", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}))
+	_, _, err := ReadVariable("NotFound", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}))
 	c.Check(err, Equals, ErrVarNotExist)
 }
 
-func (s *varsLinuxSuite) TestWriteVarImmutable(c *C) {
-	err := WriteVar("Test", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}),
+func (s *varsLinuxSuite) TestWriteVariableImmutable(c *C) {
+	err := WriteVariable("Test", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}),
 		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, DecodeHexString(c, "080808080808"))
 	c.Check(err, IsNil)
 
@@ -315,8 +315,8 @@ func (s *varsLinuxSuite) TestWriteVarImmutable(c *C) {
 	c.Check(v.flags, Equals, uint(immutableFlag))
 }
 
-func (s *varsLinuxSuite) TestWriteVarMutable(c *C) {
-	err := WriteVar("BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}),
+func (s *varsLinuxSuite) TestWriteVariableMutable(c *C) {
+	err := WriteVariable("BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}),
 		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, DecodeHexString(c, "0001"))
 	c.Check(err, IsNil)
 
@@ -326,8 +326,8 @@ func (s *varsLinuxSuite) TestWriteVarMutable(c *C) {
 	c.Check(v.flags, Equals, uint(0))
 }
 
-func (s *varsLinuxSuite) TestWriteVarAppend(c *C) {
-	err := WriteVar("BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}),
+func (s *varsLinuxSuite) TestWriteVariableAppend(c *C) {
+	err := WriteVariable("BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}),
 		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess|AttributeAppendWrite,
 		DecodeHexString(c, "0001"))
 	c.Check(err, IsNil)
@@ -338,8 +338,8 @@ func (s *varsLinuxSuite) TestWriteVarAppend(c *C) {
 	c.Check(v.flags, Equals, uint(0))
 }
 
-func (s *varsLinuxSuite) TestCreateVar(c *C) {
-	err := WriteVar("Test2", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}),
+func (s *varsLinuxSuite) TestCreateVariable(c *C) {
+	err := WriteVariable("Test2", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}),
 		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, DecodeHexString(c, "a5a5a5a5"))
 	c.Assert(err, IsNil)
 
@@ -349,7 +349,7 @@ func (s *varsLinuxSuite) TestCreateVar(c *C) {
 	c.Check(v.mode, Equals, os.FileMode(0644))
 }
 
-func (s *varsLinuxSuite) TestWriteVarEACCES(c *C) {
+func (s *varsLinuxSuite) TestWriteVariableEACCES(c *C) {
 	var restore func()
 	restore = MockOpenVarFile(func(path string, flags int, perm os.FileMode) (VarFile, error) {
 		if flags&os.O_WRONLY == 0 {
@@ -367,12 +367,12 @@ func (s *varsLinuxSuite) TestWriteVarEACCES(c *C) {
 		restore()
 	}()
 
-	err := WriteVar("BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}),
+	err := WriteVariable("BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}),
 		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, DecodeHexString(c, "0001"))
 	c.Check(err, Equals, ErrVarPermission)
 }
 
-func (s *varsLinuxSuite) TestWriteVarRace(c *C) {
+func (s *varsLinuxSuite) TestWriteVariableRace(c *C) {
 	var restore func()
 	restore = MockOpenVarFile(func(path string, flags int, perm os.FileMode) (VarFile, error) {
 		if flags&os.O_WRONLY != 0 {
@@ -391,12 +391,12 @@ func (s *varsLinuxSuite) TestWriteVarRace(c *C) {
 		restore()
 	}()
 
-	err := WriteVar("BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}),
+	err := WriteVariable("BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}),
 		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, DecodeHexString(c, "0001"))
 	c.Check(err, IsNil)
 }
 
-func (s *varsLinuxSuite) TestWriteVarRaceGiveUp(c *C) {
+func (s *varsLinuxSuite) TestWriteVariableRaceGiveUp(c *C) {
 	count := 0
 	restore := MockOpenVarFile(func(path string, flags int, perm os.FileMode) (VarFile, error) {
 		if flags&os.O_WRONLY != 0 {
@@ -409,22 +409,22 @@ func (s *varsLinuxSuite) TestWriteVarRaceGiveUp(c *C) {
 	})
 	defer restore()
 
-	err := WriteVar("BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}),
+	err := WriteVariable("BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}),
 		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, DecodeHexString(c, "0001"))
 	c.Check(err, Equals, ErrVarPermission)
 	c.Check(count, Equals, 5)
 }
 
-func (s *varsLinuxSuite) TestListVars(c *C) {
-	ents, err := ListVars()
+func (s *varsLinuxSuite) TestListVariables(c *C) {
+	ents, err := ListVariables()
 	c.Check(err, IsNil)
-	c.Check(ents, DeepEquals, []VarEntry{
+	c.Check(ents, DeepEquals, []VarDescriptor{
 		{Name: "BootOrder", GUID: MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c})},
 		{Name: "SecureBoot", GUID: MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c})},
 		{Name: "Test", GUID: MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20})}})
 }
 
-func (s *varsLinuxSuite) TestListVarsInvalidNames(c *C) {
+func (s *varsLinuxSuite) TestListVariablesInvalidNames(c *C) {
 	fs := &mockEfiVarfs{vars: make(map[string]*mockEfiVar)}
 	fs.vars["Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"] = &mockEfiVar{data: DecodeHexString(c, "00000000000000000000"), mode: os.ModeDir | 0755}
 	fs.vars["e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"] = &mockEfiVar{data: DecodeHexString(c, "00000000000000000000"), mode: 0644}
@@ -435,7 +435,7 @@ func (s *varsLinuxSuite) TestListVarsInvalidNames(c *C) {
 	restore := MockOpenVarFile(fs.Open)
 	defer restore()
 
-	ents, err := ListVars()
+	ents, err := ListVariables()
 	c.Check(err, IsNil)
-	c.Check(ents, DeepEquals, []VarEntry{{Name: "Test", GUID: MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20})}})
+	c.Check(ents, DeepEquals, []VarDescriptor{{Name: "Test", GUID: MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20})}})
 }

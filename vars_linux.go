@@ -203,7 +203,7 @@ func (v efivarfsVarsBackend) Set(name string, guid GUID, attrs VariableAttribute
 	return maybeRetry(4, func() (bool, error) { return writeEfivarfsFile(path, attrs, data) })
 }
 
-func (v efivarfsVarsBackend) List() ([]VarEntry, error) {
+func (v efivarfsVarsBackend) List() ([]VarDescriptor, error) {
 	f, err := openVarFile(efivarfsPath(), os.O_RDONLY, 0)
 	switch {
 	case os.IsNotExist(err):
@@ -220,7 +220,7 @@ func (v efivarfsVarsBackend) List() ([]VarEntry, error) {
 		return nil, err
 	}
 
-	var entries []VarEntry
+	var entries []VarDescriptor
 
 	for _, dirent := range dirents {
 		if !dirent.Mode().IsRegular() {
@@ -249,7 +249,7 @@ func (v efivarfsVarsBackend) List() ([]VarEntry, error) {
 			continue
 		}
 
-		entries = append(entries, VarEntry{Name: name, GUID: guid})
+		entries = append(entries, VarDescriptor{Name: name, GUID: guid})
 	}
 
 	sort.Slice(entries, func(i, j int) bool {
