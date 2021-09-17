@@ -16,13 +16,30 @@ import (
 // GUID corresponds to the EFI_GUID type.
 type GUID [16]byte
 
+func (guid GUID) A() uint32 {
+	return binary.LittleEndian.Uint32(guid[0:4])
+}
+
+func (guid GUID) B() uint16 {
+	return binary.LittleEndian.Uint16(guid[4:6])
+}
+
+func (guid GUID) C() uint16 {
+	return binary.LittleEndian.Uint16(guid[6:8])
+}
+
+func (guid GUID) D() uint16 {
+	return binary.BigEndian.Uint16(guid[8:10])
+}
+
+func (guid GUID) E() [6]uint8 {
+	var out [6]uint8
+	copy(out[:], guid[10:16])
+	return out
+}
+
 func (guid GUID) String() string {
-	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
-		binary.LittleEndian.Uint32(guid[0:4]),
-		binary.LittleEndian.Uint16(guid[4:6]),
-		binary.LittleEndian.Uint16(guid[6:8]),
-		binary.BigEndian.Uint16(guid[8:10]),
-		guid[10:16])
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", guid.A(), guid.B(), guid.C(), guid.D(), guid.E())
 }
 
 // MakeGUID makes a new GUID from the supplied arguments.
