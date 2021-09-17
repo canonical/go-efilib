@@ -38,8 +38,9 @@ func ConvertUTF8ToUTF16(in string) []uint16 {
 }
 
 // ConvertUTF8ToUCS2 converts the supplied UTF-8 string to a
-// UCS2 string. Any code point outside of the BML is converted
-// to the replacement character.
+// UCS2 string. Any code point outside of the Basic Multilingual
+// Plane cannot be represented by UCS2 and is converted to the
+// replacement character.
 func ConvertUTF8ToUCS2(in string) []uint16 {
 	var unicodeStr []rune
 	for len(in) > 0 {
