@@ -18,16 +18,16 @@ import (
 
 type LoadOptionAttributes uint32
 
-func (a LoadOptionAttributes) Category() uint32 {
-	return uint32(a & uefi.LOAD_OPTION_CATEGORY)
+func (a LoadOptionAttributes) Category() LoadOptionAttributes {
+	return a & LoadOptionAttributes(uefi.LOAD_OPTION_CATEGORY)
 }
 
 const (
-	LoadOptionActive         = uefi.LOAD_OPTION_ACTIVE
-	LoadOptionForceReconnect = uefi.LOAD_OPTION_FORCE_RECONNECT
-	LoadOptionHidden         = uefi.LOAD_OPTION_HIDDEN
-	LoadOptionCategoryBoot   = uefi.LOAD_OPTION_CATEGORY_BOOT
-	LoadOptionCategoryApp    = uefi.LOAD_OPTION_CATEGORY_APP
+	LoadOptionActive         LoadOptionAttributes = uefi.LOAD_OPTION_ACTIVE
+	LoadOptionForceReconnect LoadOptionAttributes = uefi.LOAD_OPTION_FORCE_RECONNECT
+	LoadOptionHidden         LoadOptionAttributes = uefi.LOAD_OPTION_HIDDEN
+	LoadOptionCategoryBoot   LoadOptionAttributes = uefi.LOAD_OPTION_CATEGORY_BOOT
+	LoadOptionCategoryApp    LoadOptionAttributes = uefi.LOAD_OPTION_CATEGORY_APP
 )
 
 // LoadOption corresponds to the EFI_LOAD_OPTION type.
