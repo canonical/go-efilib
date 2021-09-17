@@ -29,7 +29,8 @@ var (
 	ErrVarPermission   = errors.New("permission denied")
 )
 
-type VarDescriptor struct {
+// VariableDescriptor represents the identity of a variable.
+type VariableDescriptor struct {
 	Name string
 	GUID GUID
 }
@@ -37,7 +38,7 @@ type VarDescriptor struct {
 type varsBackend interface {
 	Get(name string, guid GUID) (VariableAttributes, []byte, error)
 	Set(name string, guid GUID, attrs VariableAttributes, data []byte) error
-	List() ([]VarDescriptor, error)
+	List() ([]VariableDescriptor, error)
 }
 
 type nullVarsBackend struct{}
@@ -50,7 +51,7 @@ func (v nullVarsBackend) Set(name string, guid GUID, attrs VariableAttributes, d
 	return ErrVarsUnavailable
 }
 
-func (v nullVarsBackend) List() ([]VarDescriptor, error) {
+func (v nullVarsBackend) List() ([]VariableDescriptor, error) {
 	return nil, ErrVarsUnavailable
 }
 
@@ -75,6 +76,6 @@ func WriteVariable(name string, guid GUID, attrs VariableAttributes, data []byte
 }
 
 // ListVariables returns a list of variables that can be accessed.
-func ListVariables() ([]VarDescriptor, error) {
+func ListVariables() ([]VariableDescriptor, error) {
 	return vars.List()
 }

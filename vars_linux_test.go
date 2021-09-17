@@ -418,7 +418,7 @@ func (s *varsLinuxSuite) TestWriteVariableRaceGiveUp(c *C) {
 func (s *varsLinuxSuite) TestListVariables(c *C) {
 	ents, err := ListVariables()
 	c.Check(err, IsNil)
-	c.Check(ents, DeepEquals, []VarDescriptor{
+	c.Check(ents, DeepEquals, []VariableDescriptor{
 		{Name: "BootOrder", GUID: MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c})},
 		{Name: "SecureBoot", GUID: MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c})},
 		{Name: "Test", GUID: MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20})}})
@@ -437,5 +437,5 @@ func (s *varsLinuxSuite) TestListVariablesInvalidNames(c *C) {
 
 	ents, err := ListVariables()
 	c.Check(err, IsNil)
-	c.Check(ents, DeepEquals, []VarDescriptor{{Name: "Test", GUID: MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20})}})
+	c.Check(ents, DeepEquals, []VariableDescriptor{{Name: "Test", GUID: MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20})}})
 }
