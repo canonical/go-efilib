@@ -13,14 +13,14 @@ import (
 type VariableAttributes uint32
 
 const (
-	AttributeNonVolatile                       = VariableAttributes(uefi.EFI_VARIABLE_NON_VOLATILE)
-	AttributeBootserviceAccess                 = VariableAttributes(uefi.EFI_VARIABLE_BOOTSERVICE_ACCESS)
-	AttributeRuntimeAccess                     = VariableAttributes(uefi.EFI_VARIABLE_RUNTIME_ACCESS)
-	AttributeHardwareErrorRecord               = VariableAttributes(uefi.EFI_VARIABLE_HARDWARE_ERROR_RECORD)
-	AttributeAuthenticatedWriteAccess          = VariableAttributes(uefi.EFI_VARIABLE_AUTHENTICATED_WRITE_ACCESS)
-	AttributeTimeBasedAuthenticatedWriteAccess = VariableAttributes(uefi.EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS)
-	AttributeAppendWrite                       = VariableAttributes(uefi.EFI_VARIABLE_APPEND_WRITE)
-	AttributeEnhancedAuthenticatedAccess       = VariableAttributes(uefi.EFI_VARIABLE_ENHANCED_AUTHENTICATED_ACCESS)
+	AttributeNonVolatile                       VariableAttributes = uefi.EFI_VARIABLE_NON_VOLATILE
+	AttributeBootserviceAccess                 VariableAttributes = uefi.EFI_VARIABLE_BOOTSERVICE_ACCESS
+	AttributeRuntimeAccess                     VariableAttributes = uefi.EFI_VARIABLE_RUNTIME_ACCESS
+	AttributeHardwareErrorRecord               VariableAttributes = uefi.EFI_VARIABLE_HARDWARE_ERROR_RECORD
+	AttributeAuthenticatedWriteAccess          VariableAttributes = uefi.EFI_VARIABLE_AUTHENTICATED_WRITE_ACCESS
+	AttributeTimeBasedAuthenticatedWriteAccess VariableAttributes = uefi.EFI_VARIABLE_TIME_BASED_AUTHENTICATED_WRITE_ACCESS
+	AttributeAppendWrite                       VariableAttributes = uefi.EFI_VARIABLE_APPEND_WRITE
+	AttributeEnhancedAuthenticatedAccess       VariableAttributes = uefi.EFI_VARIABLE_ENHANCED_AUTHENTICATED_ACCESS
 )
 
 var (
