@@ -28,14 +28,14 @@ func (s *stringSuite) TestUCS2ConversionASCII(c *C) {
 	c.Check(ConvertUTF16ToUTF8(append(u16, 0)), Equals, u8)
 }
 
-func (s *stringSuite) TestUTF16ConversionBML(c *C) {
+func (s *stringSuite) TestUTF16ConversionBMP(c *C) {
 	u8 := "αβγδεζη"
 	u16 := ConvertUTF8ToUTF16(u8)
 	c.Check(u16, DeepEquals, []uint16{0x3b1, 0x3b2, 0x3b3, 0x3b4, 0x3b5, 0x3b6, 0x3b7})
 	c.Check(ConvertUTF16ToUTF8(append(u16, 0)), Equals, u8)
 }
 
-func (s *stringSuite) TestUCS2ConversionBML(c *C) {
+func (s *stringSuite) TestUCS2ConversionBMP(c *C) {
 	u8 := "αβγδεζη"
 	u16 := ConvertUTF8ToUCS2(u8)
 	c.Check(u16, DeepEquals, []uint16{0x3b1, 0x3b2, 0x3b3, 0x3b4, 0x3b5, 0x3b6, 0x3b7})
