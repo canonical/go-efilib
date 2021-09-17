@@ -17,13 +17,6 @@ import (
 	"golang.org/x/xerrors"
 )
 
-type signatureListHdr struct {
-	Type          GUID
-	ListSize      uint32
-	HeaderSize    uint32
-	SignatureSize uint32
-}
-
 // SignatureData corresponds to the EFI_SIGNATURE_DATA type.
 type SignatureData struct {
 	Owner GUID
