@@ -10,7 +10,7 @@ import (
 
 type EFI_GUID [16]byte
 
-func new_EFI_GUID(a uint32, b, c, d uint16, e [6]uint8) (out EFI_GUID) {
+func New_EFI_GUID(a uint32, b, c, d uint16, e [6]uint8) (out EFI_GUID) {
 	binary.LittleEndian.PutUint32(out[0:4], a)
 	binary.LittleEndian.PutUint16(out[4:6], b)
 	binary.LittleEndian.PutUint16(out[6:8], c)

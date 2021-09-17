@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+
+	"github.com/canonical/go-efilib/internal/uefi"
 )
 
 // GUID corresponds to the EFI_GUID type.
@@ -43,13 +45,8 @@ func (guid GUID) String() string {
 }
 
 // MakeGUID makes a new GUID from the supplied arguments.
-func MakeGUID(a uint32, b, c, d uint16, e [6]uint8) (out GUID) {
-	binary.LittleEndian.PutUint32(out[0:4], a)
-	binary.LittleEndian.PutUint16(out[4:6], b)
-	binary.LittleEndian.PutUint16(out[6:8], c)
-	binary.BigEndian.PutUint16(out[8:10], d)
-	copy(out[10:], e[:])
-	return
+func MakeGUID(a uint32, b, c, d uint16, e [6]uint8) GUID {
+	return GUID(uefi.New_EFI_GUID(a, b, c, d, e))
 }
 
 // ReadGUID reads a EFI_GUID from the supplied io.Reader.
