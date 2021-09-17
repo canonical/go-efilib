@@ -86,14 +86,14 @@ func (p DevicePath) Write(w io.Writer) error {
 	return binary.Write(w, binary.LittleEndian, &end)
 }
 
-// RawDevicePathNode corresponds to a device path nodes with an unhandled type.
-type RawDevicePathNode struct {
+// GenericDevicePathNode corresponds to a device path nodes with an unhandled type.
+type GenericDevicePathNode struct {
 	Type    DevicePathType
 	SubType DevicePathSubType
 	Data    []byte
 }
 
-func (d *RawDevicePathNode) String() string {
+func (d *GenericDevicePathNode) String() string {
 	var builder bytes.Buffer
 	fmt.Fprintf(&builder, "%s(%d", d.Type, d.SubType)
 	if len(d.Data) > 0 {
@@ -103,7 +103,7 @@ func (d *RawDevicePathNode) String() string {
 	return builder.String()
 }
 
-func (d *RawDevicePathNode) Write(w io.Writer) error {
+func (d *GenericDevicePathNode) Write(w io.Writer) error {
 	data := uefi.EFI_DEVICE_PATH_PROTOCOL{
 		Type:    uint8(d.Type),
 		SubType: uint8(d.SubType)}
@@ -1067,7 +1067,7 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 		return nil, err
 	}
 	data, _ := ioutil.ReadAll(buf)
-	return &RawDevicePathNode{Type: DevicePathType(n.Type), SubType: DevicePathSubType(n.SubType), Data: data}, nil
+	return &GenericDevicePathNode{Type: DevicePathType(n.Type), SubType: DevicePathSubType(n.SubType), Data: data}, nil
 }
 
 // ReadDevicePath decodes a device path from the supplied io.Reader.
