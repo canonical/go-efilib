@@ -46,7 +46,7 @@ func (o *LoadOption) String() string {
 func (o *LoadOption) Write(w io.Writer) error {
 	opt := uefi.EFI_LOAD_OPTION{
 		Attributes:   uint32(o.Attributes),
-		Description:  ConvertUTF8ToUTF16(o.Description + "\x00"),
+		Description:  ConvertUTF8ToUCS2(o.Description + "\x00"),
 		OptionalData: o.OptionalData}
 
 	dp := new(bytes.Buffer)
