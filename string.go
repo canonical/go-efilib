@@ -5,6 +5,7 @@
 package efi
 
 import (
+	"unicode"
 	"unicode/utf16"
 	"unicode/utf8"
 )
@@ -46,7 +47,7 @@ func ConvertUTF8ToUCS2(in string) []uint16 {
 	for len(in) > 0 {
 		r, sz := utf8.DecodeRuneInString(in)
 		if r >= 0x10000 {
-			r = '\uFFFD'
+			r = unicode.ReplacementChar
 		}
 		unicodeStr = append(unicodeStr, r)
 		in = in[sz:]
