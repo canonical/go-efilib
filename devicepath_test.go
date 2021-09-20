@@ -124,6 +124,18 @@ func (s *dpSuite) TestWriteDevicePath(c *C) {
 	c.Check(w.Bytes(), DeepEquals, src)
 }
 
+func (d *dpSuite) TestDevicePathBytes(c *C) {
+	src := DecodeHexString(c, "02010c00d041030a0000000001010600001d0101060000000317100001000000000000000000000004012a000100"+
+		"0000000800000000000000001000000000007b94de66b2fd2545b75230d66bb2b9600202040434005c004500460049005c007500620075006e00740075005c007"+
+		"300680069006d007800360034002e0065006600690000007fff0400")
+	path, err := ReadDevicePath(bytes.NewReader(src))
+	c.Assert(err, IsNil)
+
+	b, err := path.Bytes()
+	c.Check(err, IsNil)
+	c.Check(b, DeepEquals, src)
+}
+
 func (d *dpSuite) TestNewFilePathDevicePathNode(c *C) {
 	p := NewFilePathDevicePathNode("EFI/ubuntu/shimx64.efi")
 	c.Check(p, Equals, FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi"))

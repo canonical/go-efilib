@@ -71,6 +71,15 @@ func (p DevicePath) String() string {
 	return s.String()
 }
 
+// Bytes returns the serialized form of this device path.
+func (p DevicePath) Bytes() ([]byte, error) {
+	w := new(bytes.Buffer)
+	if err := p.Write(w); err != nil {
+		return nil, err
+	}
+	return w.Bytes(), nil
+}
+
 // Write serializes the complete device path to w.
 func (p DevicePath) Write(w io.Writer) error {
 	for i, node := range p {

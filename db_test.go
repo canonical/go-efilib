@@ -368,6 +368,20 @@ func (s *dbSuite) TestWriteSignatureWithWrongSize(c *C) {
 	c.Check(db.Write(&b), ErrorMatches, "cannot encode signature list 0: signature 1 contains the wrong size")
 }
 
+func (s *dbSuite) TestSignatureDatabaseBytes(c *C) {
+	f, err := os.Open("testdata/sigdbs/4.siglist")
+	c.Assert(err, IsNil)
+	defer f.Close()
+
+	var src bytes.Buffer
+	db, err := ReadSignatureDatabase(io.TeeReader(f, &src))
+	c.Check(err, IsNil)
+
+	b, err := db.Bytes()
+	c.Check(err, IsNil)
+	c.Check(b, DeepEquals, src.Bytes())
+}
+
 func (s *dbSuite) TestWriteSignatureData(c *C) {
 	d := SignatureData{
 		Owner: dellOwnerGuid,

@@ -138,3 +138,23 @@ func (s *loadoptionSuite) TestWriteLoadOption3(c *C) {
 				MediaFvFileDevicePathNode(MakeGUID(0x6b287864, 0x759c, 0x42c4, 0xb435, [...]uint8{0xa7, 0x4a, 0xb6, 0x94, 0xcd, 0x3b}))},
 			OptionalData: []byte{}}})
 }
+
+func (s *loadoptionSuite) TestLoadOptionBytes(c *C) {
+	option := &LoadOption{
+		Attributes:  1,
+		Description: "ubuntu",
+		FilePath: DevicePath{
+			&HardDriveDevicePathNode{
+				PartitionNumber: 1,
+				PartitionStart:  0x800,
+				PartitionSize:   0x100000,
+				Signature:       MakeGUID(0x66de947b, 0xfdb2, 0x4525, 0xb752, [...]uint8{0x30, 0xd6, 0x6b, 0xb2, 0xb9, 0x60}),
+				MBRType:         GPT},
+			FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}}
+	b, err := option.Bytes()
+	c.Check(err, IsNil)
+	c.Check(b, DeepEquals, DecodeHexString(c,
+		"0100000062007500620075006e0074007500000004012a0001000000000800000000000000001000000000007b94de66b2fd25"+
+			"45b75230d66bb2b9600202040434005c004500460049005c007500620075006e00740075005c007300680069006d007800360034002e006500660069"+
+			"0000007fff0400"))
+}

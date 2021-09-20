@@ -43,6 +43,16 @@ func (o *LoadOption) String() string {
 		o.Attributes, o.Description, o.FilePath, o.OptionalData)
 }
 
+// Bytes returns the serialized form of this load option.
+func (o *LoadOption) Bytes() ([]byte, error) {
+	w := new(bytes.Buffer)
+	if err := o.Write(w); err != nil {
+		return nil, err
+	}
+	return w.Bytes(), nil
+}
+
+// Write serializes this load option to the supplied io.Writer.
 func (o *LoadOption) Write(w io.Writer) error {
 	opt := uefi.EFI_LOAD_OPTION{
 		Attributes:   uint32(o.Attributes),

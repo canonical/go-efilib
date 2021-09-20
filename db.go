@@ -136,6 +136,15 @@ func (db SignatureDatabase) String() string {
 	return s
 }
 
+// Bytes returns the serialized form of this signature database.
+func (db SignatureDatabase) Bytes() ([]byte, error) {
+	w := new(bytes.Buffer)
+	if err := db.Write(w); err != nil {
+		return nil, err
+	}
+	return w.Bytes(), nil
+}
+
 // Write serializes this signature database to w.
 func (db SignatureDatabase) Write(w io.Writer) error {
 	for i, l := range db {
