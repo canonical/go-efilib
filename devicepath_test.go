@@ -141,6 +141,11 @@ func (d *dpSuite) TestNewFilePathDevicePathNode(c *C) {
 	c.Check(p, Equals, FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi"))
 }
 
+func (d *dpSuite) TestNewFilePathDevicePathNode2(c *C) {
+	p := NewFilePathDevicePathNode("/EFI/ubuntu/shimx64.efi")
+	c.Check(p, Equals, FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi"))
+}
+
 func (d *dpSuite) TestEISAID(c *C) {
 	id := EISAID(0xa5a541d0)
 	c.Check(id.Vendor(), Equals, "PNP")

@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"math"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/canonical/go-efilib/internal/ioerr"
@@ -809,9 +810,12 @@ func (d FilePathDevicePathNode) Write(w io.Writer) error {
 // NewFilePathDevicePathNode constructs a new FilePathDevicePathNode from the supplied
 // path, converting the OS native separators to EFI separators ("\") and prepending
 // a separator to the start of the path if one doesn't already exist.
-func NewFilePathDevicePathNode(path string) FilePathDevicePathNode {
+func NewFilePathDevicePathNode(path string) (out FilePathDevicePathNode) {
 	components := strings.Split(path, string(os.PathSeparator))
-	return FilePathDevicePathNode("\\" + strings.Join(components, "\\"))
+	if !filepath.IsAbs(path) {
+		out = FilePathDevicePathNode("\\")
+	}
+	return out + FilePathDevicePathNode(strings.Join(components, "\\"))
 }
 
 // MediaFvFileDevicePathNode corresponds to a firmware volume file device path node.

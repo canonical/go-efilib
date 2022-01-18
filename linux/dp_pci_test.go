@@ -23,20 +23,17 @@ func (s *pciSuite) TestHandlePCIDevicePathNodeBridge(c *C) {
 	defer restoreSysfs()
 
 	builder := &devicePathBuilderImpl{
-		dev: &dev{
-			node: "/dev/nvme0n1", part: 1,
-			devPath:       efi.DevicePath{&efi.ACPIDevicePathNode{HID: 0x0a0341d0}},
-			devPathIsFull: true},
+		iface: interfaceTypePCI,
+		devPath:       efi.DevicePath{&efi.ACPIDevicePathNode{HID: 0x0a0341d0}},
 		processed: []string{"pci0000:00"},
 		remaining: []string{"0000:00:1d.0"}}
-	c.Check(handlePCIDevicePathNode(builder, builder.dev), IsNil)
+	c.Check(handlePCIDevicePathNode(builder), IsNil)
 	c.Check(builder.processed, DeepEquals, []string{"pci0000:00", "0000:00:1d.0"})
 	c.Check(builder.remaining, DeepEquals, []string{})
-	c.Check(builder.dev.interfaceType, Equals, interfaceType(interfaceTypePCI))
-	c.Check(builder.dev.devPath, DeepEquals, efi.DevicePath{
+	c.Check(builder.iface, Equals, interfaceTypePCI)
+	c.Check(builder.devPath, DeepEquals, efi.DevicePath{
 		&efi.ACPIDevicePathNode{HID: 0x0a0341d0},
 		&efi.PCIDevicePathNode{Function: 0, Device: 0x1d}})
-	c.Check(builder.dev.devPathIsFull, Equals, true)
 }
 
 func (s *pciSuite) TestHandlePCIDevicePathNodeNVME(c *C) {
@@ -44,21 +41,18 @@ func (s *pciSuite) TestHandlePCIDevicePathNodeNVME(c *C) {
 	defer restoreSysfs()
 
 	builder := &devicePathBuilderImpl{
-		dev: &dev{
-			node: "/dev/nvme0n1", part: 1,
-			devPath: efi.DevicePath{
-				&efi.ACPIDevicePathNode{HID: 0x0a0341d0},
-				&efi.PCIDevicePathNode{Function: 0, Device: 0x1d}},
-			devPathIsFull: true},
+		iface: interfaceTypePCI,
+		devPath: efi.DevicePath{
+			&efi.ACPIDevicePathNode{HID: 0x0a0341d0},
+			&efi.PCIDevicePathNode{Function: 0, Device: 0x1d}},
 		processed: []string{"pci0000:00", "0000:00:1d.0"},
 		remaining: []string{"0000:3d:00.0"}}
-	c.Check(handlePCIDevicePathNode(builder, builder.dev), IsNil)
+	c.Check(handlePCIDevicePathNode(builder), IsNil)
 	c.Check(builder.processed, DeepEquals, []string{"pci0000:00", "0000:00:1d.0", "0000:3d:00.0"})
 	c.Check(builder.remaining, DeepEquals, []string{})
-	c.Check(builder.dev.interfaceType, Equals, interfaceType(interfaceTypeNVME))
-	c.Check(builder.dev.devPath, DeepEquals, efi.DevicePath{
+	c.Check(builder.iface, Equals, interfaceTypeNVME)
+	c.Check(builder.devPath, DeepEquals, efi.DevicePath{
 		&efi.ACPIDevicePathNode{HID: 0x0a0341d0},
 		&efi.PCIDevicePathNode{Function: 0, Device: 0x1d},
 		&efi.PCIDevicePathNode{Function: 0, Device: 0}})
-	c.Check(builder.dev.devPathIsFull, Equals, true)
 }

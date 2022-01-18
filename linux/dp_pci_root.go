@@ -5,7 +5,6 @@
 package linux
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 )
@@ -13,15 +12,11 @@ import (
 // pcirootRE matches a pcixxxx.xx path component.
 var pcirootRE = regexp.MustCompile(`^pci[[:xdigit:]]{4}:[[:xdigit:]]{2}$`)
 
-func handlePCIRootDevicePathNode(builder devicePathBuilder, dev *dev) error {
+func handlePCIRootDevicePathNode(builder devicePathBuilder) error {
 	component := builder.next(1)
 
 	if !pcirootRE.MatchString(component) {
 		return errSkipDevicePathNodeHandler
-	}
-
-	if dev.devPath != nil {
-		return errors.New("found unexpected root node")
 	}
 
 	node, err := newACPIExtendedDevicePathNode(builder.absPath(component))
@@ -39,9 +34,8 @@ func handlePCIRootDevicePathNode(builder devicePathBuilder, dev *dev) error {
 
 	builder.advance(1)
 
-	dev.interfaceType = interfaceTypePCI
-	dev.devPath = append(dev.devPath, maybeUseSimpleACPIDevicePathNode(node))
-	dev.devPathIsFull = true
+	builder.setInterfaceType(interfaceTypePCI)
+	builder.append(maybeUseSimpleACPIDevicePathNode(node))
 
 	return nil
 }

@@ -25,7 +25,7 @@ var classRE = regexp.MustCompile(`^0x([[:xdigit:]]+)$`)
 // function.
 var pciRE = regexp.MustCompile(`^[[:xdigit:]]{4}:[[:xdigit:]]{2}:([[:xdigit:]]{2})\.([[:digit:]]{1})$`)
 
-func handlePCIDevicePathNode(builder devicePathBuilder, dev *dev) error {
+func handlePCIDevicePathNode(builder devicePathBuilder) error {
 	component := builder.next(1)
 
 	m := pciRE.FindStringSubmatch(component)
@@ -50,20 +50,20 @@ func handlePCIDevicePathNode(builder devicePathBuilder, dev *dev) error {
 
 	switch {
 	case bytes.HasPrefix(class, []byte{0x01, 0x00}):
-		dev.interfaceType = interfaceTypeSCSI
+		builder.setInterfaceType(interfaceTypeSCSI)
 	case bytes.HasPrefix(class, []byte{0x01, 0x01}):
-		dev.interfaceType = interfaceTypeIDE
+		builder.setInterfaceType(interfaceTypeIDE)
 	case bytes.HasPrefix(class, []byte{0x01, 0x06}):
-		dev.interfaceType = interfaceTypeSATA
+		builder.setInterfaceType(interfaceTypeSATA)
 	case bytes.HasPrefix(class, []byte{0x01, 0x08}):
-		dev.interfaceType = interfaceTypeNVME
+		builder.setInterfaceType(interfaceTypeNVME)
 	case bytes.HasPrefix(class, []byte{0x06, 0x04}):
-		dev.interfaceType = interfaceTypePCI
+		builder.setInterfaceType(interfaceTypePCI)
 	default:
-		dev.interfaceType = interfaceTypeUnknown
+		return fmt.Errorf("unknown device class: %s", string(classBytes))
 	}
 
-	dev.devPath = append(dev.devPath, &efi.PCIDevicePathNode{
+	builder.append(&efi.PCIDevicePathNode{
 		Function: uint8(fun),
 		Device:   uint8(devNum)})
 	return nil

@@ -22,7 +22,7 @@ import (
 // nvmeNSRe matches "nvme/nvme<ctrl_id>/nvme<ctrl_id>n<ns_id>", capturing ns_id
 var nvmeNSRe = regexp.MustCompile(`^nvme\/nvme[[:digit:]]+\/nvme[[:digit:]]+n([[:digit:]]+)$`)
 
-func handleNVMEDevicePathNode(builder devicePathBuilder, dev *dev) error {
+func handleNVMEDevicePathNode(builder devicePathBuilder) error {
 	if builder.numRemaining() < 3 {
 		return errors.New("invalid path: not enough components")
 	}
@@ -62,7 +62,7 @@ func handleNVMEDevicePathNode(builder devicePathBuilder, dev *dev) error {
 		}
 	}
 
-	dev.devPath = append(dev.devPath, &efi.NVMENamespaceDevicePathNode{
+	builder.append(&efi.NVMENamespaceDevicePathNode{
 		NamespaceID:   uint32(nsid),
 		NamespaceUUID: uint64(binary.LittleEndian.Uint64(euid[:]))})
 	return nil

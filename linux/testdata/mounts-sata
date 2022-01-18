@@ -1,47 +1,49 @@
-sysfs /sys sysfs rw,nosuid,nodev,noexec,relatime 0 0
-proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0
-udev /dev devtmpfs rw,nosuid,noexec,relatime,size=16194116k,nr_inodes=4048529,mode=755,inode64 0 0
-devpts /dev/pts devpts rw,nosuid,noexec,relatime,gid=5,mode=620,ptmxmode=000 0 0
-tmpfs /run tmpfs rw,nosuid,nodev,noexec,relatime,size=3249956k,mode=755,inode64 0 0
-/dev/mapper/vgubuntu-root / ext4 rw,relatime,errors=remount-ro 0 0
-securityfs /sys/kernel/security securityfs rw,nosuid,nodev,noexec,relatime 0 0
-tmpfs /dev/shm tmpfs rw,nosuid,nodev,inode64 0 0
-tmpfs /run/lock tmpfs rw,nosuid,nodev,noexec,relatime,size=5120k,inode64 0 0
-tmpfs /sys/fs/cgroup tmpfs ro,nosuid,nodev,noexec,size=4096k,nr_inodes=1024,mode=755,inode64 0 0
-cgroup2 /sys/fs/cgroup/unified cgroup2 rw,nosuid,nodev,noexec,relatime,nsdelegate 0 0
-cgroup /sys/fs/cgroup/systemd cgroup rw,nosuid,nodev,noexec,relatime,xattr,name=systemd 0 0
-pstore /sys/fs/pstore pstore rw,nosuid,nodev,noexec,relatime 0 0
-efivarfs /sys/firmware/efi/efivars efivarfs rw,nosuid,nodev,noexec,relatime 0 0
-none /sys/fs/bpf bpf rw,nosuid,nodev,noexec,relatime,mode=700 0 0
-cgroup /sys/fs/cgroup/rdma cgroup rw,nosuid,nodev,noexec,relatime,rdma 0 0
-cgroup /sys/fs/cgroup/cpuset cgroup rw,nosuid,nodev,noexec,relatime,cpuset 0 0
-cgroup /sys/fs/cgroup/memory cgroup rw,nosuid,nodev,noexec,relatime,memory 0 0
-cgroup /sys/fs/cgroup/cpu,cpuacct cgroup rw,nosuid,nodev,noexec,relatime,cpu,cpuacct 0 0
-cgroup /sys/fs/cgroup/net_cls,net_prio cgroup rw,nosuid,nodev,noexec,relatime,net_cls,net_prio 0 0
-cgroup /sys/fs/cgroup/perf_event cgroup rw,nosuid,nodev,noexec,relatime,perf_event 0 0
-cgroup /sys/fs/cgroup/freezer cgroup rw,nosuid,nodev,noexec,relatime,freezer 0 0
-cgroup /sys/fs/cgroup/hugetlb cgroup rw,nosuid,nodev,noexec,relatime,hugetlb 0 0
-cgroup /sys/fs/cgroup/pids cgroup rw,nosuid,nodev,noexec,relatime,pids 0 0
-cgroup /sys/fs/cgroup/devices cgroup rw,nosuid,nodev,noexec,relatime,devices 0 0
-cgroup /sys/fs/cgroup/blkio cgroup rw,nosuid,nodev,noexec,relatime,blkio 0 0
-systemd-1 /proc/sys/fs/binfmt_misc autofs rw,relatime,fd=29,pgrp=1,timeout=0,minproto=5,maxproto=5,direct,pipe_ino=27375 0 0
-hugetlbfs /dev/hugepages hugetlbfs rw,relatime,pagesize=2M 0 0
-mqueue /dev/mqueue mqueue rw,nosuid,nodev,noexec,relatime 0 0
-debugfs /sys/kernel/debug debugfs rw,nosuid,nodev,noexec,relatime 0 0
-tracefs /sys/kernel/tracing tracefs rw,nosuid,nodev,noexec,relatime 0 0
-sunrpc /run/rpc_pipefs rpc_pipefs rw,relatime 0 0
-fusectl /sys/fs/fuse/connections fusectl rw,nosuid,nodev,noexec,relatime 0 0
-configfs /sys/kernel/config configfs rw,nosuid,nodev,noexec,relatime 0 0
-nfsd /proc/fs/nfsd nfsd rw,relatime 0 0
-/dev/sda2 /boot ext4 rw,relatime 0 0
-/dev/sda1 /boot/efi vfat rw,relatime,fmask=0077,dmask=0077,codepage=437,iocharset=iso8859-1,shortname=mixed,errors=remount-ro 0 0
-/dev/loop1 /snap/core/11606 squashfs ro,nodev,relatime 0 0
-/dev/loop2 /snap/gnome-3-34-1804/72 squashfs ro,nodev,relatime 0 0
-/dev/loop3 /snap/gtk-common-themes/1515 squashfs ro,nodev,relatime 0 0
-/dev/loop4 /snap/snap-store/547 squashfs ro,nodev,relatime 0 0
-binfmt_misc /proc/sys/fs/binfmt_misc binfmt_misc rw,nosuid,nodev,noexec,relatime 0 0
-tmpfs /run/snapd/ns tmpfs rw,nosuid,nodev,noexec,relatime,size=3249956k,mode=755,inode64 0 0
-tmpfs /run/user/1000 tmpfs rw,nosuid,nodev,relatime,size=3249952k,nr_inodes=812488,mode=700,uid=1000,gid=1000,inode64 0 0
-gvfsd-fuse /run/user/1000/gvfs fuse.gvfsd-fuse rw,nosuid,nodev,relatime,user_id=1000,group_id=1000 0 0
-portal /run/user/1000/doc fuse.portal rw,nosuid,nodev,relatime,user_id=1000,group_id=1000 0 0
-nsfs /run/snapd/ns/snap-store.mnt nsfs rw 0 0
+24 31 0:22 / /sys rw,nosuid,nodev,noexec,relatime shared:7 - sysfs sysfs rw
+25 31 0:23 / /proc rw,nosuid,nodev,noexec,relatime shared:15 - proc proc rw
+26 31 0:5 / /dev rw,nosuid,noexec,relatime shared:2 - devtmpfs udev rw,size=16192424k,nr_inodes=4048106,mode=755,inode64
+27 26 0:24 / /dev/pts rw,nosuid,noexec,relatime shared:3 - devpts devpts rw,gid=5,mode=620,ptmxmode=000
+28 31 0:25 / /run rw,nosuid,nodev,noexec,relatime shared:5 - tmpfs tmpfs rw,size=3249924k,mode=755,inode64
+31 1 253:1 / / rw,relatime shared:1 - ext4 /dev/mapper/vgubuntu-root rw,errors=remount-ro
+32 24 0:6 / /sys/kernel/security rw,nosuid,nodev,noexec,relatime shared:8 - securityfs securityfs rw
+33 26 0:28 / /dev/shm rw,nosuid,nodev shared:4 - tmpfs tmpfs rw,inode64
+34 28 0:29 / /run/lock rw,nosuid,nodev,noexec,relatime shared:6 - tmpfs tmpfs rw,size=5120k,inode64
+35 24 0:30 / /sys/fs/cgroup ro,nosuid,nodev,noexec shared:9 - tmpfs tmpfs ro,size=4096k,nr_inodes=1024,mode=755,inode64
+36 35 0:31 / /sys/fs/cgroup/unified rw,nosuid,nodev,noexec,relatime shared:10 - cgroup2 cgroup2 rw,nsdelegate
+37 35 0:32 / /sys/fs/cgroup/systemd rw,nosuid,nodev,noexec,relatime shared:11 - cgroup cgroup rw,xattr,name=systemd
+38 24 0:33 / /sys/fs/pstore rw,nosuid,nodev,noexec,relatime shared:12 - pstore pstore rw
+39 24 0:34 / /sys/firmware/efi/efivars rw,nosuid,nodev,noexec,relatime shared:13 - efivarfs efivarfs rw
+40 24 0:35 / /sys/fs/bpf rw,nosuid,nodev,noexec,relatime shared:14 - bpf none rw,mode=700
+41 35 0:36 / /sys/fs/cgroup/hugetlb rw,nosuid,nodev,noexec,relatime shared:16 - cgroup cgroup rw,hugetlb
+42 35 0:37 / /sys/fs/cgroup/memory rw,nosuid,nodev,noexec,relatime shared:17 - cgroup cgroup rw,memory
+43 35 0:38 / /sys/fs/cgroup/cpu,cpuacct rw,nosuid,nodev,noexec,relatime shared:18 - cgroup cgroup rw,cpu,cpuacct
+44 35 0:39 / /sys/fs/cgroup/blkio rw,nosuid,nodev,noexec,relatime shared:19 - cgroup cgroup rw,blkio
+45 35 0:40 / /sys/fs/cgroup/perf_event rw,nosuid,nodev,noexec,relatime shared:20 - cgroup cgroup rw,perf_event
+46 35 0:41 / /sys/fs/cgroup/net_cls,net_prio rw,nosuid,nodev,noexec,relatime shared:21 - cgroup cgroup rw,net_cls,net_prio
+47 35 0:42 / /sys/fs/cgroup/pids rw,nosuid,nodev,noexec,relatime shared:22 - cgroup cgroup rw,pids
+48 35 0:43 / /sys/fs/cgroup/rdma rw,nosuid,nodev,noexec,relatime shared:23 - cgroup cgroup rw,rdma
+49 35 0:44 / /sys/fs/cgroup/freezer rw,nosuid,nodev,noexec,relatime shared:24 - cgroup cgroup rw,freezer
+50 35 0:45 / /sys/fs/cgroup/devices rw,nosuid,nodev,noexec,relatime shared:25 - cgroup cgroup rw,devices
+51 35 0:46 / /sys/fs/cgroup/cpuset rw,nosuid,nodev,noexec,relatime shared:26 - cgroup cgroup rw,cpuset
+52 25 0:47 / /proc/sys/fs/binfmt_misc rw,relatime shared:27 - autofs systemd-1 rw,fd=29,pgrp=1,timeout=0,minproto=5,maxproto=5,direct,pipe_ino=29783
+53 26 0:20 / /dev/mqueue rw,nosuid,nodev,noexec,relatime shared:28 - mqueue mqueue rw
+54 26 0:48 / /dev/hugepages rw,relatime shared:29 - hugetlbfs hugetlbfs rw,pagesize=2M
+55 24 0:7 / /sys/kernel/debug rw,nosuid,nodev,noexec,relatime shared:30 - debugfs debugfs rw
+56 24 0:11 / /sys/kernel/tracing rw,nosuid,nodev,noexec,relatime shared:31 - tracefs tracefs rw
+57 28 0:49 / /run/rpc_pipefs rw,relatime shared:32 - rpc_pipefs sunrpc rw
+58 24 0:50 / /sys/fs/fuse/connections rw,nosuid,nodev,noexec,relatime shared:33 - fusectl fusectl rw
+59 24 0:21 / /sys/kernel/config rw,nosuid,nodev,noexec,relatime shared:34 - configfs configfs rw
+60 25 0:51 / /proc/fs/nfsd rw,relatime shared:35 - nfsd nfsd rw
+239 31 8:2 / /boot rw,relatime shared:86 - ext4 /dev/sda2 rw
+338 239 8:1 / /boot/efi rw,relatime shared:90 - vfat /dev/sda1 rw,fmask=0077,dmask=0077,codepage=437,iocharset=iso8859-1,shortname=mixed,errors=remount-ro
+156 31 7:1 / /snap/core/11993 ro,nodev,relatime shared:128 - squashfs /dev/loop1 ro
+192 31 7:2 / /snap/gnome-3-38-2004/87 ro,nodev,relatime shared:102 - squashfs /dev/loop2 ro
+195 31 7:3 / /snap/snap-store/558 ro,nodev,relatime shared:126 - squashfs /dev/loop3 ro
+207 31 7:4 / /snap/gtk-common-themes/1519 ro,nodev,relatime shared:136 - squashfs /dev/loop4 ro
+420 52 0:52 / /proc/sys/fs/binfmt_misc rw,nosuid,nodev,noexec,relatime shared:264 - binfmt_misc binfmt_misc rw
+4473 28 0:25 /snapd/ns /run/snapd/ns rw,nosuid,nodev,noexec,relatime - tmpfs tmpfs rw,size=3249924k,mode=755,inode64
+7080 28 0:84 / /run/user/1000 rw,nosuid,nodev,relatime shared:2859 - tmpfs tmpfs rw,size=3249920k,nr_inodes=812480,mode=700,uid=1000,gid=1000,inode64
+3397 7080 0:61 / /run/user/1000/gvfs rw,nosuid,nodev,relatime shared:2179 - fuse.gvfsd-fuse gvfsd-fuse rw,user_id=1000,group_id=1000
+7658 7080 0:86 / /run/user/1000/doc rw,nosuid,nodev,relatime shared:2718 - fuse.portal portal rw,user_id=1000,group_id=1000
+8273 4473 0:4 mnt:[4026533127] /run/snapd/ns/snap-store.mnt rw - nsfs nsfs rw
+3437 55 0:11 / /sys/kernel/debug/tracing rw,nosuid,nodev,noexec,relatime shared:2196 - tracefs tracefs rw
+682 31 8:1 /EFI /efi rw,relatime shared:90 - vfat /dev/sda1 rw,fmask=0077,dmask=0077,codepage=437,iocharset=iso8859-1,shortname=mixed,errors=remount-ro

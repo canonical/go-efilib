@@ -7,9 +7,7 @@ package linux
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"syscall"
-	"time"
 
 	"golang.org/x/sys/unix"
 
@@ -20,72 +18,23 @@ import (
 
 type FilepathMockMixin struct{}
 
-type mockDeviceInfo struct {
-	mode os.FileMode
-}
-
-func (i *mockDeviceInfo) Name() string       { return "" }
-func (i *mockDeviceInfo) Size() int64        { return 0 }
-func (i *mockDeviceInfo) Mode() os.FileMode  { return i.mode }
-func (i *mockDeviceInfo) ModTime() time.Time { return time.Time{} }
-func (i *mockDeviceInfo) IsDir() bool        { return false }
-func (i *mockDeviceInfo) Sys() interface{}   { return nil }
-
-func (s *FilepathMockMixin) MockOsStat() (restore func()) {
-	return MockOsStat(func(path string) (os.FileInfo, error) {
-		if !filepath.IsAbs(path) {
-			return nil, &os.PathError{Op: "stat", Path: path, Err: syscall.ENOENT}
+func (s *FilepathMockMixin) MockFilepathEvalSymlinks(m map[string]string) (restore func()) {
+	orig := filepathEvalSymlinks
+	filepathEvalSymlinks = func(path string) (string, error) {
+		p, ok := m[path]
+		switch {
+		case ok && p == "":
+			return "", &os.PathError{Op: "lstat", Path: filepath.Dir(path), Err: syscall.EEXIST}
+		case ok:
+			return p, nil
+		default:
+			return path, nil
 		}
-		if !strings.HasPrefix(path, "/dev") {
-			return &mockDeviceInfo{0600}, nil
-		}
-		return &mockDeviceInfo{os.ModeDevice | 0600}, nil
-	})
-}
+	}
 
-type MockMountPoint struct {
-	Dev  string
-	Root string
-}
-
-func (s *FilepathMockMixin) MockUnixStat(mounts []MockMountPoint, devs map[string]uint64, paths []string) (restore func()) {
-	return MockUnixStat(func(path string, st *unix.Stat_t) error {
-		path = filepath.Clean(path)
-
-		if devNum, ok := devs[path]; ok {
-			st.Rdev = devNum
-			return nil
-		}
-
-		if strings.HasPrefix(path, "/dev") {
-			return nil
-		}
-
-		var found bool
-		for _, p := range paths {
-			if p == path {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return syscall.ENOENT
-		}
-
-		var chosen *MockMountPoint
-		for _, mount := range mounts {
-			if strings.HasPrefix(path, mount.Root) && (chosen == nil || len(mount.Root) > len(chosen.Root)) {
-				chosen = &mount
-			}
-		}
-		if chosen != nil {
-			if devNum, ok := devs[chosen.Dev]; ok {
-				st.Dev = devNum
-			}
-		}
-
-		return nil
-	})
+	return func() {
+		filepathEvalSymlinks = orig
+	}
 }
 
 type filepathSuite struct {
@@ -96,116 +45,133 @@ type filepathSuite struct {
 var _ = Suite(&filepathSuite{})
 
 func (s *filepathSuite) TestScanBlockDeviceMounts(c *C) {
-	restoreMounts := MockMountsPath("testdata/mounts-nvme")
-	defer restoreMounts()
-	restoreStat := s.MockOsStat()
-	defer restoreStat()
+	restore := MockMountsPath("testdata/mounts-nvme")
+	defer restore()
 
 	mounts, err := scanBlockDeviceMounts()
 	c.Check(err, IsNil)
-	c.Check(mounts, DeepEquals, []mountPoint{
-		{"/dev/mapper/vgubuntu-root", "/"},
-		{"/dev/nvme0n1p2", "/boot"},
-		{"/dev/nvme0n1p1", "/boot/efi"},
-		{"/dev/loop1", "/snap/core/11606"},
-		{"/dev/loop2", "/snap/gnome-3-34-1804/72"},
-		{"/dev/loop3", "/snap/gtk-common-themes/1515"},
-		{"/dev/loop4", "/snap/snap-store/547"}})
+	c.Check(mounts, DeepEquals, []*mountPoint{
+		{dev: unix.Mkdev(253, 1), root: "/", mountDir: "/", mountSource: "/dev/mapper/vgubuntu-root"},
+		{dev: unix.Mkdev(259, 2), root: "/", mountDir: "/boot", mountSource: "/dev/nvme0n1p2"},
+		{dev: unix.Mkdev(259, 1), root: "/", mountDir: "/boot/efi", mountSource: "/dev/nvme0n1p1"},
+		{dev: unix.Mkdev(7, 1), root: "/", mountDir: "/snap/core/11993", mountSource: "/dev/loop1"},
+		{dev: unix.Mkdev(7, 2), root: "/", mountDir: "/snap/gnome-3-38-2004/87", mountSource: "/dev/loop2"},
+		{dev: unix.Mkdev(7, 3), root: "/", mountDir: "/snap/snap-store/558", mountSource: "/dev/loop3"},
+		{dev: unix.Mkdev(7, 4), root: "/", mountDir: "/snap/gtk-common-themes/1519", mountSource: "/dev/loop4"},
+		{dev: unix.Mkdev(259, 1), root: "/EFI", mountDir: "/efi", mountSource: "/dev/nvme0n1p1"}})
 }
 
-func (s *filepathSuite) TestGetFileMockMountPoint(c *C) {
-	restoreMounts := MockMountsPath("testdata/mounts-nvme")
-	defer restoreMounts()
-
-	restoreOsStat := s.MockOsStat()
-	defer restoreOsStat()
-
-	restoreUnixStat := s.MockUnixStat(
-		[]MockMountPoint{{Dev: "/dev/nvme0n1p1", Root: "/boot/efi"}},
-		map[string]uint64{"/dev/nvme0n1p1": unix.Mkdev(259, 1)},
-		[]string{"/boot/efi/EFI/ubuntu/shimx64.efi"})
-	defer restoreUnixStat()
+func (s *filepathSuite) TestGetFileMountPoint(c *C) {
+	restore := s.MockFilepathEvalSymlinks(map[string]string{})
+	defer restore()
+	restore = MockMountsPath("testdata/mounts-nvme")
+	defer restore()
 
 	mount, err := getFileMountPoint("/boot/efi/EFI/ubuntu/shimx64.efi")
 	c.Check(err, IsNil)
-	c.Check(mount, DeepEquals, &mountPoint{"/dev/nvme0n1p1", "/boot/efi"})
+	c.Check(mount, DeepEquals, &mountPoint{dev: unix.Mkdev(259, 1), root: "/", mountDir: "/boot/efi", mountSource: "/dev/nvme0n1p1"})
+}
+
+func (s *filepathSuite) TestGetFileMountPointBindMount(c *C) {
+	restore := s.MockFilepathEvalSymlinks(map[string]string{})
+	defer restore()
+	restore = MockMountsPath("testdata/mounts-nvme")
+	defer restore()
+
+	mount, err := getFileMountPoint("/efi/ubuntu/shimx64.efi")
+	c.Check(err, IsNil)
+	c.Check(mount, DeepEquals, &mountPoint{dev: unix.Mkdev(259, 1), root: "/EFI", mountDir: "/efi", mountSource: "/dev/nvme0n1p1"})
 }
 
 func (s *filepathSuite) TestNewFilePath(c *C) {
-	restoreMounts := MockMountsPath("testdata/mounts-nvme")
-	defer restoreMounts()
+	restore := s.MockFilepathEvalSymlinks(map[string]string{})
+	defer restore()
+	restore = MockMountsPath("testdata/mounts-nvme")
+	defer restore()
 
-	restoreOsStat := s.MockOsStat()
-	defer restoreOsStat()
-
-	restoreSysfs := MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
-	defer restoreSysfs()
-
-	restoreUnixStat := s.MockUnixStat(
-		[]MockMountPoint{{Dev: "/dev/nvme0n1p1", Root: "/boot/efi"}},
-		map[string]uint64{"/dev/nvme0n1p1": unix.Mkdev(259, 1)},
-		[]string{"/boot/efi/EFI/ubuntu/shimx64.efi"})
-	defer restoreUnixStat()
+	sysfs := filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys")
+	restore = MockSysfsPath(sysfs)
+	defer restore()
 
 	path, err := newFilePath("/boot/efi/EFI/ubuntu/shimx64.efi")
 	c.Check(err, IsNil)
 	c.Check(path, DeepEquals, &filePath{
 		dev: dev{
-			node: "/dev/nvme0n1",
+			sysfsPath: filepath.Join(sysfs, "devices/pci0000:00/0000:00:1d.0/0000:3d:00.0/nvme/nvme0/nvme0n1"),
+			devPath: "/dev/nvme0n1",
 			part: 1},
-		path: "EFI/ubuntu/shimx64.efi"})
+		path: "/EFI/ubuntu/shimx64.efi"})
 }
 
-func (s *filepathSuite) TestNewFilePathNotPartitioned(c *C) {
-	restoreMounts := MockMountsPath("testdata/mounts-nvme")
-	defer restoreMounts()
+func (s *filepathSuite) TestNewFilePathBindMount(c *C) {
+	restore := s.MockFilepathEvalSymlinks(map[string]string{})
+	defer restore()
+	restore = MockMountsPath("testdata/mounts-nvme")
+	defer restore()
 
-	restoreOsStat := s.MockOsStat()
-	defer restoreOsStat()
+	sysfs := filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys")
+	restore = MockSysfsPath(sysfs)
+	defer restore()
 
-	restoreSysfs := MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
-	defer restoreSysfs()
-
-	restoreUnixStat := s.MockUnixStat(
-		[]MockMountPoint{{Dev: "/dev/loop1", Root: "/snap/core/11606"}},
-		map[string]uint64{"/dev/loop1": unix.Mkdev(7, 1)},
-		[]string{"/snap/core/11606/bin/ls"})
-	defer restoreUnixStat()
-
-	path, err := newFilePath("/snap/core/11606/bin/ls")
+	path, err := newFilePath("/efi/ubuntu/shimx64.efi")
 	c.Check(err, IsNil)
 	c.Check(path, DeepEquals, &filePath{
 		dev: dev{
-			node: "/dev/loop1",
-			part: 0},
-		path: "bin/ls"})
+			sysfsPath: filepath.Join(sysfs, "devices/pci0000:00/0000:00:1d.0/0000:3d:00.0/nvme/nvme0/nvme0n1"),
+			devPath: "/dev/nvme0n1",
+			part: 1},
+		path: "/EFI/ubuntu/shimx64.efi"})
 }
 
-func (s *filepathSuite) TestDevSysfsPath(c *C) {
-	restoreSysfs := MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
-	defer restoreSysfs()
+func (s *filepathSuite) TestNewFilePathSymlink(c *C) {
+	restore := s.MockFilepathEvalSymlinks(map[string]string{"/foo/bar/shimx64.efi": "/efi/ubuntu/shimx64.efi"})
+	defer restore()
+	restore = MockMountsPath("testdata/mounts-nvme")
+	defer restore()
 
-	restoreUnixStat := s.MockUnixStat(nil, map[string]uint64{"/dev/nvme0n1": unix.Mkdev(259, 0)}, nil)
-	defer restoreUnixStat()
+	sysfs := filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys")
+	restore = MockSysfsPath(sysfs)
+	defer restore()
 
-	dev := &dev{node: "/dev/nvme0n1", part: 1}
-	sysfsPath, err := dev.sysfsPath()
+	path, err := newFilePath("/foo/bar/shimx64.efi")
 	c.Check(err, IsNil)
-	c.Check(sysfsPath, Matches, `.*\/sys\/devices\/pci0000:00\/0000:00:1d\.0\/0000:3d:00\.0\/nvme\/nvme0\/nvme0n1$`)
+	c.Check(path, DeepEquals, &filePath{
+		dev: dev{
+			sysfsPath: filepath.Join(sysfs, "devices/pci0000:00/0000:00:1d.0/0000:3d:00.0/nvme/nvme0/nvme0n1"),
+			devPath: "/dev/nvme0n1",
+			part: 1},
+		path: "/EFI/ubuntu/shimx64.efi"})
+}
+
+func (s *filepathSuite) TestNewFilePathNotPartitioned(c *C) {
+	restore := s.MockFilepathEvalSymlinks(map[string]string{})
+	defer restore()
+	restore = MockMountsPath("testdata/mounts-nvme")
+	defer restore()
+
+	sysfs := filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys")
+	restore = MockSysfsPath(sysfs)
+	defer restore()
+
+	path, err := newFilePath("/snap/core/11993/bin/ls")
+	c.Check(err, IsNil)
+	c.Check(path, DeepEquals, &filePath{
+		dev: dev{
+			sysfsPath: filepath.Join(sysfs, "devices/virtual/block/loop1"),
+			devPath: "/dev/loop1",
+			part: 0},
+		path: "/bin/ls"})
 }
 
 func (s *filepathSuite) TestNewDevicePathBuilder(c *C) {
-	restoreSysfs := MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
-	defer restoreSysfs()
+	sysfs := filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys")
+	restore := MockSysfsPath(sysfs)
+	defer restore()
 
-	restoreUnixStat := s.MockUnixStat(nil, map[string]uint64{"/dev/nvme0n1": unix.Mkdev(259, 0)}, nil)
-	defer restoreUnixStat()
-
-	dev := &dev{node: "/dev/nvme0n1", part: 1}
+	dev := &dev{sysfsPath: filepath.Join(sysfs, "devices/pci0000:00/0000:00:1d.0/0000:3d:00.0/nvme/nvme0/nvme0n1")}
 	builder, err := newDevicePathBuilder(dev)
 	c.Check(err, IsNil)
 	c.Check(builder, DeepEquals, &devicePathBuilderImpl{
-		dev:       dev,
 		remaining: []string{"pci0000:00", "0000:00:1d.0", "0000:3d:00.0", "nvme", "nvme0", "nvme0n1"}})
 }
 
@@ -255,20 +221,19 @@ func (s *filepathSuite) TestDevicePathBuilderDone(c *C) {
 
 func (s *filepathSuite) TestDevicePathBuilderProcessNextComponent(c *C) {
 	builder := &devicePathBuilderImpl{
-		dev:       &dev{node: "/dev/nvme0n1", part: 1},
 		remaining: []string{"pci0000:00", "0000:00:1d.0", "0000:3d:00.0", "nvme", "nvme0", "nvme0n1"}}
 
 	hid, _ := efi.NewEISAID("PNP", 0x0a03)
 
 	var skipped int
-	skipHandler := func(_ devicePathBuilder, _ *dev) error {
+	skipHandler := func(_ devicePathBuilder) error {
 		skipped += 1
+		builder.advance(2)
 		return errSkipDevicePathNodeHandler
 	}
-	realHandler := func(builder devicePathBuilder, dev *dev) error {
-		dev.interfaceType = interfaceTypePCI
-		dev.devPath = append(dev.devPath, &efi.ACPIDevicePathNode{HID: hid})
-		dev.devPathIsFull = true
+	realHandler := func(builder devicePathBuilder) error {
+		builder.setInterfaceType(interfaceTypePCI)
+		builder.append(&efi.ACPIDevicePathNode{HID: hid})
 		builder.advance(1)
 		return nil
 	}
@@ -283,9 +248,8 @@ func (s *filepathSuite) TestDevicePathBuilderProcessNextComponent(c *C) {
 
 	c.Check(builder.processNextComponent(), IsNil)
 	c.Check(skipped, Equals, 2)
-	c.Check(builder.dev.interfaceType, Equals, interfaceType(interfaceTypePCI))
-	c.Check(builder.dev.devPath, DeepEquals, efi.DevicePath{&efi.ACPIDevicePathNode{HID: hid}})
-	c.Check(builder.dev.devPathIsFull, Equals, true)
+	c.Check(builder.iface, Equals, interfaceTypePCI)
+	c.Check(builder.devPath, DeepEquals, efi.DevicePath{&efi.ACPIDevicePathNode{HID: hid}})
 	c.Check(builder.remaining, DeepEquals, []string{"0000:00:1d.0", "0000:3d:00.0", "nvme", "nvme0", "nvme0n1"})
 	c.Check(builder.processed, DeepEquals, []string{"pci0000:00"})
 }
@@ -294,18 +258,14 @@ func (s *filepathSuite) TestDevicePathBuilderProcessNextComponentUnhandled(c *C)
 	hid, _ := efi.NewEISAID("PNP", 0x0a03)
 
 	builder := &devicePathBuilderImpl{
-		dev: &dev{
-			node: "/dev/nvme0n1", part: 1,
-			interfaceType: interfaceTypePCI,
-			devPath:       efi.DevicePath{&efi.ACPIDevicePathNode{HID: hid}},
-			devPathIsFull: true},
+		iface: interfaceTypePCI,
+		devPath:       efi.DevicePath{&efi.ACPIDevicePathNode{HID: hid}},
 		processed: []string{"pci0000:00"},
 		remaining: []string{"0000:00:1d.0", "0000:3d:00.0", "nvme", "nvme0", "nvme0n1"}}
 
 	var skipped int
-	skipHandler := func(builder devicePathBuilder, _ *dev) error {
+	skipHandler := func(builder devicePathBuilder) error {
 		skipped += 1
-		builder.advance(2)
 		return errSkipDevicePathNodeHandler
 	}
 	restore := MockDevicePathNodeHandlers(map[interfaceType][]registeredDpHandler{
@@ -316,11 +276,6 @@ func (s *filepathSuite) TestDevicePathBuilderProcessNextComponentUnhandled(c *C)
 			{name: "skip2", fn: skipHandler}}})
 	defer restore()
 
-	c.Check(builder.processNextComponent(), IsNil)
+	c.Check(builder.processNextComponent(), Equals, errNoHandler)
 	c.Check(skipped, Equals, 2)
-	c.Check(builder.dev.interfaceType, Equals, interfaceType(interfaceTypeUnknown))
-	c.Check(builder.dev.devPath, IsNil)
-	c.Check(builder.dev.devPathIsFull, Equals, false)
-	c.Check(builder.remaining, DeepEquals, []string{"0000:3d:00.0", "nvme", "nvme0", "nvme0n1"})
-	c.Check(builder.processed, DeepEquals, []string{"pci0000:00", "0000:00:1d.0"})
 }

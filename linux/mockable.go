@@ -6,15 +6,13 @@ package linux
 
 import (
 	"os"
-
-	"golang.org/x/sys/unix"
+	"path/filepath"
 )
 
 var (
-	mountsPath = "/proc/self/mounts"
+	mountsPath = "/proc/self/mountinfo"
 	sysfsPath  = "/sys"
 
+	filepathEvalSymlinks = filepath.EvalSymlinks
 	osOpen   = os.Open
-	osStat   = os.Stat
-	unixStat = unix.Stat
 )

@@ -31,7 +31,7 @@ var ataRE = regexp.MustCompile(`^ata([[:digit:]]+)\/host[[:digit:]]+\/target[[:d
 
 var ataDevRE = regexp.MustCompile(`^dev[[:digit:]]+\.([[:digit:]]+)\.?([[:digit:]]*)`)
 
-func handleATADevicePathNode(builder devicePathBuilder, dev *dev) error {
+func handleATADevicePathNode(builder devicePathBuilder) error {
 	if builder.numRemaining() < 6 {
 		return errors.New("invalid path: not enough components")
 	}
@@ -54,7 +54,7 @@ func handleATADevicePathNode(builder devicePathBuilder, dev *dev) error {
 
 	var node efi.DevicePathNode
 
-	switch dev.interfaceType {
+	switch builder.interfaceType() {
 	case interfaceTypeIDE:
 		controller, err := strconv.Atoi(strings.TrimSpace(string(portBytes)))
 		if err != nil {
@@ -127,7 +127,7 @@ func handleATADevicePathNode(builder devicePathBuilder, dev *dev) error {
 	}
 
 	builder.advance(6)
-	dev.devPath = append(dev.devPath, node)
+	builder.append(node)
 	return nil
 }
 

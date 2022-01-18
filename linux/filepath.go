@@ -44,7 +44,7 @@ var ErrNoDevicePath = errors.New("cannot map device to a device path")
 type interfaceType int
 
 const (
-	interfaceTypeUnknown = iota
+	interfaceTypeUnknown interfaceType = iota
 	interfaceTypePCI
 	interfaceTypeUSB
 	interfaceTypeSCSI
@@ -53,9 +53,12 @@ const (
 	interfaceTypeNVME
 )
 
-var errSkipDevicePathNodeHandler = errors.New("")
+var (
+	errNoHandler = errors.New("")
+	errSkipDevicePathNodeHandler = errors.New("")
+)
 
-type devicePathNodeHandler func(devicePathBuilder, *dev) error
+type devicePathNodeHandler func(devicePathBuilder) error
 
 type registeredDpHandler struct {
 	name string
@@ -89,10 +92,23 @@ type devicePathBuilder interface {
 	// advance marks the specified number of sysfs components
 	// as handled and advances to the next ones.
 	advance(n int)
+
+	// interfaceType returns the type of the interface detected
+	// by the last handler.
+	interfaceType() interfaceType
+
+	// setInterfaceType allows a handler to set the detected interface
+	// type.
+	setInterfaceType(iface interfaceType)
+
+	// append allows a handler to append device path nodes to the current
+	// path.
+	append(nodes ...efi.DevicePathNode)
 }
 
 type devicePathBuilderImpl struct {
-	dev *dev
+	iface interfaceType
+	devPath efi.DevicePath
 
 	processed []string
 	remaining []string
@@ -118,16 +134,28 @@ func (b *devicePathBuilderImpl) advance(n int) {
 	b.remaining = b.remaining[n:]
 }
 
+func (b *devicePathBuilderImpl) interfaceType() interfaceType {
+	return b.iface
+}
+
+func (b *devicePathBuilderImpl) setInterfaceType(iface interfaceType) {
+	b.iface = iface
+}
+
+func (b *devicePathBuilderImpl) append(nodes ...efi.DevicePathNode) {
+	b.devPath = append(b.devPath, nodes...)
+}
+
 func (b *devicePathBuilderImpl) done() bool {
 	return len(b.remaining) == 0
 }
 
 func (b *devicePathBuilderImpl) processNextComponent() error {
-	for _, handler := range devicePathNodeHandlers[b.dev.interfaceType] {
+	for _, handler := range devicePathNodeHandlers[b.iface] {
 		p := len(b.processed)
 		r := b.remaining
 
-		err := handler.fn(b, b.dev)
+		err := handler.fn(b)
 		if err == errSkipDevicePathNodeHandler {
 			b.processed = b.processed[:p]
 			b.remaining = r
@@ -136,38 +164,30 @@ func (b *devicePathBuilderImpl) processNextComponent() error {
 		if err != nil {
 			return xerrors.Errorf("cannot execute handler %s: %w", handler.name, err)
 		}
+
 		return nil
 	}
 
-	b.dev.interfaceType = interfaceTypeUnknown
-	b.dev.devPath = nil
-	b.dev.devPathIsFull = false
-	b.advance(1)
-	return nil
+	return errNoHandler
 }
 
 func newDevicePathBuilder(dev *dev) (*devicePathBuilderImpl, error) {
-	path, err := dev.sysfsPath()
-	if err != nil {
-		return nil, xerrors.Errorf("cannot determine sysfs device path: %w", err)
-	}
-
-	path, err = filepath.Rel(filepath.Join(sysfsPath, "devices"), path)
+	path, err := filepath.Rel(filepath.Join(sysfsPath, "devices"), dev.sysfsPath)
 	if err != nil {
 		return nil, err
 	}
 
-	return &devicePathBuilderImpl{
-		dev:       dev,
-		remaining: strings.Split(path, string(os.PathSeparator))}, nil
+	return &devicePathBuilderImpl{remaining: strings.Split(path, string(os.PathSeparator))}, nil
 }
 
 type mountPoint struct {
-	dev  string
+	dev uint64
 	root string
+	mountDir string
+	mountSource string
 }
 
-func scanBlockDeviceMounts() (mounts []mountPoint, err error) {
+func scanBlockDeviceMounts() (mounts []*mountPoint, err error) {
 	f, err := os.Open(mountsPath)
 	if err != nil {
 		return nil, err
@@ -177,23 +197,38 @@ func scanBlockDeviceMounts() (mounts []mountPoint, err error) {
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		fields := strings.Fields(scanner.Text())
-		if len(fields) != 6 {
-			continue
+		if len(fields) < 10 || len(fields) > 11 {
+			return nil, errors.New("invalid mount info: incorrect number of fields")
 		}
-		dev := fields[0]
-		root := fields[1]
-		if !filepath.IsAbs(dev) {
+
+		devStr := strings.Split(fields[2], ":")
+		if len(devStr) != 2 {
+			return nil, errors.New("invalid mount info: invalid device number")
+		}
+		devMajor, err := strconv.ParseUint(devStr[0], 10, 32)
+		if err != nil {
+			return nil, xerrors.Errorf("invalid mount info: invalid device number: %w", err)
+		}
+		devMinor, err := strconv.ParseUint(devStr[1], 10, 32)
+		if err != nil {
+			return nil, xerrors.Errorf("invalid mount info: invalid device number: %w", err)
+		}
+
+		var mountSource string
+		if len(fields) == 10 {
+			mountSource = fields[8]
+		} else {
+			mountSource = fields[9]
+		}
+		if !filepath.IsAbs(mountSource) {
 			continue
 		}
 
-		info, err := osStat(dev)
-		if err != nil {
-			return nil, err
-		}
-		if info.Mode()&os.ModeDevice == 0 {
-			continue
-		}
-		mounts = append(mounts, mountPoint{dev, root})
+		mounts = append(mounts, &mountPoint{
+			dev: unix.Mkdev(uint32(devMajor), uint32(devMinor)),
+			root: fields[3],
+			mountDir: fields[4],
+			mountSource: mountSource})
 	}
 	if scanner.Err() != nil {
 		return nil, xerrors.Errorf("cannot parse mount info: %w", err)
@@ -203,46 +238,37 @@ func scanBlockDeviceMounts() (mounts []mountPoint, err error) {
 }
 
 func getFileMountPoint(path string) (*mountPoint, error) {
-	var fileSt unix.Stat_t
-	if err := unixStat(path, &fileSt); err != nil {
-		return nil, xerrors.Errorf("cannot obtain file information: %w", err)
-	}
-
 	mounts, err := scanBlockDeviceMounts()
 	if err != nil {
 		return nil, xerrors.Errorf("cannot obtain list of block device mounts: %w", err)
 	}
 
+	var candidate *mountPoint
+
 	for _, mount := range mounts {
-		var devSt unix.Stat_t
-		if err := unixStat(mount.dev, &devSt); err != nil {
-			return nil, xerrors.Errorf("cannot obtain information for block device %s: %w", mount.dev, err)
+		if !strings.HasPrefix(path, mount.mountDir) {
+			continue
 		}
-		if devSt.Rdev == fileSt.Dev {
-			return &mount, nil
+
+		if candidate == nil {
+			candidate = mount
+		}
+		if len(mount.mountDir) > len(candidate.mountDir) {
+			candidate = mount
 		}
 	}
 
-	return nil, errors.New("not found")
+	if candidate == nil {
+		return nil, errors.New("not found")
+	}
+
+	return candidate, nil
 }
 
 type dev struct {
-	node string
+	sysfsPath string
+	devPath string
 	part int
-
-	interfaceType interfaceType
-
-	devPath       efi.DevicePath
-	devPathIsFull bool
-}
-
-func (d *dev) sysfsPath() (string, error) {
-	var st unix.Stat_t
-	if err := unixStat(d.node, &st); err != nil {
-		return "", xerrors.Errorf("cannot obtain information for block device: %w", err)
-	}
-
-	return filepath.EvalSymlinks(filepath.Join(sysfsPath, "dev/block", fmt.Sprintf("%d:%d", unix.Major(st.Rdev), unix.Minor(st.Rdev))))
 }
 
 type filePath struct {
@@ -251,23 +277,23 @@ type filePath struct {
 }
 
 func newFilePath(path string) (*filePath, error) {
+	path, err := filepathEvalSymlinks(path)
+	if err != nil {
+		return nil, xerrors.Errorf("cannot evaluate symbolic links: %w", err)
+	}
+
 	mount, err := getFileMountPoint(path)
 	if err != nil {
 		return nil, xerrors.Errorf("cannot obtain mount information for path: %w", err)
 	}
 
-	rel, err := filepath.Rel(mount.root, path)
+	rel, err := filepath.Rel(mount.mountDir, path)
 	if err != nil {
 		return nil, err
 	}
-	out := &filePath{path: rel}
+	out := &filePath{path: filepath.Join(mount.root, rel)}
 
-	var st unix.Stat_t
-	if err := unixStat(mount.dev, &st); err != nil {
-		return nil, xerrors.Errorf("cannot obtain information for block device %s: %w", mount.dev, err)
-	}
-
-	childDev, err := filepath.EvalSymlinks(filepath.Join(sysfsPath, "dev/block", fmt.Sprintf("%d:%d", unix.Major(st.Rdev), unix.Minor(st.Rdev))))
+	childDev, err := filepath.EvalSymlinks(filepath.Join(sysfsPath, "dev/block", fmt.Sprintf("%d:%d", unix.Major(mount.dev), unix.Minor(mount.dev))))
 	if err != nil {
 		return nil, err
 	}
@@ -283,11 +309,13 @@ func newFilePath(path string) (*filePath, error) {
 
 	if parentSubsystem != filepath.Join(sysfsPath, "class", "block") {
 		// Parent device is not a block device
-		out.dev.node = filepath.Join("/dev", filepath.Base(childDev))
+		out.dev.sysfsPath = childDev
+		out.dev.devPath = filepath.Join("/dev", filepath.Base(childDev))
 	} else {
 		// Parent device is a block device, so this is a partitioned
 		// device.
-		out.dev.node = filepath.Join("/dev", filepath.Base(parentDev))
+		out.dev.sysfsPath = parentDev
+		out.dev.devPath = filepath.Join("/dev", filepath.Base(parentDev))
 		b, err := ioutil.ReadFile(filepath.Join(childDev, "partition"))
 		if err != nil {
 			return nil, xerrors.Errorf("cannot obtain partition number for %s: %w", mount.dev, err)
@@ -341,21 +369,21 @@ func NewFileDevicePath(path string, mode FileDevicePathMode) (out efi.DevicePath
 
 	if mode == FullPath {
 		for !builder.done() {
-			if err := builder.processNextComponent(); err != nil {
+			err := builder.processNextComponent()
+			switch {
+			case err == errNoHandler:
+				return nil, ErrNoDevicePath
+			case err != nil:
 				return nil, xerrors.Errorf("cannot process components %s from device path %s: %w",
 					builder.next(-1), builder.absPath(builder.next(-1)), err)
 			}
 		}
-
-		if !fp.dev.devPathIsFull {
-			return nil, ErrNoDevicePath
-		}
 	}
 
-	out = fp.dev.devPath
+	out = builder.devPath
 
 	if mode != ShortFormPathFile && fp.part > 0 {
-		node, err := NewHardDriveDevicePathNodeFromDevice(fp.node, fp.part)
+		node, err := NewHardDriveDevicePathNodeFromDevice(fp.devPath, fp.part)
 		if err != nil {
 			return nil, xerrors.Errorf("cannot construct hard drive device path node: %w", err)
 		}

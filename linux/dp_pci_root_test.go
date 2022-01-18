@@ -20,19 +20,17 @@ var _ = Suite(&pciRootSuite{})
 
 func (s *pciRootSuite) TestHandlePCIRootDevicePathNodeSkip(c *C) {
 	builder := &devicePathBuilderImpl{remaining: []string{"0000:00:1d.0"}}
-	c.Check(handlePCIRootDevicePathNode(builder, nil), Equals, errSkipDevicePathNodeHandler)
+	c.Check(handlePCIRootDevicePathNode(builder), Equals, errSkipDevicePathNodeHandler)
 }
 
 func (s *pciRootSuite) TestHandlePCIRootDevicePathNode(c *C) {
 	restoreSysfs := MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restoreSysfs()
 
-	builder := &devicePathBuilderImpl{
-		dev:       &dev{node: "/dev/nvme0n1", part: 1},
-		remaining: []string{"pci0000:00"}}
-	c.Check(handlePCIRootDevicePathNode(builder, builder.dev), IsNil)
+	builder := &devicePathBuilderImpl{remaining: []string{"pci0000:00"}}
+	c.Check(handlePCIRootDevicePathNode(builder), IsNil)
 	c.Check(builder.processed, DeepEquals, []string{"pci0000:00"})
 	c.Check(builder.remaining, DeepEquals, []string{})
-	c.Check(builder.dev.devPath, DeepEquals, efi.DevicePath{&efi.ACPIDevicePathNode{HID: 0x0a0341d0}})
-	c.Check(builder.dev.devPathIsFull, Equals, true)
+	c.Check(builder.iface, Equals, interfaceTypePCI)
+	c.Check(builder.devPath, DeepEquals, efi.DevicePath{&efi.ACPIDevicePathNode{HID: 0x0a0341d0}})
 }

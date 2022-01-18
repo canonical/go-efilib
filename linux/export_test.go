@@ -6,8 +6,6 @@ package linux
 
 import (
 	"os"
-
-	"golang.org/x/sys/unix"
 )
 
 func MockDevicePathNodeHandlers(handlers map[interfaceType][]registeredDpHandler) (restore func()) {
@@ -34,26 +32,10 @@ func MockOsOpen(fn func(string) (*os.File, error)) (restore func()) {
 	}
 }
 
-func MockOsStat(fn func(string) (os.FileInfo, error)) (restore func()) {
-	orig := osStat
-	osStat = fn
-	return func() {
-		osStat = orig
-	}
-}
-
 func MockSysfsPath(path string) (restore func()) {
 	orig := sysfsPath
 	sysfsPath = path
 	return func() {
 		sysfsPath = orig
-	}
-}
-
-func MockUnixStat(fn func(string, *unix.Stat_t) error) (restore func()) {
-	orig := unixStat
-	unixStat = fn
-	return func() {
-		unixStat = orig
 	}
 }
