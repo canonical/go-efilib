@@ -98,8 +98,8 @@ func (s *filepathSuite) TestNewFilePath(c *C) {
 	c.Check(path, DeepEquals, &filePath{
 		dev: dev{
 			sysfsPath: filepath.Join(sysfs, "devices/pci0000:00/0000:00:1d.0/0000:3d:00.0/nvme/nvme0/nvme0n1"),
-			devPath: "/dev/nvme0n1",
-			part: 1},
+			devPath:   "/dev/nvme0n1",
+			part:      1},
 		path: "/EFI/ubuntu/shimx64.efi"})
 }
 
@@ -118,8 +118,8 @@ func (s *filepathSuite) TestNewFilePathBindMount(c *C) {
 	c.Check(path, DeepEquals, &filePath{
 		dev: dev{
 			sysfsPath: filepath.Join(sysfs, "devices/pci0000:00/0000:00:1d.0/0000:3d:00.0/nvme/nvme0/nvme0n1"),
-			devPath: "/dev/nvme0n1",
-			part: 1},
+			devPath:   "/dev/nvme0n1",
+			part:      1},
 		path: "/EFI/ubuntu/shimx64.efi"})
 }
 
@@ -138,8 +138,8 @@ func (s *filepathSuite) TestNewFilePathSymlink(c *C) {
 	c.Check(path, DeepEquals, &filePath{
 		dev: dev{
 			sysfsPath: filepath.Join(sysfs, "devices/pci0000:00/0000:00:1d.0/0000:3d:00.0/nvme/nvme0/nvme0n1"),
-			devPath: "/dev/nvme0n1",
-			part: 1},
+			devPath:   "/dev/nvme0n1",
+			part:      1},
 		path: "/EFI/ubuntu/shimx64.efi"})
 }
 
@@ -158,8 +158,8 @@ func (s *filepathSuite) TestNewFilePathNotPartitioned(c *C) {
 	c.Check(path, DeepEquals, &filePath{
 		dev: dev{
 			sysfsPath: filepath.Join(sysfs, "devices/virtual/block/loop1"),
-			devPath: "/dev/loop1",
-			part: 0},
+			devPath:   "/dev/loop1",
+			part:      0},
 		path: "/bin/ls"})
 }
 
@@ -258,8 +258,8 @@ func (s *filepathSuite) TestDevicePathBuilderProcessNextComponentUnhandled(c *C)
 	hid, _ := efi.NewEISAID("PNP", 0x0a03)
 
 	builder := &devicePathBuilderImpl{
-		iface: interfaceTypePCI,
-		devPath:       efi.DevicePath{&efi.ACPIDevicePathNode{HID: hid}},
+		iface:     interfaceTypePCI,
+		devPath:   efi.DevicePath{&efi.ACPIDevicePathNode{HID: hid}},
 		processed: []string{"pci0000:00"},
 		remaining: []string{"0000:00:1d.0", "0000:3d:00.0", "nvme", "nvme0", "nvme0n1"}}
 

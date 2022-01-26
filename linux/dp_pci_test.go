@@ -23,8 +23,8 @@ func (s *pciSuite) TestHandlePCIDevicePathNodeBridge(c *C) {
 	defer restoreSysfs()
 
 	builder := &devicePathBuilderImpl{
-		iface: interfaceTypePCI,
-		devPath:       efi.DevicePath{&efi.ACPIDevicePathNode{HID: 0x0a0341d0}},
+		iface:     interfaceTypePCI,
+		devPath:   efi.DevicePath{&efi.ACPIDevicePathNode{HID: 0x0a0341d0}},
 		processed: []string{"pci0000:00"},
 		remaining: []string{"0000:00:1d.0"}}
 	c.Check(handlePCIDevicePathNode(builder), IsNil)

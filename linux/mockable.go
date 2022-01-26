@@ -14,5 +14,5 @@ var (
 	sysfsPath  = "/sys"
 
 	filepathEvalSymlinks = filepath.EvalSymlinks
-	osOpen   = os.Open
+	osOpen               = os.Open
 )

@@ -39,7 +39,11 @@ const (
 // ErrNoDevicePath is returned from NewFileDevicePath if the device in
 // which a file is stored cannot be mapped to a device path with the
 // specified mode.
-var ErrNoDevicePath = errors.New("cannot map device to a device path")
+type ErrNoDevicePath string
+
+func (e ErrNoDevicePath) Error() string {
+	return "cannot map file path to a UEFI device path: " + string(e)
+}
 
 type interfaceType int
 
@@ -54,7 +58,7 @@ const (
 )
 
 var (
-	errNoHandler = errors.New("")
+	errNoHandler                 = errors.New("")
 	errSkipDevicePathNodeHandler = errors.New("")
 )
 
@@ -107,7 +111,7 @@ type devicePathBuilder interface {
 }
 
 type devicePathBuilderImpl struct {
-	iface interfaceType
+	iface   interfaceType
 	devPath efi.DevicePath
 
 	processed []string
@@ -181,9 +185,9 @@ func newDevicePathBuilder(dev *dev) (*devicePathBuilderImpl, error) {
 }
 
 type mountPoint struct {
-	dev uint64
-	root string
-	mountDir string
+	dev         uint64
+	root        string
+	mountDir    string
 	mountSource string
 }
 
@@ -225,9 +229,9 @@ func scanBlockDeviceMounts() (mounts []*mountPoint, err error) {
 		}
 
 		mounts = append(mounts, &mountPoint{
-			dev: unix.Mkdev(uint32(devMajor), uint32(devMinor)),
-			root: fields[3],
-			mountDir: fields[4],
+			dev:         unix.Mkdev(uint32(devMajor), uint32(devMinor)),
+			root:        fields[3],
+			mountDir:    fields[4],
 			mountSource: mountSource})
 	}
 	if scanner.Err() != nil {
@@ -267,8 +271,8 @@ func getFileMountPoint(path string) (*mountPoint, error) {
 
 type dev struct {
 	sysfsPath string
-	devPath string
-	part int
+	devPath   string
+	part      int
 }
 
 type filePath struct {
@@ -359,7 +363,7 @@ func NewFileDevicePath(path string, mode FileDevicePathMode) (out efi.DevicePath
 	}
 
 	if mode == ShortFormPathHD && fp.part == 0 {
-		return nil, ErrNoDevicePath
+		return nil, ErrNoDevicePath("file is not inside partitioned media - use linux.ShortFormPathFile")
 	}
 
 	builder, err := newDevicePathBuilder(&fp.dev)
@@ -372,7 +376,8 @@ func NewFileDevicePath(path string, mode FileDevicePathMode) (out efi.DevicePath
 			err := builder.processNextComponent()
 			switch {
 			case err == errNoHandler:
-				return nil, ErrNoDevicePath
+				return nil, ErrNoDevicePath("no handler for components " + builder.next(-1) +
+					" from device path " + builder.absPath(builder.next(-1)))
 			case err != nil:
 				return nil, xerrors.Errorf("cannot process components %s from device path %s: %w",
 					builder.next(-1), builder.absPath(builder.next(-1)), err)

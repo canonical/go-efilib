@@ -74,7 +74,7 @@ func (s *filepathSuite) TestNewFileDevicePathShortFormHDUnpartitioned(c *C) {
 	defer restore()
 
 	_, err := NewFileDevicePath("/snap/core/11993/bin/ls", ShortFormPathHD)
-	c.Check(err, Equals, ErrNoDevicePath)
+	c.Check(err, ErrorMatches, "cannot map file path to a UEFI device path: file is not inside partitioned media - use linux.ShortFormPathFile")
 }
 
 func (s *filepathSuite) TestNewFileDevicePathFullNVME(c *C) {
@@ -135,11 +135,13 @@ func (s *filepathSuite) TestNewFileDevicePathFullNoDevicePath(c *C) {
 	defer restore()
 	restore = MockMountsPath("testdata/mounts-nvme")
 	defer restore()
-	restore = MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
+
+	sysfs := filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys")
+	restore = MockSysfsPath(sysfs)
 	defer restore()
 
 	_, err := NewFileDevicePath("/snap/core/11993/bin/ls", FullPath)
-	c.Check(err, Equals, ErrNoDevicePath)
+	c.Check(err, ErrorMatches, "cannot map file path to a UEFI device path: no handler for components virtual/block/loop1 from device path "+sysfs+"/devices/virtual/block/loop1")
 }
 
 func (s *filepathSuite) TestNewFileDevicePathFullWithBindMount(c *C) {
