@@ -57,6 +57,10 @@ const (
 	interfaceTypeNVME
 )
 
+const (
+	prependHandler = 1 << 0
+)
+
 var (
 	errNoHandler                 = errors.New("")
 	errSkipDevicePathNodeHandler = errors.New("")
@@ -71,12 +75,16 @@ type registeredDpHandler struct {
 
 var devicePathNodeHandlers = make(map[interfaceType][]registeredDpHandler)
 
-func registerDevicePathNodeHandler(name string, fn devicePathNodeHandler, interfaces []interfaceType) {
+func registerDevicePathNodeHandler(name string, fn devicePathNodeHandler, interfaces []interfaceType, flags int) {
 	if len(interfaces) == 0 {
 		interfaces = []interfaceType{interfaceTypeUnknown}
 	}
 	for _, i := range interfaces {
-		devicePathNodeHandlers[i] = append(devicePathNodeHandlers[i], registeredDpHandler{name, fn})
+		if flags&prependHandler > 0 {
+			devicePathNodeHandlers[i] = append([]registeredDpHandler{{name, fn}}, devicePathNodeHandlers[i]...)
+		} else {
+			devicePathNodeHandlers[i] = append(devicePathNodeHandlers[i], registeredDpHandler{name, fn})
+		}
 	}
 }
 

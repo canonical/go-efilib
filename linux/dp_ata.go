@@ -132,5 +132,5 @@ func handleATADevicePathNode(builder devicePathBuilder) error {
 }
 
 func init() {
-	registerDevicePathNodeHandler("ata", handleATADevicePathNode, []interfaceType{interfaceTypeIDE, interfaceTypeSATA})
+	registerDevicePathNodeHandler("ata", handleATADevicePathNode, []interfaceType{interfaceTypeIDE, interfaceTypeSATA}, 0)
 }

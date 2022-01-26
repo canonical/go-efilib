@@ -41,5 +41,5 @@ func handlePCIRootDevicePathNode(builder devicePathBuilder) error {
 }
 
 func init() {
-	registerDevicePathNodeHandler("pci-root", handlePCIRootDevicePathNode, nil)
+	registerDevicePathNodeHandler("pci-root", handlePCIRootDevicePathNode, nil, 0)
 }

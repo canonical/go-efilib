@@ -70,5 +70,5 @@ func handlePCIDevicePathNode(builder devicePathBuilder) error {
 }
 
 func init() {
-	registerDevicePathNodeHandler("pci", handlePCIDevicePathNode, []interfaceType{interfaceTypePCI})
+	registerDevicePathNodeHandler("pci", handlePCIDevicePathNode, []interfaceType{interfaceTypePCI}, 0)
 }

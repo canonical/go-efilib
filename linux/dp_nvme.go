@@ -69,5 +69,5 @@ func handleNVMEDevicePathNode(builder devicePathBuilder) error {
 }
 
 func init() {
-	registerDevicePathNodeHandler("nvme", handleNVMEDevicePathNode, []interfaceType{interfaceTypeNVME})
+	registerDevicePathNodeHandler("nvme", handleNVMEDevicePathNode, []interfaceType{interfaceTypeNVME}, 0)
 }
