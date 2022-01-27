@@ -19,7 +19,7 @@ type pciRootSuite struct {
 var _ = Suite(&pciRootSuite{})
 
 func (s *pciRootSuite) TestHandlePCIRootDevicePathNodeSkip(c *C) {
-	builder := &devicePathBuilderImpl{remaining: []string{"0000:00:1d.0"}}
+	builder := &devicePathBuilderImpl{remaining: []string{"ACPI0004:00"}}
 	c.Check(handlePCIRootDevicePathNode(builder), Equals, errSkipDevicePathNodeHandler)
 }
 

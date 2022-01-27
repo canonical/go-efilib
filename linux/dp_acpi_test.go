@@ -19,41 +19,15 @@ type acpiSuite struct {
 var _ = Suite(&acpiSuite{})
 
 func (s *acpiSuite) TestDecodeACPIOrPNPId1(c *C) {
-	vendor, product, err := decodeACPIOrPNPId("PNP0a03")
-	c.Check(err, IsNil)
-	c.Check(vendor, Equals, "PNP")
-	c.Check(product, Equals, uint16(0x0a03))
-}
-
-func (s *acpiSuite) TestDecodeACPIOrPNPId2(c *C) {
-	vendor, product, err := decodeACPIOrPNPId("ACPI0008")
-	c.Check(err, IsNil)
-	c.Check(vendor, Equals, "ACPI")
-	c.Check(product, Equals, uint16(0x0008))
-}
-
-func (s *acpiSuite) TestDecodeACPIOrPNPIdInvalid1(c *C) {
-	_, _, err := decodeACPIOrPNPId("XXXXX0000")
-	c.Check(err, ErrorMatches, "invalid length")
-}
-
-func (s *acpiSuite) TestDecodeACPIOrPNPIdInvalid2(c *C) {
-	_, _, err := decodeACPIOrPNPId("XXXXX000")
-	c.Check(err, ErrorMatches, "invalid ID")
-}
-
-func (s *acpiSuite) TestNewEISAIDOrStringPNP(c *C) {
-	id, str, err := newEISAIDOrString("PNP", 0x0a08)
-	c.Check(err, IsNil)
-	c.Check(id, Equals, efi.EISAID(0x0a0841d0))
+	id, str := decodeACPIOrPNPId("PNP0a03")
+	c.Check(id, Equals, efi.EISAID(0x0a0341d0))
 	c.Check(str, Equals, "")
 }
 
-func (s *acpiSuite) TestNewEISAIDOrStringACPI(c *C) {
-	id, str, err := newEISAIDOrString("ACPI", 0x0001)
-	c.Check(err, IsNil)
+func (s *acpiSuite) TestDecodeACPIOrPNPId2(c *C) {
+	id, str := decodeACPIOrPNPId("ACPI0008")
 	c.Check(id, Equals, efi.EISAID(0))
-	c.Check(str, Equals, "ACPI0001")
+	c.Check(str, Equals, "ACPI0008")
 }
 
 func (s *acpiSuite) TestMaybeUseSimpleACPIDevicePathNode1(c *C) {
@@ -84,9 +58,29 @@ func (s *acpiSuite) TestMaybeUseSimpleACPIDevicePathNode3(c *C) {
 func (s *acpiSuite) TestNewACPIExtendedDevicePathNode(c *C) {
 	sysfs := filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys")
 
-	node, err := newACPIExtendedDevicePathNode(filepath.Join(sysfs, "devices/pci0000:00"))
+	node, err := newACPIExtendedDevicePathNode(filepath.Join(sysfs, "devices/LNXSYSTM:00/LNXSYBUS:00/PNP0A08:00"))
 	c.Assert(err, IsNil)
 	c.Check(node, DeepEquals, &efi.ACPIExtendedDevicePathNode{
 		HID: 0x0a0841d0,
 		CID: 0x0a0341d0})
+}
+
+func (s *acpiSuite) TestHandleACPIDevicePathNode(c *C) {
+	restore := MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
+	defer restore()
+
+	builder := &devicePathBuilderImpl{remaining: []string{"LNXSYSTM:00", "LNXSYBUS:00", "PNP0A08:00"}}
+	c.Check(handleACPIDevicePathNode(builder), IsNil)
+	c.Check(builder.processed, DeepEquals, []string{"LNXSYSTM:00"})
+	c.Check(builder.remaining, DeepEquals, []string{"LNXSYBUS:00", "PNP0A08:00"})
+	c.Check(builder.iface, Equals, interfaceTypeUnknown)
+	c.Check(builder.devPath, DeepEquals, efi.DevicePath(nil))
+}
+
+func (s *acpiSuite) TestHandleACPIDevicePathNodeSkip(c *C) {
+	restore := MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
+	defer restore()
+
+	builder := &devicePathBuilderImpl{remaining: []string{"virtual", "block", "loop1"}}
+	c.Check(handleACPIDevicePathNode(builder), Equals, errSkipDevicePathNodeHandler)
 }

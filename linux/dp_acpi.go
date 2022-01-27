@@ -16,8 +16,6 @@ import (
 	"strconv"
 	"strings"
 
-	"golang.org/x/xerrors"
-
 	"github.com/canonical/go-efilib"
 )
 
@@ -37,56 +35,37 @@ func maybeUseSimpleACPIDevicePathNode(node *efi.ACPIExtendedDevicePathNode) efi.
 	return &efi.ACPIDevicePathNode{HID: node.HID, UID: node.UID}
 }
 
-func decodeACPIOrPNPId(str string) (string, uint16, error) {
-	switch len(str) {
-	case 7, 8:
-		m := acpiIdRE.FindStringSubmatch(str)
-		if len(m) == 0 {
-			return "", 0, errors.New("invalid ID")
-		}
-		vendor := m[1]
-		product, _ := hex.DecodeString(m[2])
-		return vendor, binary.BigEndian.Uint16(product), nil
-	default:
-		return "", 0, errors.New("invalid length")
+func decodeACPIOrPNPId(str string) (efi.EISAID, string) {
+	m := acpiIdRE.FindStringSubmatch(str)
+	if len(m) == 0 {
+		return 0, str
 	}
-}
 
-func newEISAIDOrString(vendor string, product uint16) (efi.EISAID, string, error) {
-	switch len(vendor) {
-	case 3:
-		id, err := efi.NewEISAID(vendor, product)
-		if err != nil {
-			return 0, "", err
-		}
-		return id, "", nil
-	case 4:
-		return 0, fmt.Sprintf("%s%04x", vendor, product), nil
-	default:
-		return 0, "", errors.New("invalid vendor length")
+	vendor := m[1]
+	p, _ := hex.DecodeString(m[2])
+	product := binary.BigEndian.Uint16(p)
+
+	if len(vendor) != 3 {
+		return 0, fmt.Sprintf("%s%04x", vendor, product)
 	}
+
+	id, _ := efi.NewEISAID(vendor, product)
+	return id, ""
 }
 
 func newACPIExtendedDevicePathNode(path string) (*efi.ACPIExtendedDevicePathNode, error) {
 	node := new(efi.ACPIExtendedDevicePathNode)
 
-	hidBytes, err := ioutil.ReadFile(filepath.Join(path, "firmware_node", "hid"))
+	hidBytes, err := ioutil.ReadFile(filepath.Join(path, "hid"))
 	if err != nil {
 		return nil, err
 	}
 
-	hidVendor, hidProduct, err := decodeACPIOrPNPId(strings.TrimSpace(string(hidBytes)))
-	if err != nil {
-		return nil, xerrors.Errorf("cannot decode hid: %w", err)
-	}
-	hid, hidStr, err := newEISAIDOrString(hidVendor, hidProduct)
-	if err != nil {
-		return nil, xerrors.Errorf("cannot make hid: %w", err)
-	}
+	hid, hidStr := decodeACPIOrPNPId(strings.TrimSpace(string(hidBytes)))
 	node.HID = hid
 	node.HIDStr = hidStr
 
-	modalias, err := ioutil.ReadFile(filepath.Join(path, "firmware_node", "modalias"))
+	modalias, err := ioutil.ReadFile(filepath.Join(path, "modalias"))
 	switch {
 	case os.IsNotExist(err):
 	case err != nil:
@@ -97,20 +76,13 @@ func newACPIExtendedDevicePathNode(path string) (*efi.ACPIExtendedDevicePathNode
 			return nil, errors.New("invalid modalias")
 		}
 		if len(m[1]) > 0 {
-			cidVendor, cidProduct, err := decodeACPIOrPNPId(string(m[1]))
-			if err != nil {
-				return nil, xerrors.Errorf("cannot decode cid: %w", err)
-			}
-			cid, cidStr, err := newEISAIDOrString(cidVendor, cidProduct)
-			if err != nil {
-				return nil, xerrors.Errorf("cannot make cid: %w", err)
-			}
+			cid, cidStr := decodeACPIOrPNPId(string(m[1]))
 			node.CID = cid
 			node.CIDStr = cidStr
 		}
 	}
 
-	uidBytes, err := ioutil.ReadFile(filepath.Join(path, "firmware_node", "uid"))
+	uidBytes, err := ioutil.ReadFile(filepath.Join(path, "uid"))
 	switch {
 	case os.IsNotExist(err):
 	case err != nil:
@@ -126,4 +98,27 @@ func newACPIExtendedDevicePathNode(path string) (*efi.ACPIExtendedDevicePathNode
 	}
 
 	return node, nil
+}
+
+func handleACPIDevicePathNode(builder devicePathBuilder) error {
+	component := builder.next(1)
+
+	subsystem, err := filepath.EvalSymlinks(filepath.Join(builder.absPath(component), "subsystem"))
+	switch {
+	case os.IsNotExist(err):
+		return errSkipDevicePathNodeHandler
+	case err != nil:
+		return err
+	}
+
+	if subsystem != filepath.Join(sysfsPath, "bus", "acpi") {
+		return errSkipDevicePathNodeHandler
+	}
+
+	builder.advance(1)
+	return nil
+}
+
+func init() {
+	registerDevicePathNodeHandler("acpi", handleACPIDevicePathNode, nil, 0)
 }

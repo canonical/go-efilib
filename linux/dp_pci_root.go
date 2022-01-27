@@ -6,6 +6,7 @@ package linux
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
 )
 
@@ -19,7 +20,7 @@ func handlePCIRootDevicePathNode(builder devicePathBuilder) error {
 		return errSkipDevicePathNodeHandler
 	}
 
-	node, err := newACPIExtendedDevicePathNode(builder.absPath(component))
+	node, err := newACPIExtendedDevicePathNode(filepath.Join(builder.absPath(component), "firmware_node"))
 	if err != nil {
 		return err
 	}
@@ -41,5 +42,5 @@ func handlePCIRootDevicePathNode(builder devicePathBuilder) error {
 }
 
 func init() {
-	registerDevicePathNodeHandler("pci-root", handlePCIRootDevicePathNode, nil, 0)
+	registerDevicePathNodeHandler("pci-root", handlePCIRootDevicePathNode, nil, prependHandler)
 }

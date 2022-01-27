@@ -5,6 +5,7 @@
 package linux
 
 import (
+	"encoding/hex"
 	"os/exec"
 	"testing"
 
@@ -22,4 +23,10 @@ func (m *TarFileMixin) UnpackTar(c *C, path string) string {
 	c.Assert(cmd.Run(), IsNil)
 
 	return dir
+}
+
+func DecodeHexString(c *C, s string) []byte {
+	x, err := hex.DecodeString(s)
+	c.Assert(err, IsNil)
+	return x
 }

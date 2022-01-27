@@ -20,5 +20,5 @@ func handleVirtioDevicePathNode(builder devicePathBuilder) error {
 }
 
 func init() {
-	registerDevicePathNodeHandler("virtio", handleVirtioDevicePathNode, []interfaceType{interfaceTypeSCSI}, 0)
+	registerDevicePathNodeHandler("virtio", handleVirtioDevicePathNode, []interfaceType{interfaceTypeSCSI}, prependHandler)
 }

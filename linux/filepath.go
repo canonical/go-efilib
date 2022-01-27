@@ -55,6 +55,7 @@ const (
 	interfaceTypeIDE
 	interfaceTypeSATA
 	interfaceTypeNVME
+	interfaceTypeVMBus
 )
 
 const (
