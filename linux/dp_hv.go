@@ -57,5 +57,5 @@ func handleHVDevicePathNode(builder devicePathBuilder) error {
 }
 
 func init() {
-	registerDevicePathNodeHandler("hv", handleHVDevicePathNode, []interfaceType{interfaceTypeVMBus}, 0)
+	registerDevicePathNodeHandler("hv", handleHVDevicePathNode, 0, interfaceTypeVMBus)
 }

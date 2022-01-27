@@ -49,5 +49,5 @@ func handleSCSIDevicePathNode(builder devicePathBuilder) error {
 }
 
 func init() {
-	registerDevicePathNodeHandler("scsi", handleSCSIDevicePathNode, []interfaceType{interfaceTypeSCSI}, 0)
+	registerDevicePathNodeHandler("scsi", handleSCSIDevicePathNode, 0, interfaceTypeSCSI)
 }

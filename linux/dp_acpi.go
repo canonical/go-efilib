@@ -120,5 +120,5 @@ func handleACPIDevicePathNode(builder devicePathBuilder) error {
 }
 
 func init() {
-	registerDevicePathNodeHandler("acpi", handleACPIDevicePathNode, nil, 0)
+	registerDevicePathNodeHandler("acpi", handleACPIDevicePathNode, 0)
 }

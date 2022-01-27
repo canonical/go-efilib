@@ -76,7 +76,7 @@ type registeredDpHandler struct {
 
 var devicePathNodeHandlers = make(map[interfaceType][]registeredDpHandler)
 
-func registerDevicePathNodeHandler(name string, fn devicePathNodeHandler, interfaces []interfaceType, flags int) {
+func registerDevicePathNodeHandler(name string, fn devicePathNodeHandler, flags int, interfaces ...interfaceType) {
 	if len(interfaces) == 0 {
 		interfaces = []interfaceType{interfaceTypeUnknown}
 	}

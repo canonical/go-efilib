@@ -42,5 +42,5 @@ func handleVMBusRootDevicePathNode(builder devicePathBuilder) error {
 }
 
 func init() {
-	registerDevicePathNodeHandler("vmbus-root", handleVMBusRootDevicePathNode, nil, prependHandler)
+	registerDevicePathNodeHandler("vmbus-root", handleVMBusRootDevicePathNode, prependHandler)
 }
