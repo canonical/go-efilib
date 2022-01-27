@@ -141,7 +141,7 @@ func (s *filepathSuite) TestNewFileDevicePathFullNoDevicePath(c *C) {
 	defer restore()
 
 	_, err := NewFileDevicePath("/snap/core/11993/bin/ls", FullPath)
-	c.Check(err, ErrorMatches, "cannot map file path to a UEFI device path: no handler for components virtual/block/loop1 from device path "+sysfs+"/devices/virtual/block/loop1")
+	c.Check(err, ErrorMatches, "cannot map file path to a UEFI device path: encountered an error when handling components virtual/block/loop1 from device path "+sysfs+"/devices/virtual/block/loop1: cannot determine the interface: unknown root node")
 }
 
 func (s *filepathSuite) TestNewFileDevicePathFullWithBindMount(c *C) {

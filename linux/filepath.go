@@ -59,13 +59,25 @@ const (
 )
 
 const (
+	// prependHandler indicates that a handler wants to be tried
+	// before handlers registered without this flag. These handlers
+	// should use errSkipDevicePathNodeHandler on unhandled nodes.
 	prependHandler = 1 << 0
 )
 
 var (
-	errNoHandler                 = errors.New("")
+	// errSkipDevicePathNodeHandler is returned from a handler when it
+	// wants to defer handling to another handler.
 	errSkipDevicePathNodeHandler = errors.New("")
 )
+
+// errUnknownInterface is returned from a handler when it cannot
+// determine the interface.
+type errUnknownInterface string
+
+func (e errUnknownInterface) Error() string {
+	return "cannot determine the interface: " + string(e)
+}
 
 type devicePathNodeHandler func(devicePathBuilder) error
 
@@ -164,24 +176,49 @@ func (b *devicePathBuilderImpl) done() bool {
 }
 
 func (b *devicePathBuilderImpl) processNextComponent() error {
-	for _, handler := range devicePathNodeHandlers[b.iface] {
-		p := len(b.processed)
-		r := b.remaining
+	nProcessed := len(b.processed)
+	remaining := b.remaining
+	iface := b.iface
 
+	handlers := devicePathNodeHandlers[b.iface]
+	if len(handlers) == 0 {
+		// There should always be at least one handler registered for an interface.
+		panic(fmt.Sprintf("no handlers registered for interface type %v", b.iface))
+	}
+
+	for _, handler := range handlers {
 		err := handler.fn(b)
+		if err != nil {
+			// Roll back changes
+			b.processed = b.processed[:nProcessed]
+			b.remaining = remaining
+			b.iface = iface
+		}
 		if err == errSkipDevicePathNodeHandler {
-			b.processed = b.processed[:p]
-			b.remaining = r
+			// Try the next handler.
 			continue
 		}
 		if err != nil {
 			return xerrors.Errorf("cannot execute handler %s: %w", handler.name, err)
 		}
 
+		if iface != interfaceTypeUnknown && b.iface == interfaceTypeUnknown {
+			// The handler set the interface type back to unknown. Turn this
+			// in to a errUnknownInterface error.
+			return errUnknownInterface("handler " + handler.name + " could not determine the interface")
+		}
 		return nil
 	}
 
-	return errNoHandler
+	// If we get here, then all handlers returned errSkipDevicePathNodeHandler.
+
+	if b.iface != interfaceTypeUnknown {
+		// If the interface has already been determined, require at least one
+		// handler to handle this node or return an error.
+		panic(fmt.Sprintf("all handlers skipped handling interface type %v", b.iface))
+	}
+
+	return errUnknownInterface("unknown root node")
 }
 
 func newDevicePathBuilder(dev *dev) (*devicePathBuilderImpl, error) {
@@ -382,11 +419,14 @@ func NewFileDevicePath(path string, mode FileDevicePathMode) (out efi.DevicePath
 
 	if mode == FullPath {
 		for !builder.done() {
+			var e errUnknownInterface
+
 			err := builder.processNextComponent()
 			switch {
-			case err == errNoHandler:
-				return nil, ErrNoDevicePath("no handler for components " + builder.next(-1) +
-					" from device path " + builder.absPath(builder.next(-1)))
+			case xerrors.As(err, &e):
+				return nil, ErrNoDevicePath("encountered an error when handling components " +
+					builder.next(-1) + " from device path " +
+					builder.absPath(builder.next(-1)) + ": " + err.Error())
 			case err != nil:
 				return nil, xerrors.Errorf("cannot process components %s from device path %s: %w",
 					builder.next(-1), builder.absPath(builder.next(-1)), err)

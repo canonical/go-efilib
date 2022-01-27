@@ -5,7 +5,6 @@
 package linux
 
 import (
-	"fmt"
 	"io/ioutil"
 	"path/filepath"
 
@@ -42,7 +41,7 @@ func handleHVDevicePathNode(builder devicePathBuilder) error {
 	case hvSCSIGuid:
 		builder.setInterfaceType(interfaceTypeSCSI)
 	default:
-		return fmt.Errorf("unrecognized device class: %v", classId)
+		return errUnknownInterface("unknown device class: " + classId.String())
 	}
 
 	data := make([]byte, len(deviceId)+len(classId))

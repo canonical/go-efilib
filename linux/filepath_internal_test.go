@@ -5,6 +5,7 @@
 package linux
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"syscall"
@@ -276,6 +277,53 @@ func (s *filepathSuite) TestDevicePathBuilderProcessNextComponentUnhandled(c *C)
 			{name: "skip2", fn: skipHandler}}})
 	defer restore()
 
-	c.Check(builder.processNextComponent(), Equals, errNoHandler)
+	c.Check(func() { builder.processNextComponent() }, PanicMatches, "all handlers skipped handling interface type 1")
 	c.Check(skipped, Equals, 2)
+}
+
+func (s *filepathSuite) TestDevicePathBuilderProcessNextComponentUnhandledRoot(c *C) {
+	builder := &devicePathBuilderImpl{
+		iface:     interfaceTypeUnknown,
+		remaining: []string{"pci0000:00", "0000:00:1d.0", "0000:3d:00.0", "nvme", "nvme0", "nvme0n1"}}
+
+	var skipped int
+	skipHandler := func(builder devicePathBuilder) error {
+		skipped += 1
+		builder.setInterfaceType(interfaceTypePCI)
+		return errSkipDevicePathNodeHandler
+	}
+	restore := MockDevicePathNodeHandlers(map[interfaceType][]registeredDpHandler{
+		interfaceTypeUnknown: []registeredDpHandler{
+			{name: "acpi-skip", fn: skipHandler}},
+		interfaceTypePCI: []registeredDpHandler{
+			{name: "skip1", fn: skipHandler},
+			{name: "skip2", fn: skipHandler}}})
+	defer restore()
+
+	c.Check(builder.processNextComponent(), ErrorMatches, "cannot determine the interface: unknown root node")
+	c.Check(skipped, Equals, 1)
+	c.Check(builder.iface, Equals, interfaceTypeUnknown)
+}
+
+func (s *filepathSuite) TestDevicePathBuilderProcessNextComponentError(c *C) {
+	hid, _ := efi.NewEISAID("PNP", 0x0a03)
+
+	builder := &devicePathBuilderImpl{
+		iface:     interfaceTypePCI,
+		devPath:   efi.DevicePath{&efi.ACPIDevicePathNode{HID: hid}},
+		processed: []string{"pci0000:00"},
+		remaining: []string{"0000:00:1d.0", "0000:3d:00.0", "nvme", "nvme0", "nvme0n1"}}
+
+	handler := func(builder devicePathBuilder) error {
+		builder.advance(1)
+		return errors.New("error")
+	}
+	restore := MockDevicePathNodeHandlers(map[interfaceType][]registeredDpHandler{
+		interfaceTypePCI: []registeredDpHandler{
+			{name: "pci", fn: handler}}})
+	defer restore()
+
+	c.Check(builder.processNextComponent(), ErrorMatches, "cannot execute handler pci: error")
+	c.Check(builder.remaining, DeepEquals, []string{"0000:00:1d.0", "0000:3d:00.0", "nvme", "nvme0", "nvme0n1"})
+	c.Check(builder.processed, DeepEquals, []string{"pci0000:00"})
 }
