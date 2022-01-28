@@ -60,7 +60,7 @@ func (s *filepathSuite) TestNewFileDevicePathShortFormHD(c *C) {
 			PartitionNumber: 1,
 			PartitionStart:  34,
 			PartitionSize:   64,
-			Signature:       efi.MakeGUID(0xc7a2907e, 0xd8c9, 0x4a41, 0x8b99, [...]uint8{0x3e, 0xf3, 0x24, 0x5f, 0xaf, 0x2a}),
+			Signature:       efi.GUIDHardDriveSignature(efi.MakeGUID(0xc7a2907e, 0xd8c9, 0x4a41, 0x8b99, [...]uint8{0x3e, 0xf3, 0x24, 0x5f, 0xaf, 0x2a})),
 			MBRType:         efi.GPT},
 		efi.FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")})
 }
@@ -98,7 +98,7 @@ func (s *filepathSuite) TestNewFileDevicePathFullNVME(c *C) {
 			PartitionNumber: 1,
 			PartitionStart:  34,
 			PartitionSize:   64,
-			Signature:       efi.MakeGUID(0xc7a2907e, 0xd8c9, 0x4a41, 0x8b99, [...]uint8{0x3e, 0xf3, 0x24, 0x5f, 0xaf, 0x2a}),
+			Signature:       efi.GUIDHardDriveSignature(efi.MakeGUID(0xc7a2907e, 0xd8c9, 0x4a41, 0x8b99, [...]uint8{0x3e, 0xf3, 0x24, 0x5f, 0xaf, 0x2a})),
 			MBRType:         efi.GPT},
 		efi.FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")})
 }
@@ -125,7 +125,7 @@ func (s *filepathSuite) TestNewFileDevicePathFullSATA(c *C) {
 			PartitionNumber: 1,
 			PartitionStart:  34,
 			PartitionSize:   64,
-			Signature:       efi.MakeGUID(0xc7a2907e, 0xd8c9, 0x4a41, 0x8b99, [...]uint8{0x3e, 0xf3, 0x24, 0x5f, 0xaf, 0x2a}),
+			Signature:       efi.GUIDHardDriveSignature(efi.MakeGUID(0xc7a2907e, 0xd8c9, 0x4a41, 0x8b99, [...]uint8{0x3e, 0xf3, 0x24, 0x5f, 0xaf, 0x2a})),
 			MBRType:         efi.GPT},
 		efi.FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")})
 }
@@ -165,7 +165,7 @@ func (s *filepathSuite) TestNewFileDevicePathFullWithBindMount(c *C) {
 			PartitionNumber: 1,
 			PartitionStart:  34,
 			PartitionSize:   64,
-			Signature:       efi.MakeGUID(0xc7a2907e, 0xd8c9, 0x4a41, 0x8b99, [...]uint8{0x3e, 0xf3, 0x24, 0x5f, 0xaf, 0x2a}),
+			Signature:       efi.GUIDHardDriveSignature(efi.MakeGUID(0xc7a2907e, 0xd8c9, 0x4a41, 0x8b99, [...]uint8{0x3e, 0xf3, 0x24, 0x5f, 0xaf, 0x2a})),
 			MBRType:         efi.GPT},
 		efi.FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")})
 }
@@ -191,7 +191,7 @@ func (s *filepathSuite) TestNewFileDevicePathFullWithSymlink(c *C) {
 			PartitionNumber: 1,
 			PartitionStart:  34,
 			PartitionSize:   64,
-			Signature:       efi.MakeGUID(0xc7a2907e, 0xd8c9, 0x4a41, 0x8b99, [...]uint8{0x3e, 0xf3, 0x24, 0x5f, 0xaf, 0x2a}),
+			Signature:       efi.GUIDHardDriveSignature(efi.MakeGUID(0xc7a2907e, 0xd8c9, 0x4a41, 0x8b99, [...]uint8{0x3e, 0xf3, 0x24, 0x5f, 0xaf, 0x2a})),
 			MBRType:         efi.GPT},
 		efi.FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")})
 }

@@ -14,6 +14,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/canonical/go-efilib/internal/ioerr"
@@ -105,7 +106,15 @@ type GenericDevicePathNode struct {
 
 func (d *GenericDevicePathNode) String() string {
 	var builder bytes.Buffer
-	fmt.Fprintf(&builder, "%s(%d", d.Type, d.SubType)
+
+	switch d.Type {
+	case HardwareDevicePath, ACPIDevicePath, MessagingDevicePath,
+		MediaDevicePath, BBSDevicePath:
+		fmt.Fprintf(&builder, "%s(", d.Type)
+	default:
+		fmt.Fprintf(&builder, "Path(%d,", d.Type)
+	}
+	fmt.Fprintf(&builder, "%d", d.SubType)
 	if len(d.Data) > 0 {
 		fmt.Fprintf(&builder, ",%x", d.Data)
 	}
@@ -282,8 +291,6 @@ func (d *ACPIDevicePathNode) String() string {
 			return fmt.Sprintf("Serial(0x%x)", d.UID)
 		case 0x0401:
 			return fmt.Sprintf("ParallelPort(0x%x)", d.UID)
-		default:
-			return fmt.Sprintf("Acpi(PNP%04x,0x%x)", d.HID>>16, d.UID)
 		}
 	}
 	return fmt.Sprintf("Acpi(0x%08x,0x%x)", uint32(d.HID), d.UID)
@@ -311,6 +318,24 @@ type ACPIExtendedDevicePathNode struct {
 }
 
 func (d *ACPIExtendedDevicePathNode) String() string {
+	switch {
+	case d.HID != 0 && d.CIDStr == "" && d.UIDStr != "":
+		if d.CID == 0 {
+			return fmt.Sprintf("AcpiExp(%s,0,%s)", d.HID, d.UIDStr)
+		}
+		return fmt.Sprintf("AcpiExp(%s,%s,%s)", d.HID, d.CID, d.UIDStr)
+	case d.HID.Vendor() == "PNP" && (d.HID.Product() == 0x0a03 || (d.CID.Product() == 0x0a03 && d.HID.Product() != 0x0a08)):
+		if d.UIDStr != "" {
+			return fmt.Sprintf("PciRoot(%s)", d.UIDStr)
+		}
+		return fmt.Sprintf("PciRoot(0x%x)", d.UID)
+	case d.HID.Vendor() == "PNP" && (d.HID.Product() == 0x0a08 || d.CID.Product() == 0x0a08):
+		if d.UIDStr != "" {
+			return fmt.Sprintf("PcieRoot(%s)", d.UIDStr)
+		}
+		return fmt.Sprintf("PcieRoot(0x%x)", d.UID)
+	}
+
 	hidStr := d.HIDStr
 	if hidStr == "" {
 		hidStr = "<nil>"
@@ -321,45 +346,18 @@ func (d *ACPIExtendedDevicePathNode) String() string {
 	}
 
 	hidText := d.HID.String()
-	cidText := d.CID.String()
-
-	switch {
-	case d.HID.Vendor() == "PNP":
-		switch {
-		case d.HID.Product() == 0x0a03 || (d.CID.Product() == 0x0a03 && d.HID.Product() != 0x0a08):
-			if d.UIDStr != "" {
-				return fmt.Sprintf("PciRoot(%s)", d.UIDStr)
-			}
-			return fmt.Sprintf("PciRoot(0x%x)", d.UID)
-		case d.HID.Product() == 0x0a08 || d.CID.Product() == 0x0a08:
-			if d.UIDStr != "" {
-				return fmt.Sprintf("PcieRoot(%s)", d.UIDStr)
-			}
-			return fmt.Sprintf("PcieRoot(0x%x)", d.UID)
-		}
-	case d.HIDStr == "" && d.CIDStr == "" && d.UIDStr != "":
-		if d.CID == 0 {
-			return fmt.Sprintf("AcpiExp(%s,0,%s)", hidText, d.UIDStr)
-		}
-		return fmt.Sprintf("AcpiExp(%s,%s,%s)", hidText, cidText, d.UIDStr)
-	}
-
 	if d.HID == 0 {
 		hidText = hidStr
 	}
+	cidText := d.CID.String()
 	if d.CID == 0 {
 		cidText = cidStr
 	}
 
-	var s bytes.Buffer
-	fmt.Fprintf(&s, "AcpiEx(%s,%s,", hidText, cidText)
 	if d.UIDStr != "" {
-		fmt.Fprintf(&s, "%s)", d.UIDStr)
-	} else {
-		fmt.Fprintf(&s, "0x%x)", d.UID)
+		return fmt.Sprintf("AcpiEx(%s,%s,%s)", hidText, cidText, d.UIDStr)
 	}
-
-	return s.String()
+	return fmt.Sprintf("AcpiEx(%s,%s,0x%x)", hidText, cidText, d.UID)
 }
 
 func (d *ACPIExtendedDevicePathNode) Write(w io.Writer) error {
@@ -400,12 +398,34 @@ func (d *ACPIExtendedDevicePathNode) Write(w io.Writer) error {
 
 type ATAPIControllerRole uint8
 
+func (r ATAPIControllerRole) String() string {
+	switch r {
+	case ATAPIControllerPrimary:
+		return "Primary"
+	case ATAPIControllerSecondary:
+		return "Secondary"
+	default:
+		return strconv.FormatUint(uint64(r), 10)
+	}
+}
+
 const (
 	ATAPIControllerPrimary   ATAPIControllerRole = 0
 	ATAPIControllerSecondary ATAPIControllerRole = 1
 )
 
 type ATAPIDriveRole uint8
+
+func (r ATAPIDriveRole) String() string {
+	switch r {
+	case ATAPIDriveMaster:
+		return "Master"
+	case ATAPIDriveSlave:
+		return "Slave"
+	default:
+		return strconv.FormatUint(uint64(r), 10)
+	}
+}
 
 const (
 	ATAPIDriveMaster ATAPIDriveRole = 0
@@ -639,7 +659,7 @@ type NVMENamespaceDevicePathNode struct {
 func (d *NVMENamespaceDevicePathNode) String() string {
 	var uuid [8]uint8
 	binary.BigEndian.PutUint64(uuid[:], d.NamespaceUUID)
-	return fmt.Sprintf("NVMe(0x%x-%02x-%02x-%02x-%02x-%02x-%02x-%02x-%02x)", d.NamespaceID,
+	return fmt.Sprintf("NVMe(0x%x,%02x-%02x-%02x-%02x-%02x-%02x-%02x-%02x)", d.NamespaceID,
 		uuid[0], uuid[1], uuid[2], uuid[3], uuid[4], uuid[5], uuid[6], uuid[7])
 }
 
@@ -657,30 +677,103 @@ func (d *NVMENamespaceDevicePathNode) Write(w io.Writer) error {
 
 type MBRType uint8
 
+func (t MBRType) String() string {
+	switch t {
+	case LegacyMBR:
+		return "MBR"
+	case GPT:
+		return "GPT"
+	default:
+		return strconv.FormatUint(uint64(t), 10)
+	}
+}
+
 const (
 	LegacyMBR MBRType = 1
 	GPT               = 2
 )
+
+type HardDriveSignatureType uint8
+
+func (t HardDriveSignatureType) String() string {
+	switch t {
+	case uefi.SIGNATURE_TYPE_MBR:
+		return "MBR"
+	case uefi.SIGNATURE_TYPE_GUID:
+		return "GPT"
+	default:
+		return strconv.FormatUint(uint64(t), 10)
+	}
+}
+
+type HardDriveSignature interface {
+	fmt.Stringer
+	Data() [16]uint8
+	Type() HardDriveSignatureType
+}
+
+type GUIDHardDriveSignature GUID
+
+func (s GUIDHardDriveSignature) String() string {
+	return GUID(s).String()
+}
+
+func (s GUIDHardDriveSignature) Data() (out [16]uint8) {
+	copy(out[:], s[:])
+	return out
+}
+
+func (GUIDHardDriveSignature) Type() HardDriveSignatureType {
+	return HardDriveSignatureType(uefi.SIGNATURE_TYPE_GUID)
+}
+
+type MBRHardDriveSignature uint32
+
+func (s MBRHardDriveSignature) String() string {
+	return fmt.Sprintf("0x%08x", uint32(s))
+}
+
+func (s MBRHardDriveSignature) Data() (out [16]uint8) {
+	binary.LittleEndian.PutUint32(out[:], uint32(s))
+	return out
+}
+
+func (s MBRHardDriveSignature) Type() HardDriveSignatureType {
+	return HardDriveSignatureType(uefi.SIGNATURE_TYPE_MBR)
+}
+
+type genericHardDriveSignature struct {
+	typ  HardDriveSignatureType
+	data [16]uint8
+}
+
+func (s *genericHardDriveSignature) String() string {
+	return fmt.Sprintf("%x", s.data)
+}
+
+func (s *genericHardDriveSignature) Data() [16]uint8 {
+	return s.data
+}
+
+func (s *genericHardDriveSignature) Type() HardDriveSignatureType {
+	return s.typ
+}
 
 // HardDriveDevicePathNode corresponds to a hard drive device path node.
 type HardDriveDevicePathNode struct {
 	PartitionNumber uint32
 	PartitionStart  uint64
 	PartitionSize   uint64
-	Signature       interface{}
+	Signature       HardDriveSignature
 	MBRType         MBRType
 }
 
 func (d *HardDriveDevicePathNode) String() string {
-	switch sig := d.Signature.(type) {
-	case nil:
-		return fmt.Sprintf("HD(%d,0,0)", d.PartitionNumber)
-	case uint32:
-		return fmt.Sprintf("HD(%d,MBR,0x%08x)", d.PartitionNumber, sig)
-	case GUID:
-		return fmt.Sprintf("HD(%d,GPT,%s)", d.PartitionNumber, sig)
+	switch d.Signature.Type() {
 	default:
-		panic("invalid signature type")
+		return fmt.Sprintf("HD(%d,%d,0)", d.PartitionNumber, d.MBRType)
+	case uefi.SIGNATURE_TYPE_MBR, uefi.SIGNATURE_TYPE_GUID:
+		return fmt.Sprintf("HD(%d,%s,%s)", d.PartitionNumber, d.Signature.Type(), d.Signature)
 	}
 }
 
@@ -694,18 +787,17 @@ func (d *HardDriveDevicePathNode) Write(w io.Writer) error {
 		PartitionSize:   d.PartitionSize,
 		MBRType:         uint8(d.MBRType)}
 
-	switch sig := d.Signature.(type) {
-	case nil:
-		data.SignatureType = uefi.NO_DISK_SIGNATURE
-		_ = sig
-	case uint32:
-		data.SignatureType = uefi.SIGNATURE_TYPE_MBR
-		binary.LittleEndian.PutUint32(data.Signature[:], sig)
-	case GUID:
-		data.SignatureType = uefi.SIGNATURE_TYPE_GUID
-		copy(data.Signature[:], sig[:])
-	default:
-		return errors.New("unexpected signature type")
+	if d.Signature != nil {
+		data.SignatureType = uint8(d.Signature.Type())
+
+		switch d.Signature.Type() {
+		case uefi.NO_DISK_SIGNATURE:
+			if d.Signature.Data() != data.Signature {
+				return errors.New("inconsistent signature and signature type")
+			}
+		default:
+			data.Signature = d.Signature.Data()
+		}
 	}
 
 	data.Header.Length = uint16(binary.Size(data))
@@ -738,7 +830,7 @@ func NewHardDriveDevicePathNodeFromDevice(r io.ReaderAt, totalSz, blockSz int64,
 			PartitionNumber: uint32(part),
 			PartitionStart:  uint64(entry.StartingLBA),
 			PartitionSize:   uint64(entry.NumberOfSectors),
-			Signature:       record.UniqueSignature,
+			Signature:       MBRHardDriveSignature(record.UniqueSignature),
 			MBRType:         LegacyMBR}, nil
 	case err != nil:
 		return nil, err
@@ -757,7 +849,7 @@ func NewHardDriveDevicePathNodeFromDevice(r io.ReaderAt, totalSz, blockSz int64,
 			PartitionNumber: uint32(part),
 			PartitionStart:  uint64(entry.StartingLBA),
 			PartitionSize:   uint64(entry.EndingLBA - entry.StartingLBA + 1),
-			Signature:       entry.UniquePartitionGUID,
+			Signature:       GUIDHardDriveSignature(entry.UniquePartitionGUID),
 			MBRType:         GPT}, nil
 	}
 }
@@ -1017,16 +1109,17 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 				return nil, err
 			}
 
-			var signature interface{}
+			var signature HardDriveSignature
 			switch n.SignatureType {
 			case uefi.NO_DISK_SIGNATURE:
-				signature = nil
 			case uefi.SIGNATURE_TYPE_MBR:
-				signature = binary.LittleEndian.Uint32(n.Signature[:])
+				signature = MBRHardDriveSignature(binary.LittleEndian.Uint32(n.Signature[:]))
 			case uefi.SIGNATURE_TYPE_GUID:
-				signature = GUID(n.Signature)
+				signature = GUIDHardDriveSignature(n.Signature)
 			default:
-				return nil, errors.New("invalid signature type")
+				signature = &genericHardDriveSignature{
+					typ:  HardDriveSignatureType(n.SignatureType),
+					data: n.Signature}
 			}
 			return &HardDriveDevicePathNode{
 				PartitionNumber: n.PartitionNumber,

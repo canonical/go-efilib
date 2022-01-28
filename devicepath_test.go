@@ -23,7 +23,7 @@ func (s *dpSuite) TestReadDevicePath(c *C) {
 		"300680069006d007800360034002e0065006600690000007fff0400"))
 	path, err := ReadDevicePath(r)
 	c.Assert(err, IsNil)
-	c.Check(path.String(), Equals, "\\PciRoot(0x0)\\Pci(0x1d,0x0)\\Pci(0x0,0x0)\\NVMe(0x1-00-00-00-00-00-00-00-00)"+
+	c.Check(path.String(), Equals, "\\PciRoot(0x0)\\Pci(0x1d,0x0)\\Pci(0x0,0x0)\\NVMe(0x1,00-00-00-00-00-00-00-00)"+
 		"\\HD(1,GPT,66de947b-fdb2-4525-b752-30d66bb2b960)\\\\EFI\\ubuntu\\shimx64.efi")
 
 	expected := DevicePath{
@@ -43,7 +43,7 @@ func (s *dpSuite) TestReadDevicePath(c *C) {
 			PartitionNumber: 1,
 			PartitionStart:  0x800,
 			PartitionSize:   0x100000,
-			Signature:       MakeGUID(0x66de947b, 0xfdb2, 0x4525, 0xb752, [...]uint8{0x30, 0xd6, 0x6b, 0xb2, 0xb9, 0x60}),
+			Signature:       GUIDHardDriveSignature(MakeGUID(0x66de947b, 0xfdb2, 0x4525, 0xb752, [...]uint8{0x30, 0xd6, 0x6b, 0xb2, 0xb9, 0x60})),
 			MBRType:         GPT},
 		FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}
 	c.Check(path, DeepEquals, expected)
@@ -76,7 +76,7 @@ func (s *dpSuite) TestReadDevicePathUnrecognizedType(c *C) {
 			PartitionNumber: 15,
 			PartitionStart:  0x2800,
 			PartitionSize:   0x35000,
-			Signature:       MakeGUID(0x8933fedb, 0x2f53, 0x490b, 0xa245, [...]uint8{0x5c, 0x7f, 0xa1, 0xf9, 0x86, 0x32}),
+			Signature:       GUIDHardDriveSignature(MakeGUID(0x8933fedb, 0x2f53, 0x490b, 0xa245, [...]uint8{0x5c, 0x7f, 0xa1, 0xf9, 0x86, 0x32})),
 			MBRType:         GPT},
 		FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}
 	c.Check(path, DeepEquals, expected)
@@ -106,7 +106,7 @@ func (s *dpSuite) TestReadDevicePath2(c *C) {
 			PartitionNumber: 15,
 			PartitionStart:  0x2800,
 			PartitionSize:   0x35000,
-			Signature:       MakeGUID(0x8933fedb, 0x2f53, 0x490b, 0xa245, [...]uint8{0x5c, 0x7f, 0xa1, 0xf9, 0x86, 0x32}),
+			Signature:       GUIDHardDriveSignature(MakeGUID(0x8933fedb, 0x2f53, 0x490b, 0xa245, [...]uint8{0x5c, 0x7f, 0xa1, 0xf9, 0x86, 0x32})),
 			MBRType:         GPT},
 		FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}
 	c.Check(path, DeepEquals, expected)
@@ -183,7 +183,7 @@ func (d *dpSuite) TestNewHardDriveDevicePathNodeFromDevice1(c *C) {
 			PartitionNumber: 1,
 			PartitionStart:  0x37800,
 			PartitionSize:   0x42e7df,
-			Signature:       MakeGUID(0x15eae969, 0x91f2, 0x437b, 0x95cc, [...]uint8{0xec, 0x11, 0xd3, 0x40, 0x95, 0x9b}),
+			Signature:       GUIDHardDriveSignature(MakeGUID(0x15eae969, 0x91f2, 0x437b, 0x95cc, [...]uint8{0xec, 0x11, 0xd3, 0x40, 0x95, 0x9b})),
 			MBRType:         GPT}})
 }
 
@@ -194,7 +194,7 @@ func (d *dpSuite) TestNewHardDriveDevicePathNodeFromDevice2(c *C) {
 			PartitionNumber: 14,
 			PartitionStart:  0x800,
 			PartitionSize:   0x2000,
-			Signature:       MakeGUID(0x71c94a7b, 0xfa01, 0x416c, 0x9cdd, [...]uint8{0x60, 0x02, 0x5b, 0x54, 0xd8, 0xd2}),
+			Signature:       GUIDHardDriveSignature(MakeGUID(0x71c94a7b, 0xfa01, 0x416c, 0x9cdd, [...]uint8{0x60, 0x02, 0x5b, 0x54, 0xd8, 0xd2})),
 			MBRType:         GPT}})
 }
 
@@ -258,6 +258,6 @@ func (d *dpSuite) TestNewHardDriveDevicePathNodeFromMBRDevice(c *C) {
 		PartitionNumber: 1,
 		PartitionStart:  2048,
 		PartitionSize:   19922944,
-		Signature:       uint32(0xa773bf3f),
+		Signature:       MBRHardDriveSignature(0xa773bf3f),
 		MBRType:         LegacyMBR})
 }

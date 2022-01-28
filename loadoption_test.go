@@ -40,7 +40,7 @@ func (s *loadoptionSuite) TestReadLoadOption1(c *C) {
 					PartitionNumber: 1,
 					PartitionStart:  0x800,
 					PartitionSize:   0x100000,
-					Signature:       MakeGUID(0x66de947b, 0xfdb2, 0x4525, 0xb752, [...]uint8{0x30, 0xd6, 0x6b, 0xb2, 0xb9, 0x60}),
+					Signature:       GUIDHardDriveSignature(MakeGUID(0x66de947b, 0xfdb2, 0x4525, 0xb752, [...]uint8{0x30, 0xd6, 0x6b, 0xb2, 0xb9, 0x60})),
 					MBRType:         GPT},
 				FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")},
 			OptionalData: []byte{}}})
@@ -59,7 +59,7 @@ func (s *loadoptionSuite) TestReadLoadOption2(c *C) {
 					PartitionNumber: 1,
 					PartitionStart:  0x800,
 					PartitionSize:   0x100000,
-					Signature:       MakeGUID(0x66de947b, 0xfdb2, 0x4525, 0xb752, [...]uint8{0x30, 0xd6, 0x6b, 0xb2, 0xb9, 0x60}),
+					Signature:       GUIDHardDriveSignature(MakeGUID(0x66de947b, 0xfdb2, 0x4525, 0xb752, [...]uint8{0x30, 0xd6, 0x6b, 0xb2, 0xb9, 0x60})),
 					MBRType:         GPT},
 				FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")},
 			OptionalData: DecodeHexString(c, "5c00660077007500700064007800360034002e006500660069000000")}})
@@ -102,7 +102,7 @@ func (s *loadoptionSuite) TestWriteLoadOption(c *C) {
 					PartitionNumber: 1,
 					PartitionStart:  0x800,
 					PartitionSize:   0x100000,
-					Signature:       MakeGUID(0x66de947b, 0xfdb2, 0x4525, 0xb752, [...]uint8{0x30, 0xd6, 0x6b, 0xb2, 0xb9, 0x60}),
+					Signature:       GUIDHardDriveSignature(MakeGUID(0x66de947b, 0xfdb2, 0x4525, 0xb752, [...]uint8{0x30, 0xd6, 0x6b, 0xb2, 0xb9, 0x60})),
 					MBRType:         GPT},
 				FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}}})
 }
@@ -120,7 +120,7 @@ func (s *loadoptionSuite) TestWriteLoadOption2(c *C) {
 					PartitionNumber: 1,
 					PartitionStart:  0x800,
 					PartitionSize:   0x100000,
-					Signature:       MakeGUID(0x66de947b, 0xfdb2, 0x4525, 0xb752, [...]uint8{0x30, 0xd6, 0x6b, 0xb2, 0xb9, 0x60}),
+					Signature:       GUIDHardDriveSignature(MakeGUID(0x66de947b, 0xfdb2, 0x4525, 0xb752, [...]uint8{0x30, 0xd6, 0x6b, 0xb2, 0xb9, 0x60})),
 					MBRType:         GPT},
 				FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")},
 			OptionalData: DecodeHexString(c, "5c00660077007500700064007800360034002e006500660069000000")}})
@@ -148,7 +148,7 @@ func (s *loadoptionSuite) TestLoadOptionBytes(c *C) {
 				PartitionNumber: 1,
 				PartitionStart:  0x800,
 				PartitionSize:   0x100000,
-				Signature:       MakeGUID(0x66de947b, 0xfdb2, 0x4525, 0xb752, [...]uint8{0x30, 0xd6, 0x6b, 0xb2, 0xb9, 0x60}),
+				Signature:       GUIDHardDriveSignature(MakeGUID(0x66de947b, 0xfdb2, 0x4525, 0xb752, [...]uint8{0x30, 0xd6, 0x6b, 0xb2, 0xb9, 0x60})),
 				MBRType:         GPT},
 			FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}}
 	b, err := option.Bytes()
