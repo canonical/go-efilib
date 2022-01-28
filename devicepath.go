@@ -55,9 +55,24 @@ const (
 // DevicePathSubType is the sub-type of a device path node.
 type DevicePathSubType uint8
 
+// DevicePathToStringFlags defines flags for DevicePath.ToString and
+// DevicePathNode.ToString.
+type DevicePathToStringFlags int
+
+func (f DevicePathToStringFlags) DisplayOnly() bool {
+	return f&DevicePathDisplayOnly > 0
+}
+
+const (
+	// DevicePathDisplayOnly indicates that each node is converted
+	// to the shorter text representation.
+	DevicePathDisplayOnly DevicePathToStringFlags = 1 << 0
+)
+
 // DevicePathNode represents a single node in a device path.
 type DevicePathNode interface {
 	fmt.Stringer
+	ToString(flags DevicePathToStringFlags) string
 	Write(w io.Writer) error
 }
 
@@ -65,12 +80,18 @@ type DevicePathNode interface {
 // representing the root.
 type DevicePath []DevicePathNode
 
-func (p DevicePath) String() string {
+// ToString returns a string representation of this device path with the
+// supplied flags.
+func (p DevicePath) ToString(flags DevicePathToStringFlags) string {
 	s := new(bytes.Buffer)
 	for _, node := range p {
-		fmt.Fprintf(s, "\\%s", node)
+		fmt.Fprintf(s, "\\%s", node.ToString(flags))
 	}
 	return s.String()
+}
+
+func (p DevicePath) String() string {
+	return p.ToString(DevicePathDisplayOnly)
 }
 
 // Bytes returns the serialized form of this device path.
@@ -104,7 +125,7 @@ type GenericDevicePathNode struct {
 	Data    []byte
 }
 
-func (d *GenericDevicePathNode) String() string {
+func (d *GenericDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	var builder bytes.Buffer
 
 	switch d.Type {
@@ -120,6 +141,10 @@ func (d *GenericDevicePathNode) String() string {
 	}
 	fmt.Fprintf(&builder, ")")
 	return builder.String()
+}
+
+func (d *GenericDevicePathNode) String() string {
+	return d.ToString(DevicePathDisplayOnly)
 }
 
 func (d *GenericDevicePathNode) Write(w io.Writer) error {
@@ -145,8 +170,12 @@ type PCIDevicePathNode struct {
 	Device   uint8
 }
 
-func (d *PCIDevicePathNode) String() string {
+func (d *PCIDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	return fmt.Sprintf("Pci(0x%x,0x%x)", d.Device, d.Function)
+}
+
+func (d *PCIDevicePathNode) String() string {
+	return d.ToString(DevicePathDisplayOnly)
 }
 
 func (d *PCIDevicePathNode) Write(w io.Writer) error {
@@ -167,7 +196,7 @@ type VendorDevicePathNode struct {
 	Data []byte
 }
 
-func (d *VendorDevicePathNode) String() string {
+func (d *VendorDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	var t string
 	switch d.Type {
 	case HardwareDevicePath:
@@ -187,6 +216,10 @@ func (d *VendorDevicePathNode) String() string {
 	}
 	fmt.Fprintf(&s, ")")
 	return s.String()
+}
+
+func (d *VendorDevicePathNode) String() string {
+	return d.ToString(DevicePathDisplayOnly)
 }
 
 func (d *VendorDevicePathNode) Write(w io.Writer) error {
@@ -276,7 +309,7 @@ type ACPIDevicePathNode struct {
 	UID uint32
 }
 
-func (d *ACPIDevicePathNode) String() string {
+func (d *ACPIDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	if d.HID.Vendor() == "PNP" {
 		switch d.HID.Product() {
 		case 0x0a03:
@@ -294,6 +327,10 @@ func (d *ACPIDevicePathNode) String() string {
 		}
 	}
 	return fmt.Sprintf("Acpi(0x%08x,0x%x)", uint32(d.HID), d.UID)
+}
+
+func (d *ACPIDevicePathNode) String() string {
+	return d.ToString(DevicePathDisplayOnly)
 }
 
 func (d *ACPIDevicePathNode) Write(w io.Writer) error {
@@ -317,9 +354,9 @@ type ACPIExtendedDevicePathNode struct {
 	CIDStr string
 }
 
-func (d *ACPIExtendedDevicePathNode) String() string {
+func (d *ACPIExtendedDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	switch {
-	case d.HID != 0 && d.CIDStr == "" && d.UIDStr != "":
+	case d.HIDStr == "" && d.CIDStr == "" && d.UIDStr != "":
 		if d.CID == 0 {
 			return fmt.Sprintf("AcpiExp(%s,0,%s)", d.HID, d.UIDStr)
 		}
@@ -344,6 +381,14 @@ func (d *ACPIExtendedDevicePathNode) String() string {
 	if cidStr == "" {
 		cidStr = "<nil>"
 	}
+	uidStr := d.UIDStr
+	if uidStr == "" {
+		uidStr = "<nil>"
+	}
+
+	if !flags.DisplayOnly() {
+		return fmt.Sprintf("AcpiEx(%s,%s,0x%x,%s,%s,%s)", d.HID, d.CID, d.UID, hidStr, cidStr, uidStr)
+	}
 
 	hidText := d.HID.String()
 	if d.HID == 0 {
@@ -358,6 +403,10 @@ func (d *ACPIExtendedDevicePathNode) String() string {
 		return fmt.Sprintf("AcpiEx(%s,%s,%s)", hidText, cidText, d.UIDStr)
 	}
 	return fmt.Sprintf("AcpiEx(%s,%s,0x%x)", hidText, cidText, d.UID)
+}
+
+func (d *ACPIExtendedDevicePathNode) String() string {
+	return d.ToString(DevicePathDisplayOnly)
 }
 
 func (d *ACPIExtendedDevicePathNode) Write(w io.Writer) error {
@@ -439,8 +488,15 @@ type ATAPIDevicePathNode struct {
 	LUN        uint16
 }
 
+func (d *ATAPIDevicePathNode) ToString(flags DevicePathToStringFlags) string {
+	if flags.DisplayOnly() {
+		return fmt.Sprintf("Ata(%d)", d.LUN)
+	}
+	return fmt.Sprintf("Ata(%s,%s,%d)", d.Controller, d.Drive, d.LUN)
+}
+
 func (d *ATAPIDevicePathNode) String() string {
-	return fmt.Sprintf("Ata(%d)", d.LUN)
+	return d.ToString(DevicePathDisplayOnly)
 }
 
 func (d *ATAPIDevicePathNode) Write(w io.Writer) error {
@@ -462,8 +518,12 @@ type SCSIDevicePathNode struct {
 	LUN uint16
 }
 
-func (d *SCSIDevicePathNode) String() string {
+func (d *SCSIDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	return fmt.Sprintf("Scsi(0x%x,0x%x)", d.PUN, d.LUN)
+}
+
+func (d *SCSIDevicePathNode) String() string {
+	return d.ToString(DevicePathDisplayOnly)
 }
 
 func (d *SCSIDevicePathNode) Write(w io.Writer) error {
@@ -484,8 +544,12 @@ type USBDevicePathNode struct {
 	InterfaceNumber  uint8
 }
 
-func (d *USBDevicePathNode) String() string {
+func (d *USBDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	return fmt.Sprintf("USB(0x%x,0x%x)", d.ParentPortNumber, d.InterfaceNumber)
+}
+
+func (d *USBDevicePathNode) String() string {
+	return d.ToString(DevicePathDisplayOnly)
 }
 
 func (d *USBDevicePathNode) Write(w io.Writer) error {
@@ -526,7 +590,7 @@ type USBClassDevicePathNode struct {
 	DeviceProtocol uint8
 }
 
-func (d *USBClassDevicePathNode) String() string {
+func (d *USBClassDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	var builder bytes.Buffer
 	switch d.DeviceClass {
 	case USBClassAudio:
@@ -561,6 +625,10 @@ func (d *USBClassDevicePathNode) String() string {
 	return builder.String()
 }
 
+func (d *USBClassDevicePathNode) String() string {
+	return d.ToString(DevicePathDisplayOnly)
+}
+
 func (d *USBClassDevicePathNode) Write(w io.Writer) error {
 	data := uefi.USB_CLASS_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
@@ -584,8 +652,12 @@ type USBWWIDDevicePathNode struct {
 	SerialNumber    string
 }
 
-func (d *USBWWIDDevicePathNode) String() string {
+func (d *USBWWIDDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	return fmt.Sprintf("UsbWwid(0x%x,0x%x,0x%x,\"%s\"", d.VendorId, d.ProductId, d.InterfaceNumber, d.SerialNumber)
+}
+
+func (d *USBWWIDDevicePathNode) String() string {
+	return d.ToString(DevicePathDisplayOnly)
 }
 
 func (d *USBWWIDDevicePathNode) Write(w io.Writer) error {
@@ -611,8 +683,12 @@ type DeviceLogicalUnitDevicePathNode struct {
 	LUN uint8
 }
 
-func (d *DeviceLogicalUnitDevicePathNode) String() string {
+func (d *DeviceLogicalUnitDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	return fmt.Sprintf("Unit(0x%x)", d.LUN)
+}
+
+func (d *DeviceLogicalUnitDevicePathNode) String() string {
+	return d.ToString(DevicePathDisplayOnly)
 }
 
 func (d *DeviceLogicalUnitDevicePathNode) Write(w io.Writer) error {
@@ -633,8 +709,12 @@ type SATADevicePathNode struct {
 	LUN                      uint16
 }
 
-func (d *SATADevicePathNode) String() string {
+func (d *SATADevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	return fmt.Sprintf("Sata(0x%x,0x%x,0x%x)", d.HBAPortNumber, d.PortMultiplierPortNumber, d.LUN)
+}
+
+func (d *SATADevicePathNode) String() string {
+	return d.ToString(DevicePathDisplayOnly)
 }
 
 func (d *SATADevicePathNode) Write(w io.Writer) error {
@@ -656,11 +736,15 @@ type NVMENamespaceDevicePathNode struct {
 	NamespaceUUID uint64
 }
 
-func (d *NVMENamespaceDevicePathNode) String() string {
+func (d *NVMENamespaceDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	var uuid [8]uint8
 	binary.BigEndian.PutUint64(uuid[:], d.NamespaceUUID)
 	return fmt.Sprintf("NVMe(0x%x,%02x-%02x-%02x-%02x-%02x-%02x-%02x-%02x)", d.NamespaceID,
 		uuid[0], uuid[1], uuid[2], uuid[3], uuid[4], uuid[5], uuid[6], uuid[7])
+}
+
+func (d *NVMENamespaceDevicePathNode) String() string {
+	return d.ToString(DevicePathDisplayOnly)
 }
 
 func (d *NVMENamespaceDevicePathNode) Write(w io.Writer) error {
@@ -768,13 +852,26 @@ type HardDriveDevicePathNode struct {
 	MBRType         MBRType
 }
 
-func (d *HardDriveDevicePathNode) String() string {
+func (d *HardDriveDevicePathNode) ToString(flags DevicePathToStringFlags) string {
+	var builder bytes.Buffer
+
 	switch d.Signature.Type() {
 	default:
-		return fmt.Sprintf("HD(%d,%d,0)", d.PartitionNumber, d.MBRType)
+		fmt.Fprintf(&builder, "HD(%d,%d,0", d.PartitionNumber, d.MBRType)
 	case uefi.SIGNATURE_TYPE_MBR, uefi.SIGNATURE_TYPE_GUID:
-		return fmt.Sprintf("HD(%d,%s,%s)", d.PartitionNumber, d.Signature.Type(), d.Signature)
+		fmt.Fprintf(&builder, "HD(%d,%s,%s", d.PartitionNumber, d.Signature.Type(), d.Signature)
 	}
+
+	if !flags.DisplayOnly() {
+		fmt.Fprintf(&builder, ",0x%x,0x%x", d.PartitionStart, d.PartitionSize)
+	}
+	fmt.Fprintf(&builder, ")")
+
+	return builder.String()
+}
+
+func (d *HardDriveDevicePathNode) String() string {
+	return d.ToString(DevicePathDisplayOnly)
 }
 
 func (d *HardDriveDevicePathNode) Write(w io.Writer) error {
@@ -861,8 +958,15 @@ type CDROMDevicePathNode struct {
 	PartitionSize  uint64
 }
 
+func (d *CDROMDevicePathNode) ToString(flags DevicePathToStringFlags) string {
+	if flags.DisplayOnly() {
+		return fmt.Sprintf("CDROM(0x%x)", d.BootEntry)
+	}
+	return fmt.Sprintf("CDROM(0x%x,0x%x,0x%x)", d.BootEntry, d.PartitionStart, d.PartitionSize)
+}
+
 func (d *CDROMDevicePathNode) String() string {
-	return fmt.Sprintf("CDROM(0x%x)", d.BootEntry)
+	return d.ToString(DevicePathDisplayOnly)
 }
 
 func (d *CDROMDevicePathNode) Write(w io.Writer) error {
@@ -881,8 +985,12 @@ func (d *CDROMDevicePathNode) Write(w io.Writer) error {
 // FilePathDevicePathNode corresponds to a file path device path node.
 type FilePathDevicePathNode string
 
-func (d FilePathDevicePathNode) String() string {
+func (d FilePathDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	return string(d)
+}
+
+func (d FilePathDevicePathNode) String() string {
+	return d.ToString(DevicePathDisplayOnly)
 }
 
 func (d FilePathDevicePathNode) Write(w io.Writer) error {
@@ -913,8 +1021,12 @@ func NewFilePathDevicePathNode(path string) (out FilePathDevicePathNode) {
 // MediaFvFileDevicePathNode corresponds to a firmware volume file device path node.
 type MediaFvFileDevicePathNode GUID
 
-func (d MediaFvFileDevicePathNode) String() string {
+func (d MediaFvFileDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	return fmt.Sprintf("FvFile(%s)", GUID(d))
+}
+
+func (d MediaFvFileDevicePathNode) String() string {
+	return d.ToString(DevicePathDisplayOnly)
 }
 
 func (d MediaFvFileDevicePathNode) Write(w io.Writer) error {
@@ -931,8 +1043,12 @@ func (d MediaFvFileDevicePathNode) Write(w io.Writer) error {
 // MediaFvDevicePathNode corresponds to a firmware volume device path node.
 type MediaFvDevicePathNode GUID
 
-func (d MediaFvDevicePathNode) String() string {
+func (d MediaFvDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	return fmt.Sprintf("Fv(%s)", GUID(d))
+}
+
+func (d MediaFvDevicePathNode) String() string {
+	return d.ToString(DevicePathDisplayOnly)
 }
 
 func (d MediaFvDevicePathNode) Write(w io.Writer) error {
@@ -951,8 +1067,12 @@ type MediaRelOffsetRangeDevicePathNode struct {
 	EndingOffset   uint64
 }
 
-func (d *MediaRelOffsetRangeDevicePathNode) String() string {
+func (d *MediaRelOffsetRangeDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	return fmt.Sprintf("Offset(0x%x,0x%x)", d.StartingOffset, d.EndingOffset)
+}
+
+func (d *MediaRelOffsetRangeDevicePathNode) String() string {
+	return d.ToString(DevicePathDisplayOnly)
 }
 
 func (d *MediaRelOffsetRangeDevicePathNode) Write(w io.Writer) error {

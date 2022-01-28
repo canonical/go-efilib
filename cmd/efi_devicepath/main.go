@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/canonical/go-efilib"
 	"github.com/canonical/go-efilib/linux"
 	"github.com/jessevdk/go-flags"
 )
@@ -47,6 +48,7 @@ type options struct {
 	Hexdump bool   `long:"hexdump" description:"Display a hexdump of the device path"`
 	Mode    mode   `long:"mode" short:"m" description:"Specify the mode" default:"full" choice:"full" choice:"hd" choice:"file"`
 	Output  string `long:"output" short:"o" description:"Write the binary device path to the specified file"`
+	Verbose bool   `long:"verbose" short:"v" description:"Print more verbose version of device path"`
 
 	Positional struct {
 		Filename string `positional-arg-name:"filename"`
@@ -72,7 +74,11 @@ func run() error {
 		return nil
 	}
 
-	fmt.Println(path)
+	var flags efi.DevicePathToStringFlags
+	if !opts.Verbose {
+		flags |= efi.DevicePathDisplayOnly
+	}
+	fmt.Printf("%s\n", path.ToString(flags))
 
 	if opts.Hexdump {
 		b, err := path.Bytes()
