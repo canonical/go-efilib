@@ -286,6 +286,9 @@ func (id EISAID) Product() uint16 {
 }
 
 func (id EISAID) String() string {
+	if id == 0 {
+		return "0"
+	}
 	return fmt.Sprintf("%s%04x", id.Vendor(), id.Product())
 }
 
@@ -326,7 +329,7 @@ func (d *ACPIDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 			return fmt.Sprintf("ParallelPort(0x%x)", d.UID)
 		}
 	}
-	return fmt.Sprintf("Acpi(0x%08x,0x%x)", uint32(d.HID), d.UID)
+	return fmt.Sprintf("Acpi(%s,0x%x)", d.HID, d.UID)
 }
 
 func (d *ACPIDevicePathNode) String() string {
@@ -373,30 +376,30 @@ func (d *ACPIExtendedDevicePathNode) ToString(flags DevicePathToStringFlags) str
 		return fmt.Sprintf("PcieRoot(0x%x)", d.UID)
 	}
 
-	hidStr := d.HIDStr
-	if hidStr == "" {
-		hidStr = "<nil>"
-	}
-	cidStr := d.CIDStr
-	if cidStr == "" {
-		cidStr = "<nil>"
-	}
-	uidStr := d.UIDStr
-	if uidStr == "" {
-		uidStr = "<nil>"
-	}
-
 	if !flags.DisplayOnly() {
+		hidStr := d.HIDStr
+		if hidStr == "" {
+			hidStr = "<nil>"
+		}
+		cidStr := d.CIDStr
+		if cidStr == "" {
+			cidStr = "<nil>"
+		}
+		uidStr := d.UIDStr
+		if uidStr == "" {
+			uidStr = "<nil>"
+		}
+
 		return fmt.Sprintf("AcpiEx(%s,%s,0x%x,%s,%s,%s)", d.HID, d.CID, d.UID, hidStr, cidStr, uidStr)
 	}
 
 	hidText := d.HID.String()
-	if d.HID == 0 {
-		hidText = hidStr
+	if d.HIDStr != "" {
+		hidText = d.HIDStr
 	}
 	cidText := d.CID.String()
-	if d.CID == 0 {
-		cidText = cidStr
+	if d.CIDStr != "" {
+		cidText = d.CIDStr
 	}
 
 	if d.UIDStr != "" {
@@ -490,9 +493,9 @@ type ATAPIDevicePathNode struct {
 
 func (d *ATAPIDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	if flags.DisplayOnly() {
-		return fmt.Sprintf("Ata(%d)", d.LUN)
+		return fmt.Sprintf("Ata(0x%x)", d.LUN)
 	}
-	return fmt.Sprintf("Ata(%s,%s,%d)", d.Controller, d.Drive, d.LUN)
+	return fmt.Sprintf("Ata(%s,%s,0x%x)", d.Controller, d.Drive, d.LUN)
 }
 
 func (d *ATAPIDevicePathNode) String() string {
