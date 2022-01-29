@@ -360,16 +360,13 @@ type ACPIExtendedDevicePathNode struct {
 func (d *ACPIExtendedDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	switch {
 	case d.HIDStr == "" && d.CIDStr == "" && d.UIDStr != "":
-		if d.CID == 0 {
-			return fmt.Sprintf("AcpiExp(%s,0,%s)", d.HID, d.UIDStr)
-		}
 		return fmt.Sprintf("AcpiExp(%s,%s,%s)", d.HID, d.CID, d.UIDStr)
-	case d.HID.Vendor() == "PNP" && (d.HID.Product() == 0x0a03 || (d.CID.Product() == 0x0a03 && d.HID.Product() != 0x0a08)):
+	case flags.DisplayOnly() && d.HID.Vendor() == "PNP" && (d.HID.Product() == 0x0a03 || (d.CID.Product() == 0x0a03 && d.HID.Product() != 0x0a08)):
 		if d.UIDStr != "" {
 			return fmt.Sprintf("PciRoot(%s)", d.UIDStr)
 		}
 		return fmt.Sprintf("PciRoot(0x%x)", d.UID)
-	case d.HID.Vendor() == "PNP" && (d.HID.Product() == 0x0a08 || d.CID.Product() == 0x0a08):
+	case flags.DisplayOnly() && d.HID.Vendor() == "PNP" && (d.HID.Product() == 0x0a08 || d.CID.Product() == 0x0a08):
 		if d.UIDStr != "" {
 			return fmt.Sprintf("PcieRoot(%s)", d.UIDStr)
 		}
