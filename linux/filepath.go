@@ -71,12 +71,12 @@ var (
 	errSkipDevicePathNodeHandler = errors.New("")
 )
 
-// errUnknownInterface is returned from a handler when it cannot
+// errUnsupportedDevice is returned from a handler when it cannot
 // determine the interface.
-type errUnknownInterface string
+type errUnsupportedDevice string
 
-func (e errUnknownInterface) Error() string {
-	return "cannot determine the interface: " + string(e)
+func (e errUnsupportedDevice) Error() string {
+	return "unsupported device: " + string(e)
 }
 
 type devicePathNodeHandler func(devicePathBuilder) error
@@ -199,13 +199,13 @@ func (b *devicePathBuilderImpl) processNextComponent() error {
 			continue
 		}
 		if err != nil {
-			return xerrors.Errorf("cannot execute handler %s: %w", handler.name, err)
+			return xerrors.Errorf("[handler %s]: %w", handler.name, err)
 		}
 
 		if iface != interfaceTypeUnknown && b.iface == interfaceTypeUnknown {
 			// The handler set the interface type back to unknown. Turn this
-			// in to a errUnknownInterface error.
-			return errUnknownInterface("handler " + handler.name + " could not determine the interface")
+			// in to a errUnsupportedDevice error.
+			return errUnsupportedDevice("[handler " + handler.name + "]: unrecognized interface")
 		}
 		return nil
 	}
@@ -218,7 +218,7 @@ func (b *devicePathBuilderImpl) processNextComponent() error {
 		panic(fmt.Sprintf("all handlers skipped handling interface type %v", b.iface))
 	}
 
-	return errUnknownInterface("unknown root node")
+	return errUnsupportedDevice("unhandled root node")
 }
 
 func newDevicePathBuilder(dev *dev) (*devicePathBuilderImpl, error) {
@@ -419,7 +419,7 @@ func NewFileDevicePath(path string, mode FileDevicePathMode) (out efi.DevicePath
 
 	if mode == FullPath {
 		for !builder.done() {
-			var e errUnknownInterface
+			var e errUnsupportedDevice
 
 			err := builder.processNextComponent()
 			switch {

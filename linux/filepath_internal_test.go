@@ -300,7 +300,7 @@ func (s *filepathSuite) TestDevicePathBuilderProcessNextComponentUnhandledRoot(c
 			{name: "skip2", fn: skipHandler}}})
 	defer restore()
 
-	c.Check(builder.processNextComponent(), ErrorMatches, "cannot determine the interface: unknown root node")
+	c.Check(builder.processNextComponent(), ErrorMatches, "unsupported device: unhandled root node")
 	c.Check(skipped, Equals, 1)
 	c.Check(builder.iface, Equals, interfaceTypeUnknown)
 }
@@ -323,7 +323,7 @@ func (s *filepathSuite) TestDevicePathBuilderProcessNextComponentError(c *C) {
 			{name: "pci", fn: handler}}})
 	defer restore()
 
-	c.Check(builder.processNextComponent(), ErrorMatches, "cannot execute handler pci: error")
+	c.Check(builder.processNextComponent(), ErrorMatches, "\\[handler pci\\]: error")
 	c.Check(builder.remaining, DeepEquals, []string{"0000:00:1d.0", "0000:3d:00.0", "nvme", "nvme0", "nvme0n1"})
 	c.Check(builder.processed, DeepEquals, []string{"pci0000:00"})
 }

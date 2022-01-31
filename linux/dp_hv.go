@@ -41,7 +41,7 @@ func handleHVDevicePathNode(builder devicePathBuilder) error {
 	case hvSCSIGuid:
 		builder.setInterfaceType(interfaceTypeSCSI)
 	default:
-		return errUnknownInterface("unknown device class: " + classId.String())
+		return errUnsupportedDevice("unhandled device class: " + classId.String())
 	}
 
 	data := make([]byte, len(deviceId)+len(classId))

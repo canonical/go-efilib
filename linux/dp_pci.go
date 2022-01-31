@@ -60,7 +60,7 @@ func handlePCIDevicePathNode(builder devicePathBuilder) error {
 	case bytes.HasPrefix(class, []byte{0x06, 0x04}):
 		builder.setInterfaceType(interfaceTypePCI)
 	default:
-		return errUnknownInterface("unknown device class: " + string(classBytes))
+		return errUnsupportedDevice("unhandled device class: " + string(classBytes))
 	}
 
 	builder.append(&efi.PCIDevicePathNode{
