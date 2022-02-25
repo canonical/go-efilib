@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"math"
 
 	"github.com/canonical/go-efilib/internal/ioerr"
 )
@@ -81,19 +82,26 @@ func Read_EFI_SIGNATURE_LIST(r io.Reader) (out *EFI_SIGNATURE_LIST, err error) {
 		return nil, ioerr.EOFIsUnexpected(err)
 	}
 
+	if out.SignatureHeaderSize > math.MaxUint32-ESLHeaderSize {
+		return nil, errors.New("signature header size too large")
+	}
+	if out.SignatureHeaderSize+ESLHeaderSize > out.SignatureListSize {
+		return nil, errors.New("inconsistent size fields: total signatures payload size underflows")
+	}
+	signaturesSize := out.SignatureListSize - out.SignatureHeaderSize - ESLHeaderSize
+
+	if out.SignatureSize < uint32(binary.Size(EFI_GUID{})) {
+		return nil, errors.New("invalid SignatureSize")
+	}
+	if signaturesSize%out.SignatureSize != 0 {
+		return nil, errors.New("inconsistent size fields: total signatures payload size not a multiple of the individual signature size")
+	}
+	numOfSignatures := int(signaturesSize / out.SignatureSize)
+
 	out.SignatureHeader = make([]byte, out.SignatureHeaderSize)
 	if _, err := io.ReadFull(r, out.SignatureHeader); err != nil {
 		return nil, ioerr.EOFIsUnexpected(err)
 	}
-
-	signaturesSize := out.SignatureListSize - out.SignatureHeaderSize - ESLHeaderSize
-	if signaturesSize%out.SignatureSize != 0 {
-		return nil, errors.New("inconsistent size fields")
-	}
-	if out.SignatureSize < uint32(binary.Size(EFI_GUID{})) {
-		return nil, errors.New("invalid SignatureSize")
-	}
-	numOfSignatures := int(signaturesSize / out.SignatureSize)
 
 	for i := 0; i < numOfSignatures; i++ {
 		var s EFI_SIGNATURE_DATA

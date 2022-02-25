@@ -302,17 +302,44 @@ func (s *dbSuite) TestReadSignatureDatabase4(c *C) {
 		db:   db})
 }
 
-func (s *dbSuite) TestReadSignatureListWithInconsistentSizeFields(c *C) {
-	f, err := os.Open("testdata/sigdbs/inconsistent-sizes.siglist")
+func (s *dbSuite) TestReadSignatureListWithInvalidSignatureHeaderField(c *C) {
+	f, err := os.Open("testdata/sigdbs/invalid-sigheader-size.siglist")
 	c.Assert(err, IsNil)
 	defer f.Close()
 
 	_, err = ReadSignatureDatabase(f)
-	c.Check(err, ErrorMatches, "cannot read EFI_SIGNATURE_LIST 1: inconsistent size fields")
+	c.Check(err, ErrorMatches, "cannot read EFI_SIGNATURE_LIST 0: signature header size too large")
+}
+
+func (s *dbSuite) TestReadSignatureListWithInconsistentSizeFields1(c *C) {
+	f, err := os.Open("testdata/sigdbs/inconsistent-sizes1.siglist")
+	c.Assert(err, IsNil)
+	defer f.Close()
+
+	_, err = ReadSignatureDatabase(f)
+	c.Check(err, ErrorMatches, "cannot read EFI_SIGNATURE_LIST 0: inconsistent size fields: total signatures payload size underflows")
+}
+
+func (s *dbSuite) TestReadSignatureListWithInconsistentSizeFields(c *C) {
+	f, err := os.Open("testdata/sigdbs/inconsistent-sizes2.siglist")
+	c.Assert(err, IsNil)
+	defer f.Close()
+
+	_, err = ReadSignatureDatabase(f)
+	c.Check(err, ErrorMatches, "cannot read EFI_SIGNATURE_LIST 1: inconsistent size fields: total signatures payload size not a multiple of the individual signature size")
 }
 
 func (s *dbSuite) TestReadSignatureListWithInvalidSignatureSize(c *C) {
 	f, err := os.Open("testdata/sigdbs/invalid-signature-size.siglist")
+	c.Assert(err, IsNil)
+	defer f.Close()
+
+	_, err = ReadSignatureDatabase(f)
+	c.Check(err, ErrorMatches, "cannot read EFI_SIGNATURE_LIST 0: invalid SignatureSize")
+}
+
+func (s *dbSuite) TestReadSignatureListWithInvalidSignatureSizeDivideByZero(c *C) {
+	f, err := os.Open("testdata/sigdbs/invalid-signature-size-divide-by-zero.siglist")
 	c.Assert(err, IsNil)
 	defer f.Close()
 
