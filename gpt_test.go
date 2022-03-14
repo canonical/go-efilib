@@ -231,13 +231,12 @@ func (s *gptSuite) TestWritePartitionEntry2(c *C) {
 }
 
 type testReadPartitionTableData struct {
-	path                  string
-	role                  PartitionTableRole
-	checkCrc              bool
-	expectedGUID          GUID
-	expectedEntries       map[int]*PartitionEntry
-	expectedEntriesLength int
-	errMatch              string
+	path            string
+	role            PartitionTableRole
+	checkCrc        bool
+	expectedHeader  *PartitionTableHeader
+	expectedEntries map[int]*PartitionEntry
+	errMatch        string
 }
 
 func (s *gptSuite) testReadPartitionTable(c *C, data *testReadPartitionTableData) {
@@ -250,9 +249,9 @@ func (s *gptSuite) testReadPartitionTable(c *C, data *testReadPartitionTableData
 
 	table, err := ReadPartitionTable(f, fi.Size(), 512, data.role, data.checkCrc)
 	if data.errMatch == "" {
-		c.Check(err, IsNil)
-		c.Check(table.DiskGUID, DeepEquals, data.expectedGUID)
-		c.Assert(table.Entries, HasLen, data.expectedEntriesLength)
+		c.Assert(err, IsNil)
+		c.Check(table.Hdr, DeepEquals, data.expectedHeader)
+		c.Assert(table.Entries, HasLen, int(data.expectedHeader.NumberOfPartitionEntries))
 		expected := make([]*PartitionEntry, len(table.Entries))
 		for i := 0; i < len(expected); i++ {
 			expected[i] = new(PartitionEntry)
@@ -268,10 +267,21 @@ func (s *gptSuite) testReadPartitionTable(c *C, data *testReadPartitionTableData
 
 func (s *gptSuite) TestReadPartitionTable1(c *C) {
 	s.testReadPartitionTable(c, &testReadPartitionTableData{
-		path:         "testdata/partitiontables/cloudimg",
-		role:         PrimaryPartitionTable,
-		checkCrc:     true,
-		expectedGUID: MakeGUID(0x2dbb8d7d, 0x5972, 0x4517, 0x9c5a, [...]uint8{0x2d, 0xb1, 0x11, 0x95, 0x85, 0x01}),
+		path:     "testdata/partitiontables/cloudimg",
+		role:     PrimaryPartitionTable,
+		checkCrc: true,
+		expectedHeader: &PartitionTableHeader{
+			HeaderSize:               0x5c,
+			MyLBA:                    0x1,
+			AlternateLBA:             0x465fff,
+			FirstUsableLBA:           0x22,
+			LastUsableLBA:            0x465fde,
+			DiskGUID:                 MakeGUID(0x2dbb8d7d, 0x5972, 0x4517, 0x9c5a, [...]uint8{0x2d, 0xb1, 0x11, 0x95, 0x85, 0x01}),
+			PartitionEntryLBA:        0x2,
+			NumberOfPartitionEntries: 0x80,
+			SizeOfPartitionEntry:     0x80,
+			PartitionEntryArrayCRC32: 0x217da93b,
+		},
 		expectedEntries: map[int]*PartitionEntry{
 			0: &PartitionEntry{
 				PartitionTypeGUID:   MakeGUID(0x0fc63daf, 0x8483, 0x4772, 0x8e79, [...]uint8{0x3d, 0x69, 0xd8, 0x47, 0x7d, 0xe4}),
@@ -289,7 +299,6 @@ func (s *gptSuite) TestReadPartitionTable1(c *C) {
 				StartingLBA:         10240,
 				EndingLBA:           227327},
 		},
-		expectedEntriesLength: 128,
 	})
 }
 
@@ -313,9 +322,20 @@ func (s *gptSuite) TestReadPartitionTable3(c *C) {
 
 func (s *gptSuite) TestReadPartitionTable4(c *C) {
 	s.testReadPartitionTable(c, &testReadPartitionTableData{
-		path:         "testdata/partitiontables/cloudimg-invalid-hdr-checksum",
-		role:         PrimaryPartitionTable,
-		expectedGUID: MakeGUID(0x2dbb8d7d, 0x5972, 0x4517, 0x9c5a, [...]uint8{0x2d, 0xb1, 0x11, 0x95, 0x85, 0x01}),
+		path: "testdata/partitiontables/cloudimg-invalid-hdr-checksum",
+		role: PrimaryPartitionTable,
+		expectedHeader: &PartitionTableHeader{
+			HeaderSize:               0x5c,
+			MyLBA:                    0x1,
+			AlternateLBA:             0x465fff,
+			FirstUsableLBA:           0x22,
+			LastUsableLBA:            0x465fde,
+			DiskGUID:                 MakeGUID(0x2dbb8d7d, 0x5972, 0x4517, 0x9c5a, [...]uint8{0x2d, 0xb1, 0x11, 0x95, 0x85, 0x01}),
+			PartitionEntryLBA:        0x2,
+			NumberOfPartitionEntries: 0x80,
+			SizeOfPartitionEntry:     0x80,
+			PartitionEntryArrayCRC32: 0x217da93b,
+		},
 		expectedEntries: map[int]*PartitionEntry{
 			0: &PartitionEntry{
 				PartitionTypeGUID:   MakeGUID(0x0fc63daf, 0x8483, 0x4772, 0x8e79, [...]uint8{0x3d, 0x69, 0xd8, 0x47, 0x7d, 0xe4}),
@@ -333,16 +353,26 @@ func (s *gptSuite) TestReadPartitionTable4(c *C) {
 				StartingLBA:         10240,
 				EndingLBA:           227327},
 		},
-		expectedEntriesLength: 128,
 	})
 }
 
 func (s *gptSuite) TestReadPartitionTable5(c *C) {
 	s.testReadPartitionTable(c, &testReadPartitionTableData{
-		path:         "testdata/partitiontables/backup",
-		role:         BackupPartitionTable,
-		checkCrc:     true,
-		expectedGUID: MakeGUID(0x0eab22a8, 0x78e2, 0x9b4d, 0xb3fa, [...]uint8{0x7f, 0xdb, 0x73, 0x66, 0xd1, 0x5c}),
+		path:     "testdata/partitiontables/backup",
+		role:     BackupPartitionTable,
+		checkCrc: true,
+		expectedHeader: &PartitionTableHeader{
+			HeaderSize:               0x5c,
+			MyLBA:                    0x1ff,
+			AlternateLBA:             0x1,
+			FirstUsableLBA:           0x22,
+			LastUsableLBA:            0x1de,
+			DiskGUID:                 MakeGUID(0x0eab22a8, 0x78e2, 0x9b4d, 0xb3fa, [...]uint8{0x7f, 0xdb, 0x73, 0x66, 0xd1, 0x5c}),
+			PartitionEntryLBA:        0x1df,
+			NumberOfPartitionEntries: 0x80,
+			SizeOfPartitionEntry:     0x80,
+			PartitionEntryArrayCRC32: 0x9bc862a2,
+		},
 		expectedEntries: map[int]*PartitionEntry{
 			0: &PartitionEntry{
 				PartitionTypeGUID:   MakeGUID(0x0fc63daf, 0x8483, 0x4772, 0x8e79, [...]uint8{0x3d, 0x69, 0xd8, 0x47, 0x7d, 0xe4}),
@@ -360,7 +390,6 @@ func (s *gptSuite) TestReadPartitionTable5(c *C) {
 				StartingLBA:         434,
 				EndingLBA:           478},
 		},
-		expectedEntriesLength: 128,
 	})
 }
 

@@ -84,6 +84,14 @@ func (h *PartitionTableHeader) Write(w io.Writer) error {
 	return err
 }
 
+func (h *PartitionTableHeader) String() string {
+	return fmt.Sprintf("EFI_PARTITION_TABLE_HEADER{ MyLBA: 0x%x, AlternateLBA: 0x%x, FirstUsableLBA: 0x%x, "+
+		"LastUsableLBA: 0x%x, DiskGUID: %v, PartitionEntryLBA: 0x%x, NumberOfPartitionEntries: %d, "+
+		"SizeOfPartitionEntry: 0x%x, PartitionEntryArrayCRC32: 0x%08x }",
+		h.MyLBA, h.AlternateLBA, h.FirstUsableLBA, h.LastUsableLBA, h.DiskGUID, h.PartitionEntryLBA,
+		h.NumberOfPartitionEntries, h.SizeOfPartitionEntry, h.PartitionEntryArrayCRC32)
+}
+
 // ReadPartitionTableHeader reads a EFI_PARTITION_TABLE_HEADER from the supplied io.Reader.
 // If the header signature or revision is incorrect, an error will be returned. If
 // checkCrc is true and the header has an invalid CRC, an error will be returned.
@@ -127,7 +135,9 @@ type PartitionEntry struct {
 }
 
 func (e *PartitionEntry) String() string {
-	return fmt.Sprintf("PartitionTypeGUID: %s, UniquePartitionGUID: %s, PartitionName: \"%s\"", e.PartitionTypeGUID, e.UniquePartitionGUID, e.PartitionName)
+	return fmt.Sprintf("EFI_PARTITION_ENTRY{ PartitionTypeGUID: %s, UniquePartitionGUID: %s, StartingLBA: 0x%x, "+
+		"EndingLBA: 0x%x, Attributes: 0x%016x, PartitionName: \"%s\" }",
+		e.PartitionTypeGUID, e.UniquePartitionGUID, e.StartingLBA, e.EndingLBA, e.Attributes, e.PartitionName)
 }
 
 // Write serializes this PartitionEntry to w. Note that it doesn't write
@@ -220,8 +230,18 @@ const (
 
 // PartitionTable describes a complete GUID partition table.
 type PartitionTable struct {
-	DiskGUID GUID
-	Entries  []*PartitionEntry
+	Hdr     *PartitionTableHeader
+	Entries []*PartitionEntry
+}
+
+func (t *PartitionTable) String() string {
+	b := new(bytes.Buffer)
+	fmt.Fprintf(b, "GPT{\n\tHdr: %s,\n\tEntries: [", t.Hdr)
+	for _, entry := range t.Entries {
+		fmt.Fprintf(b, "\n\t\t%s", entry)
+	}
+	fmt.Fprintf(b, "\n\t]\n}")
+	return b.String()
 }
 
 // ReadPartitionTable reads a complete GUID partition table from the supplied
@@ -303,5 +323,5 @@ func ReadPartitionTable(r io.ReaderAt, totalSz, blockSz int64, role PartitionTab
 		return nil, err
 	}
 
-	return &PartitionTable{hdr.DiskGUID, entries}, nil
+	return &PartitionTable{hdr, entries}, nil
 }
