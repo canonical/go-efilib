@@ -16,6 +16,7 @@ import (
 	"syscall"
 
 	"golang.org/x/sys/unix"
+	"golang.org/x/xerrors"
 
 	internal_unix "github.com/canonical/go-efilib/internal/unix"
 )
@@ -107,12 +108,41 @@ func maybeRetry(n int, fn func() (bool, error)) error {
 	}
 }
 
-func writeEfivarfsFile(path string, attrs VariableAttributes, data []byte) (retry bool, err error) {
-	flags := os.O_WRONLY | os.O_CREATE
-	if attrs&AttributeAppendWrite != 0 {
-		flags |= os.O_APPEND
+func processEfivarfsFileAccessError(err error) (retry bool, errOut error) {
+	if os.IsPermission(err) {
+		var se syscall.Errno
+		if !xerrors.As(err, &se) {
+			// This shouldn't happen, but just return ErrVarPermission
+			// in this case and don't retry.
+			return false, ErrVarPermission
+		}
+		if se == syscall.EACCES {
+			// open will fail with EACCES if we lack the privileges
+			// to write to the file.
+			// open will fail with EACCES if we lack the privileges
+			// to write to the parent directory in the case where we
+			// need to create a new file.
+			// unlink will fail with EACCES if we lack the privileges
+			// to write to the parent directory.
+			// Don't retry in these cases.
+			return false, ErrVarPermission
+		}
+
+		// open and unlink will fail with EPERM if the file exists but
+		// it is immutable. This might happen as a result of a race with
+		// another process that might have been writing to the variable
+		// or may have deleted and recreated it, making the underlying
+		// inode immutable again.
+		// Retry in this case.
+		return true, ErrVarPermission
 	}
 
+	// Don't retry for any other error.
+	return false, err
+}
+
+func writeEfivarfsFile(path string, attrs VariableAttributes, data []byte) (retry bool, err error) {
+	// Open for reading to make the inode mutable
 	r, err := openVarFile(path, os.O_RDONLY, 0)
 	switch {
 	case os.IsNotExist(err):
@@ -130,33 +160,22 @@ func writeEfivarfsFile(path string, attrs VariableAttributes, data []byte) (retr
 		case err != nil:
 			return false, err
 		}
+
 		defer restoreImmutable()
 	}
 
-	w, err := openVarFile(path, flags, 0644)
-	switch {
-	case os.IsPermission(err):
-		pe, ok := err.(*os.PathError)
-		if !ok {
-			return false, err
-		}
-		if pe.Err == syscall.EACCES {
-			// open will fail with EACCES if we lack the privileges
-			// to write to the file or the parent directory in the
-			// case where we need to create a new file. Don't retry
-			// in this case.
-			return false, ErrVarPermission
-		}
+	if len(data) == 0 {
+		return processEfivarfsFileAccessError(removeVarFile(path))
+	}
 
-		// open will fail with EPERM if the file exists but we can't
-		// write to it because it is immutable. This might happen as a
-		// result of a race with another process that might have been
-		// writing to the variable or may have deleted and recreated
-		// it, making the underlying inode immutable again. Retry in
-		// this case.
-		return true, ErrVarPermission
-	case err != nil:
-		return false, err
+	flags := os.O_WRONLY | os.O_CREATE
+	if attrs&AttributeAppendWrite != 0 {
+		flags |= os.O_APPEND
+	}
+
+	w, err := openVarFile(path, flags, 0644)
+	if err != nil {
+		return processEfivarfsFileAccessError(err)
 	}
 	defer w.Close()
 

@@ -231,10 +231,25 @@ func (m *mockEfiVarfs) Open(name string, flags int, perm os.FileMode) (VarFile, 
 	}
 }
 
+func (m *mockEfiVarfs) Remove(path string) error {
+	v, ok := m.vars[path]
+	if !ok {
+		return &os.PathError{Op: "unlink", Path: path, Err: syscall.EEXIST}
+	}
+
+	if v.flags&immutableFlag != 0 {
+		return &os.PathError{Op: "open", Path: path, Err: syscall.EPERM}
+	}
+
+	delete(m.vars, path)
+	return nil
+}
+
 type varsLinuxSuite struct {
-	mockEfiVarfs       *mockEfiVarfs
-	restoreBackend     func()
-	restoreOpenVarFile func()
+	mockEfiVarfs         *mockEfiVarfs
+	restoreBackend       func()
+	restoreOpenVarFile   func()
+	restoreRemoveVarFile func()
 }
 
 func (s *varsLinuxSuite) SetUpTest(c *C) {
@@ -242,9 +257,11 @@ func (s *varsLinuxSuite) SetUpTest(c *C) {
 	s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c"] = &mockEfiVar{data: DecodeHexString(c, "0600000001"), flags: immutableFlag}
 	s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/BootOrder-8be4df61-93ca-11d2-aa0d-00e098032b8c"] = &mockEfiVar{data: DecodeHexString(c, "070000000000")}
 	s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"] = &mockEfiVar{data: DecodeHexString(c, "07000000a5a5a5a5"), flags: immutableFlag}
+	s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/Test2-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"] = &mockEfiVar{data: DecodeHexString(c, "070000005a5a5a5a")}
 
 	s.restoreBackend = MockVarsBackend(EfivarfsVarsBackend{})
 	s.restoreOpenVarFile = MockOpenVarFile(s.mockEfiVarfs.Open)
+	s.restoreRemoveVarFile = MockRemoveVarFile(s.mockEfiVarfs.Remove)
 }
 
 func (s *varsLinuxSuite) TearDownTest(c *C) {
@@ -339,14 +356,32 @@ func (s *varsLinuxSuite) TestWriteVariableAppend(c *C) {
 }
 
 func (s *varsLinuxSuite) TestCreateVariable(c *C) {
-	err := WriteVariable("Test2", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}),
+	err := WriteVariable("Test3", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}),
 		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, DecodeHexString(c, "a5a5a5a5"))
 	c.Assert(err, IsNil)
 
-	v, ok := s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/Test2-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"]
+	v, ok := s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/Test3-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"]
 	c.Check(ok, Equals, true)
 	c.Check(v.data, DeepEquals, DecodeHexString(c, "07000000a5a5a5a5"))
 	c.Check(v.mode, Equals, os.FileMode(0644))
+}
+
+func (s *varsLinuxSuite) TestDeleteVariableImmutable(c *C) {
+	err := WriteVariable("Test", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}),
+		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, nil)
+	c.Check(err, IsNil)
+
+	_, ok := s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"]
+	c.Check(ok, Equals, false)
+}
+
+func (s *varsLinuxSuite) TestDeleteVariableMutable(c *C) {
+	err := WriteVariable("Test2", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}),
+		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, nil)
+	c.Check(err, IsNil)
+
+	_, ok := s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/Test2-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"]
+	c.Check(ok, Equals, false)
 }
 
 func (s *varsLinuxSuite) TestWriteVariableEACCES(c *C) {
@@ -415,13 +450,55 @@ func (s *varsLinuxSuite) TestWriteVariableRaceGiveUp(c *C) {
 	c.Check(count, Equals, 5)
 }
 
+func (s *varsLinuxSuite) TestDeleteVariableRace(c *C) {
+	var restore func()
+	restore = MockRemoveVarFile(func(path string) error {
+		// Simulate another process flipping the immutable flag back
+		s.mockEfiVarfs.vars[path].flags = immutableFlag
+		restore()
+		restore = nil
+
+		return Defer
+	})
+	defer func() {
+		if restore == nil {
+			return
+		}
+		restore()
+	}()
+
+	err := WriteVariable("Test", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}),
+		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, nil)
+	c.Check(err, IsNil)
+
+	_, ok := s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/Test-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"]
+	c.Check(ok, Equals, false)
+}
+
+func (s *varsLinuxSuite) TestDeleteVariableRaceGiveUp(c *C) {
+	count := 0
+	restore := MockRemoveVarFile(func(path string) error {
+		// Simulate another process flipping the immutable flag back
+		s.mockEfiVarfs.vars[path].flags = immutableFlag
+		count += 1
+		return Defer
+	})
+	defer restore()
+
+	err := WriteVariable("Test", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}),
+		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, nil)
+	c.Check(err, Equals, ErrVarPermission)
+	c.Check(count, Equals, 5)
+}
+
 func (s *varsLinuxSuite) TestListVariables(c *C) {
 	ents, err := ListVariables()
 	c.Check(err, IsNil)
 	c.Check(ents, DeepEquals, []VariableDescriptor{
 		{Name: "BootOrder", GUID: MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c})},
 		{Name: "SecureBoot", GUID: MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c})},
-		{Name: "Test", GUID: MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20})}})
+		{Name: "Test", GUID: MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20})},
+		{Name: "Test2", GUID: MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20})}})
 }
 
 func (s *varsLinuxSuite) TestListVariablesInvalidNames(c *C) {

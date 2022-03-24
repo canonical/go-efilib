@@ -5,10 +5,13 @@
 package efi
 
 import (
+	"os"
+
 	"golang.org/x/sys/unix"
 )
 
 var (
-	openVarFile = realOpenVarFile
-	unixStatfs  = unix.Statfs
+	openVarFile   = realOpenVarFile
+	removeVarFile = os.Remove
+	unixStatfs    = unix.Statfs
 )
