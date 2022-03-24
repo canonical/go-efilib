@@ -34,6 +34,22 @@ func MockOpenVarFile(fn func(string, int, os.FileMode) (VarFile, error)) (restor
 	}
 }
 
+func MockRemoveVarFile(fn func(string) error) (restore func()) {
+	orig := removeVarFile
+
+	removeVarFile = func(path string) error {
+		err := fn(path)
+		if err == Defer {
+			return orig(path)
+		}
+		return err
+	}
+
+	return func() {
+		removeVarFile = orig
+	}
+}
+
 func MockUnixStatfs(fn func(string, *unix.Statfs_t) error) (restore func()) {
 	orig := unixStatfs
 	unixStatfs = fn
