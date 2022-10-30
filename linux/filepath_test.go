@@ -30,7 +30,7 @@ func (s *filepathSuite) mockOsOpen(m map[string]string) (restore func()) {
 
 var _ = Suite(&filepathSuite{})
 
-func (s *filepathSuite) TestNewFileDevicePathShortFormFile(c *C) {
+func (s *filepathSuite) TestFilePathToDevicePathShortFormFile(c *C) {
 	restore := s.MockFilepathEvalSymlinks(map[string]string{})
 	defer restore()
 	restore = MockMountsPath("testdata/mounts-nvme")
@@ -38,12 +38,12 @@ func (s *filepathSuite) TestNewFileDevicePathShortFormFile(c *C) {
 	restore = MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restore()
 
-	path, err := NewFileDevicePath("/boot/efi/EFI/ubuntu/shimx64.efi", ShortFormPathFile)
+	path, err := FilePathToDevicePath("/boot/efi/EFI/ubuntu/shimx64.efi", ShortFormPathFile)
 	c.Check(err, IsNil)
 	c.Check(path, DeepEquals, efi.DevicePath{efi.FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")})
 }
 
-func (s *filepathSuite) TestNewFileDevicePathShortFormHD(c *C) {
+func (s *filepathSuite) TestFilePathToDevicePathShortFormHD(c *C) {
 	restore := s.MockFilepathEvalSymlinks(map[string]string{})
 	defer restore()
 	restore = MockMountsPath("testdata/mounts-nvme")
@@ -53,7 +53,7 @@ func (s *filepathSuite) TestNewFileDevicePathShortFormHD(c *C) {
 	restore = MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restore()
 
-	path, err := NewFileDevicePath("/boot/efi/EFI/ubuntu/shimx64.efi", ShortFormPathHD)
+	path, err := FilePathToDevicePath("/boot/efi/EFI/ubuntu/shimx64.efi", ShortFormPathHD)
 	c.Check(err, IsNil)
 	c.Check(path, DeepEquals, efi.DevicePath{
 		&efi.HardDriveDevicePathNode{
@@ -65,7 +65,7 @@ func (s *filepathSuite) TestNewFileDevicePathShortFormHD(c *C) {
 		efi.FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")})
 }
 
-func (s *filepathSuite) TestNewFileDevicePathShortFormHDUnpartitioned(c *C) {
+func (s *filepathSuite) TestFilePathToDevicePathShortFormHDUnpartitioned(c *C) {
 	restore := s.MockFilepathEvalSymlinks(map[string]string{})
 	defer restore()
 	restore = MockMountsPath("testdata/mounts-nvme")
@@ -73,11 +73,11 @@ func (s *filepathSuite) TestNewFileDevicePathShortFormHDUnpartitioned(c *C) {
 	restore = MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restore()
 
-	_, err := NewFileDevicePath("/snap/core/11993/bin/ls", ShortFormPathHD)
+	_, err := FilePathToDevicePath("/snap/core/11993/bin/ls", ShortFormPathHD)
 	c.Check(err, ErrorMatches, "cannot map file path to a UEFI device path: file is not inside partitioned media - use linux.ShortFormPathFile")
 }
 
-func (s *filepathSuite) TestNewFileDevicePathFullNVME(c *C) {
+func (s *filepathSuite) TestFilePathToDevicePathFullNVME(c *C) {
 	restore := s.MockFilepathEvalSymlinks(map[string]string{})
 	defer restore()
 	restore = MockMountsPath("testdata/mounts-nvme")
@@ -87,7 +87,7 @@ func (s *filepathSuite) TestNewFileDevicePathFullNVME(c *C) {
 	restore = MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restore()
 
-	path, err := NewFileDevicePath("/boot/efi/EFI/ubuntu/shimx64.efi", FullPath)
+	path, err := FilePathToDevicePath("/boot/efi/EFI/ubuntu/shimx64.efi", FullPath)
 	c.Check(err, IsNil)
 	c.Check(path, DeepEquals, efi.DevicePath{
 		&efi.ACPIDevicePathNode{HID: 0x0a0341d0},
@@ -103,7 +103,7 @@ func (s *filepathSuite) TestNewFileDevicePathFullNVME(c *C) {
 		efi.FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")})
 }
 
-func (s *filepathSuite) TestNewFileDevicePathFullSATA(c *C) {
+func (s *filepathSuite) TestFilePathToDevicePathFullSATA(c *C) {
 	restore := s.MockFilepathEvalSymlinks(map[string]string{})
 	defer restore()
 	restore = MockMountsPath("testdata/mounts-sata")
@@ -113,7 +113,7 @@ func (s *filepathSuite) TestNewFileDevicePathFullSATA(c *C) {
 	restore = MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restore()
 
-	path, err := NewFileDevicePath("/boot/efi/EFI/ubuntu/shimx64.efi", FullPath)
+	path, err := FilePathToDevicePath("/boot/efi/EFI/ubuntu/shimx64.efi", FullPath)
 	c.Check(err, IsNil)
 	c.Check(path, DeepEquals, efi.DevicePath{
 		&efi.ACPIDevicePathNode{HID: 0x0a0341d0},
@@ -130,7 +130,7 @@ func (s *filepathSuite) TestNewFileDevicePathFullSATA(c *C) {
 		efi.FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")})
 }
 
-func (s *filepathSuite) TestNewFileDevicePathFullNoDevicePath(c *C) {
+func (s *filepathSuite) TestFilePathToDevicePathFullNoDevicePath(c *C) {
 	restore := s.MockFilepathEvalSymlinks(map[string]string{})
 	defer restore()
 	restore = MockMountsPath("testdata/mounts-nvme")
@@ -140,11 +140,11 @@ func (s *filepathSuite) TestNewFileDevicePathFullNoDevicePath(c *C) {
 	restore = MockSysfsPath(sysfs)
 	defer restore()
 
-	_, err := NewFileDevicePath("/snap/core/11993/bin/ls", FullPath)
+	_, err := FilePathToDevicePath("/snap/core/11993/bin/ls", FullPath)
 	c.Check(err, ErrorMatches, "cannot map file path to a UEFI device path: encountered an error when handling components virtual/block/loop1 from device path "+sysfs+"/devices/virtual/block/loop1: \\[handler virtual\\]: unsupported device: virtual devices are not supported")
 }
 
-func (s *filepathSuite) TestNewFileDevicePathFullWithBindMount(c *C) {
+func (s *filepathSuite) TestFilePathToDevicePathFullWithBindMount(c *C) {
 	restore := s.MockFilepathEvalSymlinks(map[string]string{})
 	defer restore()
 	restore = MockMountsPath("testdata/mounts-nvme")
@@ -154,7 +154,7 @@ func (s *filepathSuite) TestNewFileDevicePathFullWithBindMount(c *C) {
 	restore = MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restore()
 
-	path, err := NewFileDevicePath("/efi/ubuntu/shimx64.efi", FullPath)
+	path, err := FilePathToDevicePath("/efi/ubuntu/shimx64.efi", FullPath)
 	c.Check(err, IsNil)
 	c.Check(path, DeepEquals, efi.DevicePath{
 		&efi.ACPIDevicePathNode{HID: 0x0a0341d0},
@@ -170,7 +170,7 @@ func (s *filepathSuite) TestNewFileDevicePathFullWithBindMount(c *C) {
 		efi.FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")})
 }
 
-func (s *filepathSuite) TestNewFileDevicePathFullWithSymlink(c *C) {
+func (s *filepathSuite) TestFilePathToDevicePathFullWithSymlink(c *C) {
 	restore := s.MockFilepathEvalSymlinks(map[string]string{"/foo/bar/shimx64.efi": "/efi/ubuntu/shimx64.efi"})
 	defer restore()
 	restore = MockMountsPath("testdata/mounts-nvme")
@@ -180,7 +180,7 @@ func (s *filepathSuite) TestNewFileDevicePathFullWithSymlink(c *C) {
 	restore = MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restore()
 
-	path, err := NewFileDevicePath("/foo/bar/shimx64.efi", FullPath)
+	path, err := FilePathToDevicePath("/foo/bar/shimx64.efi", FullPath)
 	c.Check(err, IsNil)
 	c.Check(path, DeepEquals, efi.DevicePath{
 		&efi.ACPIDevicePathNode{HID: 0x0a0341d0},
