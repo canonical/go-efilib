@@ -15,10 +15,10 @@ import (
 	"github.com/jessevdk/go-flags"
 )
 
-type mode linux.FileDevicePathMode
+type mode linux.FilePathToDevicePathMode
 
 func (m mode) MarshalFlag() (string, error) {
-	switch linux.FileDevicePathMode(m) {
+	switch linux.FilePathToDevicePathMode(m) {
 	case linux.FullPath:
 		return "full", nil
 	case linux.ShortFormPathHD:
@@ -62,7 +62,7 @@ func run() error {
 		return err
 	}
 
-	path, err := linux.NewFileDevicePath(opts.Positional.Filename, linux.FileDevicePathMode(opts.Mode))
+	path, err := linux.FilePathToDevicePath(opts.Positional.Filename, linux.FilePathToDevicePathMode(opts.Mode))
 	if err != nil {
 		return err
 	}
