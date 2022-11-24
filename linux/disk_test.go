@@ -7,7 +7,7 @@ package linux_test
 import (
 	. "gopkg.in/check.v1"
 
-	"github.com/canonical/go-efilib"
+	efi "github.com/canonical/go-efilib"
 	. "github.com/canonical/go-efilib/linux"
 )
 
@@ -21,7 +21,7 @@ type testNewHardDriveDevicePathNodeFromDeviceData struct {
 }
 
 func (s *diskSuite) testNewHardDriveDevicePathNodeFromDevice(c *C, data *testNewHardDriveDevicePathNodeFromDeviceData) {
-	node, err := NewHardDriveDevicePathNodeFromDevice("../testdata/partitiontables/cloudimg", data.part)
+	node, err := NewHardDriveDevicePathNodeFromDevice("../testdata/partitiontables/valid", data.part)
 	c.Assert(err, IsNil)
 	c.Check(node, DeepEquals, data.expected)
 }
@@ -31,19 +31,19 @@ func (s *diskSuite) TestNewHardDriveDevicePathNodeFromDevice1(c *C) {
 		part: 1,
 		expected: &efi.HardDriveDevicePathNode{
 			PartitionNumber: 1,
-			PartitionStart:  0x37800,
-			PartitionSize:   0x42e7df,
-			Signature:       efi.GUIDHardDriveSignature(efi.MakeGUID(0x15eae969, 0x91f2, 0x437b, 0x95cc, [...]uint8{0xec, 0x11, 0xd3, 0x40, 0x95, 0x9b})),
+			PartitionStart:  0x22,
+			PartitionSize:   0x12c,
+			Signature:       efi.GUIDHardDriveSignature(efi.MakeGUID(0x506fddfc, 0xad5e, 0x4548, 0xb7dd, [...]uint8{0xe7, 0x73, 0x62, 0x17, 0x5c, 0x31})),
 			MBRType:         efi.GPT}})
 }
 
 func (s *diskSuite) TestNewHardDriveDevicePathNodeFromDevice2(c *C) {
 	s.testNewHardDriveDevicePathNodeFromDevice(c, &testNewHardDriveDevicePathNodeFromDeviceData{
-		part: 14,
+		part: 3,
 		expected: &efi.HardDriveDevicePathNode{
-			PartitionNumber: 14,
-			PartitionStart:  0x800,
-			PartitionSize:   0x2000,
-			Signature:       efi.GUIDHardDriveSignature(efi.MakeGUID(0x71c94a7b, 0xfa01, 0x416c, 0x9cdd, [...]uint8{0x60, 0x02, 0x5b, 0x54, 0xd8, 0xd2})),
+			PartitionNumber: 3,
+			PartitionStart:  0x1b2,
+			PartitionSize:   0x2d,
+			Signature:       efi.GUIDHardDriveSignature(efi.MakeGUID(0x94da1fcc, 0x1c0f, 0x5645, 0xabf9, [...]uint8{0xff, 0x9a, 0xc4, 0x68, 0x24, 0x2d})),
 			MBRType:         efi.GPT}})
 }

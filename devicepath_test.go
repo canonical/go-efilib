@@ -164,7 +164,7 @@ type testNewHardDriveDevicePathNodeFromDeviceData struct {
 }
 
 func (d *dpSuite) testNewHardDriveDevicePathNodeFromDevice(c *C, data *testNewHardDriveDevicePathNodeFromDeviceData) {
-	f, err := os.Open("testdata/partitiontables/cloudimg")
+	f, err := os.Open("testdata/partitiontables/valid")
 	c.Assert(err, IsNil)
 	defer f.Close()
 
@@ -181,30 +181,29 @@ func (d *dpSuite) TestNewHardDriveDevicePathNodeFromDevice1(c *C) {
 		part: 1,
 		expected: &HardDriveDevicePathNode{
 			PartitionNumber: 1,
-			PartitionStart:  0x37800,
-			PartitionSize:   0x42e7df,
-			Signature:       GUIDHardDriveSignature(MakeGUID(0x15eae969, 0x91f2, 0x437b, 0x95cc, [...]uint8{0xec, 0x11, 0xd3, 0x40, 0x95, 0x9b})),
+			PartitionStart:  0x22,
+			PartitionSize:   0x12c,
+			Signature:       GUIDHardDriveSignature(MakeGUID(0x506fddfc, 0xad5e, 0x4548, 0xb7dd, [...]uint8{0xe7, 0x73, 0x62, 0x17, 0x5c, 0x31})),
 			MBRType:         GPT}})
 }
 
 func (d *dpSuite) TestNewHardDriveDevicePathNodeFromDevice2(c *C) {
 	d.testNewHardDriveDevicePathNodeFromDevice(c, &testNewHardDriveDevicePathNodeFromDeviceData{
-		part: 14,
+		part: 3,
 		expected: &HardDriveDevicePathNode{
-			PartitionNumber: 14,
-			PartitionStart:  0x800,
-			PartitionSize:   0x2000,
-			Signature:       GUIDHardDriveSignature(MakeGUID(0x71c94a7b, 0xfa01, 0x416c, 0x9cdd, [...]uint8{0x60, 0x02, 0x5b, 0x54, 0xd8, 0xd2})),
+			PartitionNumber: 3,
+			PartitionStart:  0x1b2,
+			PartitionSize:   0x2d,
+			Signature:       GUIDHardDriveSignature(MakeGUID(0x94da1fcc, 0x1c0f, 0x5645, 0xabf9, [...]uint8{0xff, 0x9a, 0xc4, 0x68, 0x24, 0x2d})),
 			MBRType:         GPT}})
 }
 
 type testNewHardDriveDevicePathNodeFromDeviceErrorData struct {
 	path string
 	part int
-	err  string
 }
 
-func (d *dpSuite) testNewHardDriveDevicePathNodeFromDeviceError(c *C, data *testNewHardDriveDevicePathNodeFromDeviceErrorData) {
+func (d *dpSuite) testNewHardDriveDevicePathNodeFromDeviceError(c *C, data *testNewHardDriveDevicePathNodeFromDeviceErrorData) error {
 	f, err := os.Open(data.path)
 	c.Assert(err, IsNil)
 	defer f.Close()
@@ -213,35 +212,31 @@ func (d *dpSuite) testNewHardDriveDevicePathNodeFromDeviceError(c *C, data *test
 	c.Assert(err, IsNil)
 
 	_, err = NewHardDriveDevicePathNodeFromDevice(f, fi.Size(), 512, data.part)
-	c.Check(err, ErrorMatches, data.err)
+	return err
 }
 
 func (d *dpSuite) TestNewHardDriveDevicePathNodeFromDeviceInvalidPart1(c *C) {
-	d.testNewHardDriveDevicePathNodeFromDeviceError(c, &testNewHardDriveDevicePathNodeFromDeviceErrorData{
-		path: "testdata/partitiontables/cloudimg",
-		part: 0,
-		err:  "invalid partition number"})
+	c.Check(d.testNewHardDriveDevicePathNodeFromDeviceError(c, &testNewHardDriveDevicePathNodeFromDeviceErrorData{
+		path: "testdata/partitiontables/valid",
+		part: 0}), ErrorMatches, "invalid partition number")
 }
 
 func (d *dpSuite) TestNewHardDriveDevicePathNodeFromDeviceInvalidPart2(c *C) {
-	d.testNewHardDriveDevicePathNodeFromDeviceError(c, &testNewHardDriveDevicePathNodeFromDeviceErrorData{
-		path: "testdata/partitiontables/cloudimg",
-		part: 300,
-		err:  "invalid partition number 300: device only has 128 partitions"})
+	c.Check(d.testNewHardDriveDevicePathNodeFromDeviceError(c, &testNewHardDriveDevicePathNodeFromDeviceErrorData{
+		path: "testdata/partitiontables/valid",
+		part: 300}), ErrorMatches, "invalid partition number 300: device only has 128 partitions")
 }
 
 func (d *dpSuite) TestNewHardDriveDevicePathNodeFromDeviceInvalidPart3(c *C) {
-	d.testNewHardDriveDevicePathNodeFromDeviceError(c, &testNewHardDriveDevicePathNodeFromDeviceErrorData{
-		path: "testdata/partitiontables/cloudimg",
-		part: 2,
-		err:  "requested partition is unused"})
+	c.Check(d.testNewHardDriveDevicePathNodeFromDeviceError(c, &testNewHardDriveDevicePathNodeFromDeviceErrorData{
+		path: "testdata/partitiontables/valid",
+		part: 5}), ErrorMatches, "requested partition is unused")
 }
 
 func (d *dpSuite) TestNewHardDriveDevicePathNodeFromDeviceInvalidHeader(c *C) {
-	d.testNewHardDriveDevicePathNodeFromDeviceError(c, &testNewHardDriveDevicePathNodeFromDeviceErrorData{
-		path: "testdata/partitiontables/cloudimg-invalid-hdr-checksum",
-		part: 1,
-		err:  "CRC check failed"})
+	c.Check(d.testNewHardDriveDevicePathNodeFromDeviceError(c, &testNewHardDriveDevicePathNodeFromDeviceErrorData{
+		path: "testdata/partitiontables/invalid-primary-hdr-checksum",
+		part: 1}), Equals, ErrCRCCheck)
 }
 
 func (d *dpSuite) TestNewHardDriveDevicePathNodeFromMBRDevice(c *C) {

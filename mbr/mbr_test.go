@@ -45,7 +45,7 @@ func (s *mbrSuite) TestReadRecordLegacy(c *C) {
 }
 
 func (s *mbrSuite) TestReadRecordProtectiveMBR(c *C) {
-	f, err := os.Open("../testdata/partitiontables/cloudimg")
+	f, err := os.Open("../testdata/partitiontables/valid")
 	c.Assert(err, IsNil)
 	defer f.Close()
 
@@ -55,9 +55,9 @@ func (s *mbrSuite) TestReadRecordProtectiveMBR(c *C) {
 	c.Check(r.Partitions[0], DeepEquals, PartitionEntry{
 		StartAddress:    Address{0x0, 0x2, 0x0},
 		Type:            0xee,
-		EndAddress:      Address{0x16, 0x77, 0x1f},
+		EndAddress:      Address{0xff, 0xff, 0xff},
 		StartingLBA:     0x1,
-		NumberOfSectors: 0x465fff})
+		NumberOfSectors: 0x1ff})
 	c.Check(r.Partitions[1], DeepEquals, PartitionEntry{})
 	c.Check(r.Partitions[2], DeepEquals, PartitionEntry{})
 	c.Check(r.Partitions[3], DeepEquals, PartitionEntry{})
