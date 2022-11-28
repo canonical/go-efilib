@@ -212,9 +212,13 @@ func (c *WinCertificateAuthenticode) CanBeVerifiedBy(cert *x509.Certificate) boo
 	return true
 }
 
-// ReadWinCertificate decodes a signature (something that is confusingly represented by types with "certificate" in the name in both
-// the UEFI and PE/COFF specifications) from the supplied io.Reader and returns a WinCertificate of the appropriate type. The type
-// returned is dependent on the data, and will be one of *WinCertificateAuthenticode, *WinCertificatePKCS1_15 or *WinCertificateGUID.
+// ReadWinCertificate decodes a signature (something that is confusingly
+// represented by types with "certificate" in the name in both the UEFI
+// and PE/COFF specifications) from the supplied reader and returns a
+// WinCertificate of the appropriate type. The type returned is dependent
+// on the data, and will be one of *[WinCertificateAuthenticode],
+// *[WinCertificatePKCS1v15], *[WinCertificatePKCS7] or
+// *[WinCertificateGUIDPKCS1v15].
 func ReadWinCertificate(r io.Reader) (WinCertificate, error) {
 	var hdr uefi.WIN_CERTIFICATE
 	if err := binary.Read(r, binary.LittleEndian, &hdr); err != nil {
