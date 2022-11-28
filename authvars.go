@@ -77,8 +77,8 @@ func ReadTimeBasedVariableAuthentication(r io.Reader) (*VariableAuthentication2,
 type VariableAuthentication3Type int
 
 const (
-	VariableAuthentication3TimestampType VariableAuthentication3Type = iota
-	VariableAuthentication3NonceType
+	VariableAuthentication3TimestampType VariableAuthentication3Type = uefi.EFI_VARIABLE_AUTHENTICATION_3_TIMESTAMP_TYPE
+	VariableAuthentication3NonceType     VariableAuthentication3Type = uefi.EFI_VARIABLE_AUTHENTICATION_3_NONCE_TYPE
 )
 
 // VariableAuthentication3 represents the header for updating a variable
