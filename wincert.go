@@ -192,9 +192,9 @@ func (c *WinCertificateAuthenticode) Type() WinCertificateType {
 	return WinCertificateTypeAuthenticode
 }
 
-// GetSigners returns the signing certificates.
-func (c *WinCertificateAuthenticode) GetSigners() []*x509.Certificate {
-	return c.p7.GetSigners()
+// GetSigner returns the signing certificate.
+func (c *WinCertificateAuthenticode) GetSigner() *x509.Certificate {
+	return c.p7.GetSigners()[0]
 }
 
 // CanBeVerifiedBy determines if the specified CA certificate can be used to verify
@@ -202,13 +202,10 @@ func (c *WinCertificateAuthenticode) GetSigners() []*x509.Certificate {
 // one or more certificate chains that terminate in the signer certificates -
 // it does not check whether the signature will actually be verified successfully.
 func (c *WinCertificateAuthenticode) CanBeVerifiedBy(cert *x509.Certificate) bool {
-	for _, s := range c.GetSigners() {
-		chains := buildCertChains([]*x509.Certificate{s}, cert, c.p7.Certificates, nil)
-		if len(chains) == 0 {
-			return false
-		}
+	chains := buildCertChains([]*x509.Certificate{c.GetSigner()}, cert, c.p7.Certificates, nil)
+	if len(chains) == 0 {
+		return false
 	}
-
 	return true
 }
 
@@ -238,6 +235,9 @@ func ReadWinCertificate(r io.Reader) (WinCertificate, error) {
 		p7, err := pkcs7.UnmarshalAuthenticode(cert.CertData)
 		if err != nil {
 			return nil, xerrors.Errorf("cannot decode WIN_CERTIFICATE_EFI_PKCS payload: %w", err)
+		}
+		if len(p7.GetSigners()) != 1 {
+			return nil, errors.New("WIN_CERTIFICATE_EFI_PKCS has invalid number of signers")
 		}
 		return &WinCertificateAuthenticode{data: cert.CertData, p7: p7}, nil
 	case uefi.WIN_CERT_TYPE_EFI_PKCS115:

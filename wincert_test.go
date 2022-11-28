@@ -66,11 +66,8 @@ func (s *wincertSuite) TestReadWinCertificateAuthenticode(c *C) {
 	authenticodeCert, ok := cert.(*WinCertificateAuthenticode)
 	c.Check(ok, Equals, true)
 
-	signers := authenticodeCert.GetSigners()
-	c.Assert(signers, HasLen, 1)
-
 	h := crypto.SHA256.New()
-	h.Write(signers[0].RawTBSCertificate)
+	h.Write(authenticodeCert.GetSigner().RawTBSCertificate)
 	c.Check(h.Sum(nil), DeepEquals, DecodeHexString(c, "08954ce3da028da0128a81435159f543d70ccd789ee86ea55630dab9a765644e"))
 
 	caBytes, err := ioutil.ReadFile("testdata/certs/canonical-uefi-ca.der")
