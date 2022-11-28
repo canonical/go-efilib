@@ -73,7 +73,7 @@ func ReadTimeBasedVariableAuthentication(r io.Reader) (*VariableAuthentication2,
 		AuthInfo:  sig}, nil
 }
 
-// VariableAuthentication3Type describes the type of VariableAuthentication3.
+// VariableAuthentication3Type describes the type of [VariableAuthentication3].
 type VariableAuthentication3Type int
 
 const (
