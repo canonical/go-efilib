@@ -165,7 +165,7 @@ func newWinCertificateGUID(cert *uefi.WIN_CERTIFICATE_UEFI_GUID) (WinCertificate
 		if err != nil {
 			return nil, xerrors.Errorf("cannot decode payload for WIN_CERTIFICATE_UEFI_GUID with EFI_CERT_TYPE_PKCS7_GUID type: %w", err)
 		}
-		return &WinCertificatePKCS7{data: cert.CertData, p7: p7}, nil
+		return &WinCertificatePKCS7{p7: p7}, nil
 	default:
 		return &WinCertificateGUIDUnknown{unknownGUIDType: GUID(cert.CertType), Data: cert.CertData}, nil
 	}
@@ -206,8 +206,7 @@ func (c *WinCertificateGUIDPKCS1v15) GUIDType() GUID {
 // the EFI_CERT_TYPE_PKCS7_GUID type, and represents a detached PKCS7
 // signature.
 type WinCertificatePKCS7 struct {
-	data []byte
-	p7   *pkcs7.PKCS7
+	p7 *pkcs7.PKCS7
 }
 
 func (c *WinCertificatePKCS7) Type() WinCertificateType {
@@ -241,7 +240,6 @@ func (c *WinCertificatePKCS7) CanBeVerifiedBy(cert *x509.Certificate) bool {
 // WinCertificateAuthenticode corresponds to a WIN_CERTIFICATE_EFI_PKCS and
 // represents an Authenticode signature.
 type WinCertificateAuthenticode struct {
-	data         []byte
 	p7           *pkcs7.PKCS7
 	authenticode *authenticodeContent
 }
@@ -321,7 +319,7 @@ func ReadWinCertificate(r io.Reader) (WinCertificate, error) {
 		if err != nil {
 			return nil, xerrors.Errorf("cannot decode authenticode content for WIN_CERTIFICATE_EFI_PKCS: %w", err)
 		}
-		return &WinCertificateAuthenticode{data: cert.CertData, p7: p7, authenticode: auth}, nil
+		return &WinCertificateAuthenticode{p7: p7, authenticode: auth}, nil
 	case uefi.WIN_CERT_TYPE_EFI_PKCS115:
 		if hdr.Length != uint32(binary.Size(uefi.WIN_CERTIFICATE_EFI_PKCS1_15{})) {
 			return nil, fmt.Errorf("invalid length for WIN_CERTIFICATE_EFI_PKCS1_15: %d", hdr.Length)
