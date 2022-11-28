@@ -6,7 +6,10 @@ package efi
 
 import (
 	"bytes"
+	"crypto"
 	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/asn1"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -18,6 +21,60 @@ import (
 	"github.com/canonical/go-efilib/internal/pkcs7"
 	"github.com/canonical/go-efilib/internal/uefi"
 )
+
+var (
+	oidSHA256 = asn1.ObjectIdentifier{2, 16, 840, 1, 101, 3, 4, 2, 1}
+
+	oidSpcIndirectData   = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 311, 2, 1, 4}
+	oidSpcPeImageDataobj = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 311, 2, 1, 15}
+)
+
+type digestInfo struct {
+	DigestAlgorithm pkix.AlgorithmIdentifier
+	Digest          []byte
+}
+
+type spcPeImageData struct {
+	Flags asn1.BitString
+	File  asn1.RawValue `asn1:"tag:0"`
+}
+
+type spcAttributeTypeAndOptionalValue struct {
+	Type  asn1.ObjectIdentifier
+	Value asn1.RawValue
+}
+
+type spcIndirectDataContent struct {
+	Data          spcAttributeTypeAndOptionalValue
+	MessageDigest digestInfo
+}
+
+type authenticodeContent struct {
+	digestAlgorithm asn1.ObjectIdentifier
+	flags           asn1.BitString
+	digest          []byte
+}
+
+func unmarshalAuthenticodeContent(data []byte) (*authenticodeContent, error) {
+	var content spcIndirectDataContent
+	if _, err := asn1.Unmarshal(data, &content); err != nil {
+		return nil, err
+	}
+
+	if !content.Data.Type.Equal(oidSpcPeImageDataobj) {
+		return nil, asn1.StructuralError{Msg: "not a PE image data object"}
+	}
+
+	var peData spcPeImageData
+	if _, err := asn1.Unmarshal(content.Data.Value.FullBytes, &peData); err != nil {
+		return nil, err
+	}
+
+	return &authenticodeContent{
+		digestAlgorithm: content.MessageDigest.DigestAlgorithm.Algorithm,
+		flags:           peData.Flags,
+		digest:          content.MessageDigest.Digest}, nil
+}
 
 func buildCertChains(chain []*x509.Certificate, root *x509.Certificate, intermediates []*x509.Certificate, depth *int) (chains [][]*x509.Certificate) {
 	alreadyInChain := func(cert *x509.Certificate) bool {
@@ -184,8 +241,9 @@ func (c *WinCertificatePKCS7) CanBeVerifiedBy(cert *x509.Certificate) bool {
 // WinCertificateAuthenticode corresponds to a WIN_CERTIFICATE_EFI_PKCS and
 // represents an Authenticode signature.
 type WinCertificateAuthenticode struct {
-	data []byte
-	p7   *pkcs7.PKCS7
+	data         []byte
+	p7           *pkcs7.PKCS7
+	authenticode *authenticodeContent
 }
 
 func (c *WinCertificateAuthenticode) Type() WinCertificateType {
@@ -207,6 +265,21 @@ func (c *WinCertificateAuthenticode) CanBeVerifiedBy(cert *x509.Certificate) boo
 		return false
 	}
 	return true
+}
+
+func (c *WinCertificateAuthenticode) DigestAlgorithm() crypto.Hash {
+	switch {
+	case c.authenticode.digestAlgorithm.Equal(oidSHA256):
+		return crypto.SHA256
+	default:
+		return crypto.Hash(0)
+	}
+}
+
+// Digest returns the PE image digest of the image associated with this
+// signature.
+func (c *WinCertificateAuthenticode) Digest() []byte {
+	return c.authenticode.digest
 }
 
 // ReadWinCertificate decodes a signature (something that is confusingly
@@ -232,6 +305,7 @@ func ReadWinCertificate(r io.Reader) (WinCertificate, error) {
 		if _, err := io.ReadFull(r, cert.CertData); err != nil {
 			return nil, ioerr.EOFIsUnexpected("cannot read WIN_CERTIFICATE_EFI_PKCS: %w", err)
 		}
+
 		p7, err := pkcs7.UnmarshalAuthenticode(cert.CertData)
 		if err != nil {
 			return nil, xerrors.Errorf("cannot decode WIN_CERTIFICATE_EFI_PKCS payload: %w", err)
@@ -239,7 +313,15 @@ func ReadWinCertificate(r io.Reader) (WinCertificate, error) {
 		if len(p7.GetSigners()) != 1 {
 			return nil, errors.New("WIN_CERTIFICATE_EFI_PKCS has invalid number of signers")
 		}
-		return &WinCertificateAuthenticode{data: cert.CertData, p7: p7}, nil
+
+		if !p7.ContentType().Equal(oidSpcIndirectData) {
+			return nil, errors.New("WIN_CERTIFICATE_EFI_PKCS has invalid content type")
+		}
+		auth, err := unmarshalAuthenticodeContent(p7.Content())
+		if err != nil {
+			return nil, xerrors.Errorf("cannot decode authenticode content for WIN_CERTIFICATE_EFI_PKCS: %w", err)
+		}
+		return &WinCertificateAuthenticode{data: cert.CertData, p7: p7, authenticode: auth}, nil
 	case uefi.WIN_CERT_TYPE_EFI_PKCS115:
 		if hdr.Length != uint32(binary.Size(uefi.WIN_CERTIFICATE_EFI_PKCS1_15{})) {
 			return nil, fmt.Errorf("invalid length for WIN_CERTIFICATE_EFI_PKCS1_15: %d", hdr.Length)

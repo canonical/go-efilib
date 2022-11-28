@@ -69,6 +69,7 @@ type signedData struct {
 
 type PKCS7 struct {
 	Certificates []*x509.Certificate
+	contentInfo  contentInfo
 	signers      []issuerAndSerial
 }
 
@@ -102,6 +103,7 @@ func UnmarshalPKCS7(data []byte) (*PKCS7, error) {
 
 	return &PKCS7{
 		Certificates: certs,
+		contentInfo:  sd.ContentInfo,
 		signers:      signers}, nil
 }
 
@@ -151,4 +153,12 @@ func (p *PKCS7) GetSigners() []*x509.Certificate {
 	}
 
 	return certs
+}
+
+func (p *PKCS7) ContentType() asn1.ObjectIdentifier {
+	return p.contentInfo.ContentType
+}
+
+func (p *PKCS7) Content() []byte {
+	return p.contentInfo.Content.Bytes
 }

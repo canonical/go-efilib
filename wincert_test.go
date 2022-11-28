@@ -83,6 +83,9 @@ func (s *wincertSuite) TestReadWinCertificateAuthenticode(c *C) {
 	c.Assert(err, IsNil)
 
 	c.Check(authenticodeCert.CanBeVerifiedBy(ca), Equals, false)
+
+	c.Check(authenticodeCert.DigestAlgorithm(), Equals, crypto.SHA256)
+	c.Check(authenticodeCert.Digest(), DeepEquals, DecodeHexString(c, "b886cc19bdfff84a4e7b9fc2375309ec857bae5deb01635f6a73d9ed73304e50"))
 }
 
 func (s *wincertSuite) TestReadWinCertificateInvalidRevision(c *C) {
