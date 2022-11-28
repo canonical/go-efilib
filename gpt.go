@@ -23,7 +23,7 @@ var (
 	ErrNoProtectiveMBR = errors.New("no protective master boot record found")
 
 	// ErrInvalidBackupPartitionTableLocation may be returned from
-	// [ReadPartitionTable] when called with the BackupPartitionTable
+	// ReadPartitionTable when called with the BackupPartitionTable
 	// role if the partition table isn't located at the end of the
 	// device. Note that the function will still return a valid table
 	// in this case.
