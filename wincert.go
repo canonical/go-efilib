@@ -75,7 +75,6 @@ const (
 // WinCertificate is an interface type corresponding to implementations of WIN_CERTIFICATE.
 type WinCertificate interface {
 	Type() WinCertificateType // Type of this certificate
-	Write(w io.Writer) error  // Encode this certificate to the supplied io.Writer
 }
 
 // WinCertificatePKCS1v15 corresponds to the WIN_CERTIFICATE_EFI_PKCS1_15 type
@@ -87,17 +86,6 @@ type WinCertificatePKCS1v15 struct {
 
 func (c *WinCertificatePKCS1v15) Type() WinCertificateType {
 	return WinCertificateTypePKCS1v15
-}
-
-func (c *WinCertificatePKCS1v15) Write(w io.Writer) error {
-	cert := uefi.WIN_CERTIFICATE_EFI_PKCS1_15{
-		HashAlgorithm: uefi.EFI_GUID(c.HashAlgorithm),
-		Signature:     c.Signature}
-	cert.Hdr = uefi.WIN_CERTIFICATE{
-		Length:          uint32(binary.Size(cert.Hdr) + binary.Size(cert.HashAlgorithm) + len(cert.Signature)),
-		Revision:        0x0200,
-		CertificateType: uefi.WIN_CERT_TYPE_EFI_PKCS115}
-	return binary.Write(w, binary.LittleEndian, &cert)
 }
 
 // WinCertificateGUID corresponds to implementations of WIN_CERTIFICATE_UEFI_GUID.
@@ -126,10 +114,6 @@ func newWinCertificateGUID(cert *uefi.WIN_CERTIFICATE_UEFI_GUID) (WinCertificate
 	}
 }
 
-type winCertificateGUIDInternal interface {
-	toUefiType() *uefi.WIN_CERTIFICATE_UEFI_GUID
-}
-
 // WinCertificateGUIDUnknown corresponds to a WIN_CERTIFICATE_UEFI_GUID with
 // an unknown type.
 type WinCertificateGUIDUnknown struct {
@@ -141,23 +125,8 @@ func (c *WinCertificateGUIDUnknown) Type() WinCertificateType {
 	return WinCertificateTypeGUID
 }
 
-func (c *WinCertificateGUIDUnknown) Write(w io.Writer) error {
-	return binary.Write(w, binary.LittleEndian, c.toUefiType())
-}
-
 func (c *WinCertificateGUIDUnknown) GUIDType() GUID {
 	return c.unknownGUIDType
-}
-
-func (c *WinCertificateGUIDUnknown) toUefiType() *uefi.WIN_CERTIFICATE_UEFI_GUID {
-	cert := &uefi.WIN_CERTIFICATE_UEFI_GUID{
-		CertType: uefi.EFI_GUID(c.unknownGUIDType),
-		CertData: c.Data}
-	cert.Hdr = uefi.WIN_CERTIFICATE{
-		Length:          uint32(binary.Size(cert.Hdr) + binary.Size(cert.CertType) + len(cert.CertData)),
-		Revision:        0x0200,
-		CertificateType: uefi.WIN_CERT_TYPE_EFI_GUID}
-	return cert
 }
 
 // WinCertificateGUIDPKCS1v15 corresponds to a WIN_CERTIFICATE_UEFI_GUID with
@@ -172,26 +141,8 @@ func (c *WinCertificateGUIDPKCS1v15) Type() WinCertificateType {
 	return WinCertificateTypeGUID
 }
 
-func (c *WinCertificateGUIDPKCS1v15) Write(w io.Writer) error {
-	return binary.Write(w, binary.LittleEndian, c.toUefiType())
-}
-
 func (c *WinCertificateGUIDPKCS1v15) GUIDType() GUID {
 	return CertTypeRSA2048SHA256Guid
-}
-
-func (c *WinCertificateGUIDPKCS1v15) toUefiType() *uefi.WIN_CERTIFICATE_UEFI_GUID {
-	cert := &uefi.WIN_CERTIFICATE_UEFI_GUID{CertType: uefi.EFI_CERT_TYPE_RSA2048_SHA256_GUID}
-
-	w := new(bytes.Buffer)
-	binary.Write(w, binary.LittleEndian, c)
-	cert.CertData = w.Bytes()
-
-	cert.Hdr = uefi.WIN_CERTIFICATE{
-		Length:          uint32(binary.Size(cert.Hdr) + binary.Size(cert.CertType) + len(cert.CertData)),
-		Revision:        0x0200,
-		CertificateType: uefi.WIN_CERT_TYPE_EFI_GUID}
-	return cert
 }
 
 // WinCertificatePKCS7 corresponds to a WIN_CERTIFICATE_UEFI_GUID with
@@ -204,10 +155,6 @@ type WinCertificatePKCS7 struct {
 
 func (c *WinCertificatePKCS7) Type() WinCertificateType {
 	return WinCertificateTypeGUID
-}
-
-func (c *WinCertificatePKCS7) Write(w io.Writer) error {
-	return binary.Write(w, binary.LittleEndian, c.toUefiType())
 }
 
 func (c *WinCertificatePKCS7) GUIDType() GUID {
@@ -234,17 +181,6 @@ func (c *WinCertificatePKCS7) CanBeVerifiedBy(cert *x509.Certificate) bool {
 	return true
 }
 
-func (c *WinCertificatePKCS7) toUefiType() *uefi.WIN_CERTIFICATE_UEFI_GUID {
-	cert := &uefi.WIN_CERTIFICATE_UEFI_GUID{
-		CertType: uefi.EFI_CERT_TYPE_PKCS7_GUID,
-		CertData: c.data}
-	cert.Hdr = uefi.WIN_CERTIFICATE{
-		Length:          uint32(binary.Size(cert.Hdr) + binary.Size(cert.CertType) + len(cert.CertData)),
-		Revision:        0x0200,
-		CertificateType: uefi.WIN_CERT_TYPE_EFI_GUID}
-	return cert
-}
-
 // WinCertificateAuthenticode corresponds to a WIN_CERTIFICATE_EFI_PKCS and
 // represents an Authenticode signature.
 type WinCertificateAuthenticode struct {
@@ -254,15 +190,6 @@ type WinCertificateAuthenticode struct {
 
 func (c *WinCertificateAuthenticode) Type() WinCertificateType {
 	return WinCertificateTypeAuthenticode
-}
-
-func (c *WinCertificateAuthenticode) Write(w io.Writer) error {
-	cert := uefi.WIN_CERTIFICATE_EFI_PKCS{CertData: c.data}
-	cert.Hdr = uefi.WIN_CERTIFICATE{
-		Length:          uint32(binary.Size(cert.Hdr) + len(cert.CertData)),
-		Revision:        0x0200,
-		CertificateType: uefi.WIN_CERT_TYPE_PKCS_SIGNED_DATA}
-	return binary.Write(w, binary.LittleEndian, &cert)
 }
 
 // GetSigners returns the signing certificates.

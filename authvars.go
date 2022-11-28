@@ -5,7 +5,6 @@
 package efi
 
 import (
-	"bytes"
 	"encoding/binary"
 	"errors"
 	"io"
@@ -21,13 +20,6 @@ import (
 type VariableAuthentication struct {
 	MonotonicCount uint64
 	AuthInfo       WinCertificateGUID
-}
-
-func (a *VariableAuthentication) Write(w io.Writer) error {
-	desc := uefi.EFI_VARIABLE_AUTHENTICATION{
-		MonotonicCount: a.MonotonicCount,
-		AuthInfo:       *a.AuthInfo.(winCertificateGUIDInternal).toUefiType()}
-	return binary.Write(w, binary.LittleEndian, desc)
 }
 
 // ReadVariableAuthentication decodes a header for updating a variable with the EFI_VARIABLE_AUTHENTICATED_WRITE_ACCESS attribute
@@ -53,13 +45,6 @@ func ReadVariableAuthentication(r io.Reader) (*VariableAuthentication, error) {
 type VariableAuthentication2 struct {
 	TimeStamp time.Time
 	AuthInfo  WinCertificateGUID
-}
-
-func (a *VariableAuthentication2) Write(w io.Writer) error {
-	desc := uefi.EFI_VARIABLE_AUTHENTICATION_2{
-		TimeStamp: *uefi.New_EFI_TIME(a.TimeStamp),
-		AuthInfo:  *a.AuthInfo.(winCertificateGUIDInternal).toUefiType()}
-	return binary.Write(w, binary.LittleEndian, desc)
 }
 
 // ReadTimeBasedVariableAuthentication decodes the header for updating a variable with the
@@ -92,80 +77,12 @@ type VariableAuthentication3Timestamp struct {
 	SigningCert WinCertificateGUID
 }
 
-func (a *VariableAuthentication3Timestamp) Write(w io.Writer) error {
-	var buf bytes.Buffer
-
-	t := uefi.New_EFI_TIME(a.TimeStamp)
-	if err := binary.Write(&buf, binary.LittleEndian, &t); err != nil {
-		panic(err)
-	}
-
-	if a.NewCert != nil {
-		if err := binary.Write(&buf, binary.LittleEndian, a.NewCert.(winCertificateGUIDInternal).toUefiType()); err != nil {
-			panic(err)
-		}
-	}
-
-	if err := binary.Write(&buf, binary.LittleEndian, a.SigningCert.(winCertificateGUIDInternal).toUefiType()); err != nil {
-		panic(err)
-	}
-
-	hdr := uefi.EFI_VARIABLE_AUTHENTICATION_3{
-		Version: 1,
-		Type:    uefi.EFI_VARIABLE_AUTHENTICATION_3_TIMESTAMP_TYPE}
-	hdr.MetadataSize = uint32(binary.Size(hdr) + buf.Len())
-	if a.NewCert != nil {
-		hdr.Flags = 1
-	}
-	if err := binary.Write(w, binary.LittleEndian, &hdr); err != nil {
-		return err
-	}
-
-	_, err := buf.WriteTo(w)
-	return err
-}
-
 // VariableAuthentication3Nonce corresponds to the header for updating a variable with the
 // EFI_VARIABLE_ENHANCED_AUTHENTICATED_ACCESS attribute set, and a type of EFI_VARIABLE_AUTHENTICATION_3_NONCE_TYPE.
 type VariableAuthentication3Nonce struct {
 	Nonce       []byte
 	NewCert     WinCertificateGUID
 	SigningCert WinCertificateGUID
-}
-
-func (a *VariableAuthentication3Nonce) Write(w io.Writer) error {
-	var buf bytes.Buffer
-
-	n := uefi.EFI_VARIABLE_AUTHENTICATION_3_NONCE{
-		NonceSize: uint32(len(a.Nonce)),
-		Nonce:     a.Nonce}
-	if err := binary.Write(&buf, binary.LittleEndian, &n); err != nil {
-		panic(err)
-	}
-
-	if a.NewCert != nil {
-		if err := binary.Write(&buf, binary.LittleEndian, a.NewCert.(winCertificateGUIDInternal).toUefiType()); err != nil {
-			panic(err)
-		}
-	}
-
-	if err := binary.Write(&buf, binary.LittleEndian, a.SigningCert.(winCertificateGUIDInternal).toUefiType()); err != nil {
-		panic(err)
-	}
-
-	hdr := uefi.EFI_VARIABLE_AUTHENTICATION_3{
-		Version: 1,
-		Type:    uefi.EFI_VARIABLE_AUTHENTICATION_3_NONCE_TYPE}
-	hdr.MetadataSize = uint32(binary.Size(hdr) + buf.Len())
-	if a.NewCert != nil {
-		hdr.Flags = 1
-	}
-	if err := binary.Write(w, binary.LittleEndian, &hdr); err != nil {
-		return err
-	}
-
-	_, err := buf.WriteTo(w)
-	return err
 }
 
 // ReadEnhancedVariableAuthentication decodes the header for updating a variable with the
