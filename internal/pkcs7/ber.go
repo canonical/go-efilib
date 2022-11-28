@@ -102,7 +102,7 @@ func parseBase128Int(bytes []byte) (int, error) {
 		ret64 |= int64(b) << (7 * n)
 	}
 	if ret64 > math.MaxInt32 {
-		return 0, asn1.SyntaxError{"base-128 number too large"}
+		return 0, asn1.SyntaxError{Msg: "base-128 number too large"}
 	}
 
 	return int(ret64), nil
