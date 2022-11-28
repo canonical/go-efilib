@@ -6,14 +6,14 @@ package efi_test
 
 import (
 	"crypto"
+	"crypto/x509"
+	"io/ioutil"
 	"os"
 	"time"
 
 	. "github.com/canonical/go-efilib"
 
 	. "gopkg.in/check.v1"
-
-	"go.mozilla.org/pkcs7"
 )
 
 type wincertSuite struct{}
@@ -27,9 +27,33 @@ func (s *wincertSuite) TestReadWinCertificateGUID(c *C) {
 
 	cert, err := ReadWinCertificate(f)
 	c.Assert(err, IsNil)
-	guidCert, ok := cert.(*WinCertificateGUID)
+	guidCert, ok := cert.(WinCertificateGUID)
 	c.Assert(ok, Equals, true)
-	c.Check(guidCert.Type, Equals, CertTypePKCS7Guid)
+	c.Assert(guidCert.GUIDType(), Equals, CertTypePKCS7Guid)
+
+	p7cert, ok := cert.(*WinCertificatePKCS7)
+	c.Assert(ok, Equals, true)
+
+	signers := p7cert.GetSigners()
+	c.Assert(signers, HasLen, 1)
+
+	h := crypto.SHA256.New()
+	h.Write(signers[0].RawTBSCertificate)
+	c.Check(h.Sum(nil), DeepEquals, DecodeHexString(c, "607af875b99b8711204eede2c04bdf58d8f65adad8f3013a341503ca878175ea"))
+
+	caBytes, err := ioutil.ReadFile("testdata/certs/MicCorKEKCA2011_2011-06-24.crt")
+	c.Check(err, IsNil)
+	ca, err := x509.ParseCertificate(caBytes)
+	c.Assert(err, IsNil)
+
+	c.Check(p7cert.CanBeVerifiedBy(ca), Equals, true)
+
+	caBytes, err = ioutil.ReadFile("testdata/certs/canonical-uefi-ca.der")
+	c.Check(err, IsNil)
+	ca, err = x509.ParseCertificate(caBytes)
+	c.Assert(err, IsNil)
+
+	c.Check(p7cert.CanBeVerifiedBy(ca), Equals, false)
 }
 
 func (s *wincertSuite) TestReadWinCertificateAuthenticode(c *C) {
@@ -39,17 +63,29 @@ func (s *wincertSuite) TestReadWinCertificateAuthenticode(c *C) {
 
 	cert, err := ReadWinCertificate(f)
 	c.Assert(err, IsNil)
-	authenticodeCert, ok := cert.(WinCertificateAuthenticode)
+	authenticodeCert, ok := cert.(*WinCertificateAuthenticode)
 	c.Check(ok, Equals, true)
 
-	p7, err := pkcs7.Parse(authenticodeCert)
-	c.Assert(err, IsNil)
-	signer := p7.GetOnlySigner()
-	c.Assert(signer, NotNil)
+	signers := authenticodeCert.GetSigners()
+	c.Assert(signers, HasLen, 1)
 
 	h := crypto.SHA256.New()
-	h.Write(signer.RawTBSCertificate)
+	h.Write(signers[0].RawTBSCertificate)
 	c.Check(h.Sum(nil), DeepEquals, DecodeHexString(c, "08954ce3da028da0128a81435159f543d70ccd789ee86ea55630dab9a765644e"))
+
+	caBytes, err := ioutil.ReadFile("testdata/certs/canonical-uefi-ca.der")
+	c.Check(err, IsNil)
+	ca, err := x509.ParseCertificate(caBytes)
+	c.Assert(err, IsNil)
+
+	c.Check(authenticodeCert.CanBeVerifiedBy(ca), Equals, true)
+
+	caBytes, err = ioutil.ReadFile("testdata/certs/MicCorKEKCA2011_2011-06-24.crt")
+	c.Check(err, IsNil)
+	ca, err = x509.ParseCertificate(caBytes)
+	c.Assert(err, IsNil)
+
+	c.Check(authenticodeCert.CanBeVerifiedBy(ca), Equals, false)
 }
 
 func (s *wincertSuite) TestReadWinCertificateInvalidRevision(c *C) {
@@ -78,7 +114,7 @@ func (s *wincertSuite) TestReadTimeBasedVariableAuthentication(c *C) {
 	auth, err := ReadTimeBasedVariableAuthentication(f)
 	c.Assert(err, IsNil)
 	c.Check(auth.TimeStamp, DeepEquals, time.Date(2010, 3, 6, 19, 17, 21, 0, time.FixedZone("", 0)))
-	c.Check(auth.AuthInfo.Type, Equals, CertTypePKCS7Guid)
+	c.Check(auth.AuthInfo.GUIDType(), Equals, CertTypePKCS7Guid)
 	_, err = ReadSignatureDatabase(f)
 	c.Check(err, IsNil)
 }
