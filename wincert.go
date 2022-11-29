@@ -148,7 +148,7 @@ type WinCertificate interface {
 // WinCertificatePKCS1v15 corresponds to the WIN_CERTIFICATE_EFI_PKCS1_15 type
 // and represents a RSA2048 signature with PKCS#1 v1.5 padding.
 type WinCertificatePKCS1v15 struct {
-	HashAlgorithm GUID
+	HashAlgorithm crypto.Hash
 	Signature     [256]byte
 }
 
@@ -291,6 +291,23 @@ func (c *WinCertificateAuthenticode) Digest() []byte {
 	return c.authenticode.digest
 }
 
+func digestAlgorithmIdToCryptoHash(id GUID) (crypto.Hash, error) {
+	switch id {
+	case HashAlgorithmSHA1Guid:
+		return crypto.SHA1, nil
+	case HashAlgorithmSHA256Guid:
+		return crypto.SHA256, nil
+	case HashAlgorithmSHA224Guid:
+		return crypto.SHA224, nil
+	case HashAlgorithmSHA384Guid:
+		return crypto.SHA384, nil
+	case HashAlgorithmSHA512Guid:
+		return crypto.SHA512, nil
+	default:
+		return crypto.Hash(0), errors.New("unrecognized digest")
+	}
+}
+
 // ReadWinCertificate decodes a signature (something that is confusingly
 // represented by types with "certificate" in the name in both the UEFI
 // and PE/COFF specifications) from the supplied reader and returns a
@@ -335,6 +352,7 @@ func ReadWinCertificate(r io.Reader) (WinCertificate, error) {
 		if hdr.Length != uint32(binary.Size(uefi.WIN_CERTIFICATE_EFI_PKCS1_15{})) {
 			return nil, fmt.Errorf("invalid length for WIN_CERTIFICATE_EFI_PKCS1_15: %d", hdr.Length)
 		}
+
 		cert := uefi.WIN_CERTIFICATE_EFI_PKCS1_15{Hdr: hdr}
 		if _, err := io.ReadFull(r, cert.HashAlgorithm[:]); err != nil {
 			return nil, ioerr.EOFIsUnexpected("cannot read WIN_CERTIFICATE_EFI_PKCS1_15: %w", err)
@@ -342,7 +360,13 @@ func ReadWinCertificate(r io.Reader) (WinCertificate, error) {
 		if _, err := io.ReadFull(r, cert.Signature[:]); err != nil {
 			return nil, ioerr.EOFIsUnexpected("cannot read WIN_CERTIFICATE_EFI_PKCS1_15: %w", err)
 		}
-		return &WinCertificatePKCS1v15{HashAlgorithm: GUID(cert.HashAlgorithm), Signature: cert.Signature}, nil
+
+		digest, err := digestAlgorithmIdToCryptoHash(GUID(cert.HashAlgorithm))
+		if err != nil {
+			return nil, xerrors.Errorf("cannot determine digest algorithm for WIN_CERTIFICATE_EFI_PKCS1_15: %w", err)
+		}
+
+		return &WinCertificatePKCS1v15{HashAlgorithm: digest, Signature: cert.Signature}, nil
 	case uefi.WIN_CERT_TYPE_EFI_GUID:
 		cert := uefi.WIN_CERTIFICATE_UEFI_GUID{Hdr: hdr}
 		cert.CertData = make([]byte, int(cert.Hdr.Length)-binary.Size(cert.Hdr)-binary.Size(cert.CertType))
