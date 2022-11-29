@@ -124,9 +124,20 @@ func buildCertChains(chain []*x509.Certificate, root *x509.Certificate, intermed
 type WinCertificateType uint16
 
 const (
-	WinCertificateTypeAuthenticode = WinCertificateType(uefi.WIN_CERT_TYPE_PKCS_SIGNED_DATA)
-	WinCertificateTypePKCS1v15     = WinCertificateType(uefi.WIN_CERT_TYPE_EFI_PKCS115)
-	WinCertificateTypeGUID         = WinCertificateType(uefi.WIN_CERT_TYPE_EFI_GUID)
+	// WinCertificateTypeAuthenticode indicates that a WinCertificate
+	// is an authenticode signature and is implemented by the
+	// *WinCertificateAuthenticode type.
+	WinCertificateTypeAuthenticode WinCertificateType = uefi.WIN_CERT_TYPE_PKCS_SIGNED_DATA
+
+	// WinCertificatePKCS1v15 indicates that a WinCertificate is a
+	// PKCS#1-v1.5 encoded RSA2048 signature and is implemented by
+	// the *WinCertificatePKCS1v15 type.
+	WinCertificateTypePKCS1v15 WinCertificateType = uefi.WIN_CERT_TYPE_EFI_PKCS115
+
+	// WinCertificateTypeGUID indicates that a WinCertificate is a
+	// signature of a type indicated by a separate GUID and is implemented
+	// by a type that implements the WinCertificateGUID interface.
+	WinCertificateTypeGUID WinCertificateType = uefi.WIN_CERT_TYPE_EFI_GUID
 )
 
 // WinCertificate is an interface type corresponding to implementations of WIN_CERTIFICATE.
