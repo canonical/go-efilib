@@ -233,11 +233,11 @@ func (c *WinCertificatePKCS7) GetSigners() []*x509.Certificate {
 	return c.p7.GetSigners()
 }
 
-// CanBeVerifiedBy determines if the specified CA certificate can be used to verify
+// IsRootCert determines if the specified CA certificate can be used to verify
 // this signature. This checks that the specified CA certificate is a signer of
 // one or more certificate chains that terminate in the signer certificates -
 // it does not check whether the signature will actually be verified successfully.
-func (c *WinCertificatePKCS7) CanBeVerifiedBy(cert *x509.Certificate) bool {
+func (c *WinCertificatePKCS7) IsRootCert(cert *x509.Certificate) bool {
 	for _, s := range c.GetSigners() {
 		chains := buildCertChains([]*x509.Certificate{s}, cert, c.p7.Certificates, nil)
 		if len(chains) == 0 {
@@ -246,6 +246,16 @@ func (c *WinCertificatePKCS7) CanBeVerifiedBy(cert *x509.Certificate) bool {
 	}
 
 	return true
+}
+
+// CanBeVerifiedBy determines if the specified CA certificate can be used to verify
+// this signature. This checks that the specified CA certificate is a signer of
+// one or more certificate chains that terminate in the signer certificates -
+// it does not check whether the signature will actually be verified successfully.
+//
+// Deprecated: Use [WinCertificatePKCS7.IsRootCert]
+func (c *WinCertificatePKCS7) CanBeVerifiedBy(cert *x509.Certificate) bool {
+	return c.IsRootCert(cert)
 }
 
 // WinCertificateAuthenticode corresponds to a WIN_CERTIFICATE_EFI_PKCS and
@@ -264,16 +274,26 @@ func (c *WinCertificateAuthenticode) GetSigner() *x509.Certificate {
 	return c.p7.GetSigners()[0]
 }
 
-// CanBeVerifiedBy determines if the specified CA certificate can be used to verify
+// IsRootCert determines if the specified CA certificate can be used to verify
 // this signature. This checks that the specified CA certificate is a signer of
 // one or more certificate chains that terminate in the signer certificates -
 // it does not check whether the signature will actually be verified successfully.
-func (c *WinCertificateAuthenticode) CanBeVerifiedBy(cert *x509.Certificate) bool {
+func (c *WinCertificateAuthenticode) IsRootCert(cert *x509.Certificate) bool {
 	chains := buildCertChains([]*x509.Certificate{c.GetSigner()}, cert, c.p7.Certificates, nil)
 	if len(chains) == 0 {
 		return false
 	}
 	return true
+}
+
+// CanBeVerifiedBy determines if the specified CA certificate can be used to verify
+// this signature. This checks that the specified CA certificate is a signer of
+// one or more certificate chains that terminate in the signer certificates -
+// it does not check whether the signature will actually be verified successfully.
+//
+// Deprecated: Use [WinCertificateAuthenticode.IsRootCert]
+func (c *WinCertificateAuthenticode) CanBeVerifiedBy(cert *x509.Certificate) bool {
+	return c.IsRootCert(cert)
 }
 
 func (c *WinCertificateAuthenticode) DigestAlgorithm() crypto.Hash {

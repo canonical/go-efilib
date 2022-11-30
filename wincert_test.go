@@ -46,14 +46,14 @@ func (s *wincertSuite) TestReadWinCertificateGUID(c *C) {
 	ca, err := x509.ParseCertificate(caBytes)
 	c.Assert(err, IsNil)
 
-	c.Check(p7cert.CanBeVerifiedBy(ca), Equals, true)
+	c.Check(p7cert.IsRootCert(ca), Equals, true)
 
 	caBytes, err = ioutil.ReadFile("testdata/certs/canonical-uefi-ca.der")
 	c.Check(err, IsNil)
 	ca, err = x509.ParseCertificate(caBytes)
 	c.Assert(err, IsNil)
 
-	c.Check(p7cert.CanBeVerifiedBy(ca), Equals, false)
+	c.Check(p7cert.IsRootCert(ca), Equals, false)
 }
 
 func (s *wincertSuite) TestReadWinCertificateAuthenticode(c *C) {
@@ -75,14 +75,14 @@ func (s *wincertSuite) TestReadWinCertificateAuthenticode(c *C) {
 	ca, err := x509.ParseCertificate(caBytes)
 	c.Assert(err, IsNil)
 
-	c.Check(authenticodeCert.CanBeVerifiedBy(ca), Equals, true)
+	c.Check(authenticodeCert.IsRootCert(ca), Equals, true)
 
 	caBytes, err = ioutil.ReadFile("testdata/certs/MicCorKEKCA2011_2011-06-24.crt")
 	c.Check(err, IsNil)
 	ca, err = x509.ParseCertificate(caBytes)
 	c.Assert(err, IsNil)
 
-	c.Check(authenticodeCert.CanBeVerifiedBy(ca), Equals, false)
+	c.Check(authenticodeCert.IsRootCert(ca), Equals, false)
 
 	c.Check(authenticodeCert.DigestAlgorithm(), Equals, crypto.SHA256)
 	c.Check(authenticodeCert.Digest(), DeepEquals, DecodeHexString(c, "b886cc19bdfff84a4e7b9fc2375309ec857bae5deb01635f6a73d9ed73304e50"))
