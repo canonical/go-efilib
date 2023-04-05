@@ -76,10 +76,55 @@ func unmarshalAuthenticodeContent(data []byte) (*authenticodeContent, error) {
 		digest:          content.MessageDigest.Digest}, nil
 }
 
-func buildCertChains(chain []*x509.Certificate, root *x509.Certificate, intermediates []*x509.Certificate, depth *int) (chains [][]*x509.Certificate) {
-	alreadyInChain := func(cert *x509.Certificate) bool {
+func certLikelyIssued(issuer, subject *x509.Certificate) bool {
+	if !bytes.Equal(issuer.RawSubject, subject.RawIssuer) {
+		return false
+	}
+
+	if !bytes.Equal(issuer.SubjectKeyId, subject.AuthorityKeyId) {
+		// XXX: this ignores the issuer and serial number fields
+		// of the akid extension, although crypto/x509 doesn't
+		// expose this - we'd have to parse it ourselves.
+		return false
+	}
+
+	switch issuer.PublicKeyAlgorithm {
+	case x509.RSA:
+		switch subject.SignatureAlgorithm {
+		case x509.SHA1WithRSA, x509.SHA256WithRSA, x509.SHA384WithRSA, x509.SHA512WithRSA:
+			return true
+		case x509.SHA256WithRSAPSS, x509.SHA384WithRSAPSS, x509.SHA512WithRSAPSS:
+			return true
+		default:
+			return false
+		}
+	case x509.ECDSA:
+		switch subject.SignatureAlgorithm {
+		case x509.ECDSAWithSHA1, x509.ECDSAWithSHA256, x509.ECDSAWithSHA384, x509.ECDSAWithSHA512:
+			return true
+		default:
+			return false
+		}
+	case x509.Ed25519:
+		switch subject.SignatureAlgorithm {
+		case x509.PureEd25519:
+			return true
+		default:
+			return false
+		}
+	default:
+		return false
+	}
+}
+
+func isSelfSignedCert(cert *x509.Certificate) bool {
+	return certLikelyIssued(cert, cert)
+}
+
+func buildCertChains(trusted *x509.Certificate, untrusted []*x509.Certificate, chain []*x509.Certificate, depth *int) (chains [][]*x509.Certificate) {
+	alreadyInChain := func(x *x509.Certificate) bool {
 		for _, c := range chain {
-			if c.Equal(cert) {
+			if c.Equal(x) {
 				return true
 			}
 		}
@@ -96,26 +141,24 @@ func buildCertChains(chain []*x509.Certificate, root *x509.Certificate, intermed
 
 	current := chain[len(chain)-1]
 
-	if current.Equal(root) {
-		chains = append(chains, append(chain))
-	}
+	if !isSelfSignedCert(current) {
+		for _, x := range untrusted {
+			if alreadyInChain(x) {
+				continue
+			}
+			if !certLikelyIssued(x, current) {
+				continue
+			}
+			chains = append(chains, buildCertChains(trusted, untrusted, append(chain, x), depth)...)
+		}
 
-	if !alreadyInChain(root) {
-		if err := current.CheckSignatureFrom(root); err == nil {
-			chains = append(chains, append(chain, root))
+		if !alreadyInChain(trusted) && certLikelyIssued(trusted, current) {
+			chains = append(chains, append(chain, trusted))
 		}
 	}
 
-	for _, cert := range intermediates {
-		if alreadyInChain(cert) {
-			continue
-		}
-		if err := current.CheckSignatureFrom(cert); err != nil {
-			continue
-		}
-
-		childChains := buildCertChains(append(chain, cert), root, intermediates, depth)
-		chains = append(chains, childChains...)
+	if current.Equal(trusted) {
+		chains = append(chains, chain)
 	}
 
 	return chains
@@ -233,29 +276,27 @@ func (c *WinCertificatePKCS7) GetSigners() []*x509.Certificate {
 	return c.p7.GetSigners()
 }
 
-// IsRootCert determines if the specified CA certificate can be used to verify
-// this signature. This checks that the specified CA certificate is a signer of
-// one or more certificate chains that terminate in the signer certificates -
-// it does not check whether the signature will actually be verified successfully.
-func (c *WinCertificatePKCS7) IsRootCert(cert *x509.Certificate) bool {
+// CertLikelyTrustAnchor determines if the specified certificate is likely to be
+// a trust anchor for this signature. This is "likely" because it only checks if
+// there are candidate certificate chains rooted to the specified certificate.
+// When attempting to build candidate certificate chains, it considers a certificate
+// to be likely issued by another certificate if:
+//   - The certificate's issuer matches the issuer's subject.
+//   - The certificate's Authority Key Identifier keyIdentifier field matches the
+//     issuer's Subject Key Identifier.
+//   - The certificate's signature algorithm is compatible with the issuer's public
+//     key algorithm.
+//
+// It performs no verification of any candidate certificate chains and no verification
+// of the signature.
+func (c *WinCertificatePKCS7) CertLikelyTrustAnchor(cert *x509.Certificate) bool {
 	for _, s := range c.GetSigners() {
-		chains := buildCertChains([]*x509.Certificate{s}, cert, c.p7.Certificates, nil)
-		if len(chains) == 0 {
+		if len(buildCertChains(cert, c.p7.Certificates, []*x509.Certificate{s}, nil)) == 0 {
 			return false
 		}
 	}
 
 	return true
-}
-
-// CanBeVerifiedBy determines if the specified CA certificate can be used to verify
-// this signature. This checks that the specified CA certificate is a signer of
-// one or more certificate chains that terminate in the signer certificates -
-// it does not check whether the signature will actually be verified successfully.
-//
-// Deprecated: Use [WinCertificatePKCS7.IsRootCert]
-func (c *WinCertificatePKCS7) CanBeVerifiedBy(cert *x509.Certificate) bool {
-	return c.IsRootCert(cert)
 }
 
 // WinCertificateAuthenticode corresponds to a WIN_CERTIFICATE_EFI_PKCS and
@@ -274,26 +315,21 @@ func (c *WinCertificateAuthenticode) GetSigner() *x509.Certificate {
 	return c.p7.GetSigners()[0]
 }
 
-// IsRootCert determines if the specified CA certificate can be used to verify
-// this signature. This checks that the specified CA certificate is a signer of
-// one or more certificate chains that terminate in the signer certificates -
-// it does not check whether the signature will actually be verified successfully.
-func (c *WinCertificateAuthenticode) IsRootCert(cert *x509.Certificate) bool {
-	chains := buildCertChains([]*x509.Certificate{c.GetSigner()}, cert, c.p7.Certificates, nil)
-	if len(chains) == 0 {
-		return false
-	}
-	return true
-}
-
-// CanBeVerifiedBy determines if the specified CA certificate can be used to verify
-// this signature. This checks that the specified CA certificate is a signer of
-// one or more certificate chains that terminate in the signer certificates -
-// it does not check whether the signature will actually be verified successfully.
+// CertLikelyTrustAnchor determines if the specified certificate is likely to be
+// a trust anchor for this signature. This is "likely" because it only checks if
+// there are candidate certificate chains rooted to the specified certificate.
+// When attempting to build candidate certificate chains, it considers a certificate
+// to be likely issued by another certificate if:
+//   - The certificate's issuer matches the issuer's subject.
+//   - The certificate's Authority Key Identifier keyIdentifier field matches the
+//     issuer's Subject Key Identifier.
+//   - The certificate's signature algorithm is compatible with the issuer's public
+//     key algorithm.
 //
-// Deprecated: Use [WinCertificateAuthenticode.IsRootCert]
-func (c *WinCertificateAuthenticode) CanBeVerifiedBy(cert *x509.Certificate) bool {
-	return c.IsRootCert(cert)
+// It performs no verification of any candidate certificate chains and no verification
+// of the signature.
+func (c *WinCertificateAuthenticode) CertLikelyTrustAnchor(cert *x509.Certificate) bool {
+	return len(buildCertChains(cert, c.p7.Certificates, []*x509.Certificate{c.GetSigner()}, nil)) > 0
 }
 
 func (c *WinCertificateAuthenticode) DigestAlgorithm() crypto.Hash {
