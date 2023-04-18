@@ -260,16 +260,16 @@ func readBERObject(ber []byte) (int, asn1Object, error) {
 // there are some artefacts in the wild that have length encodings that
 // aren't proper DER, such as the 2016 dbx update which contains long-form
 // lengths for lengths that can be represented by the short-form encoding.
-func fixupBER(ber []byte) (int, []byte, error) {
-	n, obj, err := readBERObject(ber)
+func fixupBER(ber []byte) ([]byte, error) {
+	_, obj, err := readBERObject(ber)
 	if err != nil {
-		return n, nil, err
+		return nil, err
 	}
 
 	w := new(bytes.Buffer)
 	if err := obj.Write(w); err != nil {
-		return n, nil, err
+		return nil, err
 	}
 
-	return n, w.Bytes(), nil
+	return w.Bytes(), nil
 }

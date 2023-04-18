@@ -74,16 +74,13 @@ type PKCS7 struct {
 }
 
 func UnmarshalPKCS7(data []byte) (*PKCS7, error) {
-	n, data2, err := fixupBER(data)
+	data, err := fixupBER(data)
 	if err != nil {
 		return nil, err
 	}
-	if n != len(data) {
-		return nil, asn1.SyntaxError{Msg: "trailing data"}
-	}
 
 	var sd signedData
-	rest, err := asn1.Unmarshal(data2, &sd)
+	rest, err := asn1.Unmarshal(data, &sd)
 	if err != nil {
 		return nil, err
 	}
@@ -108,21 +105,18 @@ func UnmarshalPKCS7(data []byte) (*PKCS7, error) {
 }
 
 func UnmarshalAuthenticode(data []byte) (*PKCS7, error) {
-	n, data2, err := fixupBER(data)
+	data, err := fixupBER(data)
 	if err != nil {
 		return nil, err
 	}
-	if n != len(data) {
-		return nil, asn1.SyntaxError{Msg: "trailing data"}
-	}
 
 	var info contentInfo
-	rest, err := asn1.Unmarshal(data2, &info)
+	rest, err := asn1.Unmarshal(data, &info)
 	if err != nil {
 		return nil, err
 	}
 	if len(rest) > 0 {
-		return nil, asn1.StructuralError{Msg: "trailing data"}
+		return nil, asn1.StructuralError{Msg: "trailing data 2"}
 	}
 
 	if !info.ContentType.Equal(oidSignedData) {
