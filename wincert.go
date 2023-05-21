@@ -15,6 +15,8 @@ import (
 	"fmt"
 	"io"
 
+	"golang.org/x/crypto/cryptobyte"
+	cryptobyte_asn1 "golang.org/x/crypto/cryptobyte/asn1"
 	"golang.org/x/xerrors"
 
 	"github.com/canonical/go-efilib/internal/ioerr"
@@ -29,24 +31,153 @@ var (
 	oidSpcPeImageDataobj = asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 311, 2, 1, 15}
 )
 
-type digestInfo struct {
-	DigestAlgorithm pkix.AlgorithmIdentifier
-	Digest          []byte
+func readAlgorithmIdentifier(der cryptobyte.String) (*pkix.AlgorithmIdentifier, error) {
+	if !der.ReadASN1(&der, cryptobyte_asn1.SEQUENCE) {
+		return nil, errors.New("malformed input")
+	}
+
+	ai := new(pkix.AlgorithmIdentifier)
+
+	if !der.ReadASN1ObjectIdentifier(&ai.Algorithm) {
+		return nil, errors.New("malformed algorithm")
+	}
+
+	if der.Empty() {
+		return ai, nil
+	}
+
+	var paramsBytes cryptobyte.String
+	var paramsTag cryptobyte_asn1.Tag
+	if !der.ReadAnyASN1Element(&paramsBytes, &paramsTag) {
+		return nil, errors.New("malformed parameters")
+	}
+	ai.Parameters.Class = int(paramsTag & 0xc0)
+	ai.Parameters.Tag = int(paramsTag & 0x1f)
+	if paramsTag&0x20 != 0 {
+		ai.Parameters.IsCompound = true
+	}
+	ai.Parameters.FullBytes = paramsBytes
+	paramsBytes.ReadASN1((*cryptobyte.String)(&ai.Parameters.Bytes), paramsTag)
+
+	return ai, nil
 }
 
 type spcPeImageData struct {
-	Flags asn1.BitString
-	File  asn1.RawValue `asn1:"tag:0"`
+	flags asn1.BitString
+	// file spcLink
+}
+
+func readSpcPeImageData(der cryptobyte.String) (*spcPeImageData, error) {
+	if !der.ReadASN1(&der, cryptobyte_asn1.SEQUENCE) {
+		return nil, errors.New("malformed input")
+	}
+
+	data := new(spcPeImageData)
+
+	if !der.ReadASN1BitString(&data.flags) {
+		return nil, errors.New("malformed flags")
+	}
+
+	return data, nil
+}
+
+type digestInfo struct {
+	digestAlgorithm pkix.AlgorithmIdentifier
+	digest          []byte
+}
+
+func readDigestInfo(der cryptobyte.String) (*digestInfo, error) {
+	if !der.ReadASN1(&der, cryptobyte_asn1.SEQUENCE) {
+		return nil, errors.New("malformed input")
+	}
+
+	di := new(digestInfo)
+
+	var daRaw cryptobyte.String
+	if !der.ReadASN1Element(&daRaw, cryptobyte_asn1.SEQUENCE) {
+		return nil, errors.New("malformed digestAlgorithm")
+	}
+	da, err := readAlgorithmIdentifier(daRaw)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read digestAlgorithm: %w", err)
+	}
+	di.digestAlgorithm = *da
+
+	if !der.ReadASN1((*cryptobyte.String)(&di.digest), cryptobyte_asn1.OCTET_STRING) {
+		return nil, errors.New("malformed digest")
+	}
+
+	return di, nil
+
 }
 
 type spcAttributeTypeAndOptionalValue struct {
-	Type  asn1.ObjectIdentifier
-	Value asn1.RawValue
+	attrType asn1.ObjectIdentifier
+	valueRaw cryptobyte.String
+}
+
+func readSpcAttributeTypeAndOptionalValue(der cryptobyte.String) (*spcAttributeTypeAndOptionalValue, error) {
+	if !der.ReadASN1(&der, cryptobyte_asn1.SEQUENCE) {
+		return nil, errors.New("malformed input")
+	}
+
+	data := new(spcAttributeTypeAndOptionalValue)
+
+	if !der.ReadASN1ObjectIdentifier(&data.attrType) {
+		return nil, errors.New("malformed type")
+	}
+
+	if der.Empty() {
+		return data, nil
+	}
+
+	// This is weird - the spec documents this field with:
+	//  value [0] EXPLICIT ANY OPTIONAL
+	//
+	// It's not explicit though - the underlying SpcPeImageData structure
+	// doesn't have another tag. The tag in public signatures is actually
+	// just a universal sequence tag. I think this should really
+	// be:
+	//  value ANY DEFINED BY type OPTIONAL
+	if !der.ReadAnyASN1Element(&data.valueRaw, nil) {
+		return nil, errors.New("malformed value")
+	}
+	return data, nil
 }
 
 type spcIndirectDataContent struct {
-	Data          spcAttributeTypeAndOptionalValue
-	MessageDigest digestInfo
+	data          spcAttributeTypeAndOptionalValue
+	messageDigest digestInfo
+}
+
+func readSpcIndirectDataContent(der cryptobyte.String) (*spcIndirectDataContent, error) {
+	if !der.ReadASN1(&der, cryptobyte_asn1.SEQUENCE) {
+		return nil, errors.New("malformed input")
+	}
+
+	idc := new(spcIndirectDataContent)
+
+	var dataRaw cryptobyte.String
+	if !der.ReadASN1Element(&dataRaw, cryptobyte_asn1.SEQUENCE) {
+		return nil, errors.New("malformed data")
+	}
+	data, err := readSpcAttributeTypeAndOptionalValue(dataRaw)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read data: %w", err)
+	}
+	idc.data = *data
+
+	var mdRaw cryptobyte.String
+	if !der.ReadASN1Element(&mdRaw, cryptobyte_asn1.SEQUENCE) {
+		return nil, errors.New("malformed messageDigest")
+	}
+	md, err := readDigestInfo(mdRaw)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read messageDigest: %w", err)
+	}
+	idc.messageDigest = *md
+
+	return idc, nil
 }
 
 type authenticodeContent struct {
@@ -56,24 +187,24 @@ type authenticodeContent struct {
 }
 
 func unmarshalAuthenticodeContent(data []byte) (*authenticodeContent, error) {
-	var content spcIndirectDataContent
-	if _, err := asn1.Unmarshal(data, &content); err != nil {
-		return nil, err
+	idc, err := readSpcIndirectDataContent(cryptobyte.String(data))
+	if err != nil {
+		return nil, fmt.Errorf("cannot read SpcIndirectDataContent: %w", err)
 	}
 
-	if !content.Data.Type.Equal(oidSpcPeImageDataobj) {
-		return nil, asn1.StructuralError{Msg: "not a PE image data object"}
+	if !idc.data.attrType.Equal(oidSpcPeImageDataobj) {
+		return nil, errors.New("not a PE image data object")
 	}
 
-	var peData spcPeImageData
-	if _, err := asn1.Unmarshal(content.Data.Value.FullBytes, &peData); err != nil {
-		return nil, err
+	peData, err := readSpcPeImageData(idc.data.valueRaw)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read spcPeImageData: %w", err)
 	}
 
 	return &authenticodeContent{
-		digestAlgorithm: content.MessageDigest.DigestAlgorithm.Algorithm,
-		flags:           peData.Flags,
-		digest:          content.MessageDigest.Digest}, nil
+		digestAlgorithm: idc.messageDigest.digestAlgorithm.Algorithm,
+		flags:           peData.flags,
+		digest:          idc.messageDigest.digest}, nil
 }
 
 func certLikelyIssued(issuer, subject *x509.Certificate) bool {
@@ -215,7 +346,7 @@ func newWinCertificateGUID(cert *uefi.WIN_CERTIFICATE_UEFI_GUID) (WinCertificate
 		binary.Read(bytes.NewReader(cert.CertData), binary.LittleEndian, &c)
 		return c, nil
 	case uefi.EFI_CERT_TYPE_PKCS7_GUID:
-		p7, err := pkcs7.UnmarshalPKCS7(cert.CertData)
+		p7, err := pkcs7.UnmarshalSignedData(cert.CertData)
 		if err != nil {
 			return nil, xerrors.Errorf("cannot decode payload for WIN_CERTIFICATE_UEFI_GUID with EFI_CERT_TYPE_PKCS7_GUID type: %w", err)
 		}
@@ -260,7 +391,7 @@ func (c *WinCertificateGUIDPKCS1v15) GUIDType() GUID {
 // the EFI_CERT_TYPE_PKCS7_GUID type, and represents a detached PKCS7
 // signature.
 type WinCertificatePKCS7 struct {
-	p7 *pkcs7.PKCS7
+	p7 *pkcs7.SignedData
 }
 
 func (c *WinCertificatePKCS7) Type() WinCertificateType {
@@ -302,7 +433,7 @@ func (c *WinCertificatePKCS7) CertLikelyTrustAnchor(cert *x509.Certificate) bool
 // WinCertificateAuthenticode corresponds to a WIN_CERTIFICATE_EFI_PKCS and
 // represents an Authenticode signature.
 type WinCertificateAuthenticode struct {
-	p7           *pkcs7.PKCS7
+	p7           *pkcs7.SignedData
 	authenticode *authenticodeContent
 }
 
@@ -388,7 +519,7 @@ func ReadWinCertificate(r io.Reader) (WinCertificate, error) {
 			return nil, ioerr.EOFIsUnexpected("cannot read WIN_CERTIFICATE_EFI_PKCS: %w", err)
 		}
 
-		p7, err := pkcs7.UnmarshalAuthenticode(cert.CertData)
+		p7, err := pkcs7.UnmarshalSignedData(cert.CertData)
 		if err != nil {
 			return nil, xerrors.Errorf("cannot decode WIN_CERTIFICATE_EFI_PKCS payload: %w", err)
 		}

@@ -7,9 +7,13 @@ package pkcs7
 import (
 	"bytes"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/asn1"
+	"errors"
+	"fmt"
 	"math/big"
+
+	"golang.org/x/crypto/cryptobyte"
+	cryptobyte_asn1 "golang.org/x/crypto/cryptobyte/asn1"
 )
 
 var (
@@ -17,125 +21,224 @@ var (
 )
 
 type contentInfo struct {
-	ContentType asn1.ObjectIdentifier
-	Content     asn1.RawValue `asn1:"explicit,optional,tag:0"`
+	contentType asn1.ObjectIdentifier
+	content     []byte
 }
 
-type issuerAndSerial struct {
-	IssuerName   asn1.RawValue
-	SerialNumber *big.Int
+func readContentInfo(der cryptobyte.String) (*contentInfo, error) {
+	if !der.ReadASN1(&der, cryptobyte_asn1.SEQUENCE) {
+		return nil, errors.New("malformed input")
+	}
+
+	ci := new(contentInfo)
+
+	if !der.ReadASN1ObjectIdentifier(&ci.contentType) {
+		return nil, errors.New("malformed contentType")
+	}
+
+	if !der.ReadOptionalASN1((*cryptobyte.String)(&ci.content), nil, cryptobyte_asn1.Tag(0).ContextSpecific().Constructed()) {
+		return nil, errors.New("malformed content")
+	}
+
+	return ci, nil
 }
 
-type attribute struct {
-	Type  asn1.ObjectIdentifier
-	Value asn1.RawValue `asn1:"set"`
+type issuerAndSerialNumber struct {
+	issuerNameRaw []byte
+	serialNumber  big.Int
+}
+
+func readIssuerAndSerialNumber(der cryptobyte.String) (*issuerAndSerialNumber, error) {
+	if !der.ReadASN1(&der, cryptobyte_asn1.SEQUENCE) {
+		return nil, errors.New("malformed input")
+	}
+
+	isn := new(issuerAndSerialNumber)
+
+	if !der.ReadASN1Element((*cryptobyte.String)(&isn.issuerNameRaw), cryptobyte_asn1.SEQUENCE) {
+		return nil, errors.New("malformed issuerName")
+	}
+
+	if !der.ReadASN1Integer(&isn.serialNumber) {
+		return nil, errors.New("malformed serialNumber")
+	}
+
+	return isn, nil
+
 }
 
 type signerInfo struct {
-	Version                   int `asn1:"default:1"`
-	IssuerAndSerialNumber     issuerAndSerial
-	DigestAlgorithm           pkix.AlgorithmIdentifier
-	AuthenticatedAttributes   []attribute `asn1:"optional,omitempty,tag:0"`
-	DigestEncryptionAlgorithm pkix.AlgorithmIdentifier
-	EncryptedDigest           []byte
-	UnauthenticatedAttribtes  []attribute `asn1:"optional,omitempty,tag:1"`
+	version               int
+	issuerAndSerialNumber issuerAndSerialNumber
+	// digestAlgorithm pkix.AlgorithmIdentifier
+	// authenticatedAttributes []attribute
+	// digestEncryptionAlgorithm pkix.AlgorithmIdentifier
+	// encryptedDigest []byte
+	// unauthenticatedAttriubtes []attribute
 }
 
-type rawCertificates struct {
-	Raw asn1.RawContent
-}
-
-func (r rawCertificates) Parse() ([]*x509.Certificate, error) {
-	if len(r.Raw) == 0 {
-		return nil, nil
+func readSignerInfo(der cryptobyte.String) (*signerInfo, error) {
+	if !der.ReadASN1(&der, cryptobyte_asn1.SEQUENCE) {
+		return nil, errors.New("malformed input")
 	}
 
-	var val asn1.RawValue
-	if _, err := asn1.Unmarshal(r.Raw, &val); err != nil {
-		return nil, err
+	si := new(signerInfo)
+
+	if !der.ReadASN1Integer(&si.version) {
+		return nil, errors.New("malformed version")
 	}
 
-	return x509.ParseCertificates(val.Bytes)
+	var isnRaw cryptobyte.String
+	if !der.ReadASN1Element(&isnRaw, cryptobyte_asn1.SEQUENCE) {
+		return nil, errors.New("malformed issuerAndSerialNumber")
+	}
+	isn, err := readIssuerAndSerialNumber(isnRaw)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read issuerAndSerialNumber: %w", err)
+	}
+	si.issuerAndSerialNumber = *isn
+
+	return si, nil
 }
 
 type signedData struct {
-	Version          int                        `asn1:"default:1"`
-	DigestAlgorithms []pkix.AlgorithmIdentifier `asn1:"set"`
-	ContentInfo      contentInfo
-	Certificates     rawCertificates        `asn1:"optional,tag:0"`
-	CRLs             []pkix.CertificateList `asn1:"optional,tag:1"`
-	SignerInfos      []signerInfo           `asn1:"set"`
+	version int
+	//digestAlgorithms []pkix.AlgorithmIdentifier
+	contentInfo  contentInfo
+	certificates []*x509.Certificate
+	//crls		 []pkix.RevokedCertificate
+	signerInfos []signerInfo
 }
 
-type PKCS7 struct {
+func readSignedData(der cryptobyte.String) (*signedData, error) {
+	if !der.ReadASN1(&der, cryptobyte_asn1.SEQUENCE) {
+		return nil, errors.New("malformed input")
+	}
+
+	sd := new(signedData)
+
+	sd.version = 1
+	if der.PeekASN1Tag(cryptobyte_asn1.INTEGER) {
+		if !der.ReadASN1Integer(&sd.version) {
+			return nil, errors.New("malformed version")
+		}
+	}
+	if sd.version != 1 {
+		return nil, fmt.Errorf("invalid version %d", sd.version)
+	}
+
+	var unused cryptobyte.String
+	if !der.ReadASN1(&unused, cryptobyte_asn1.SET) {
+		return nil, errors.New("malformed digestAlgorithms")
+	}
+
+	var ciRaw cryptobyte.String
+	if !der.ReadASN1Element(&ciRaw, cryptobyte_asn1.SEQUENCE) {
+		return nil, errors.New("malformed contentInfo")
+	}
+	ci, err := readContentInfo(ciRaw)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read contentInfo: %w", err)
+	}
+	sd.contentInfo = *ci
+
+	var certsRaw cryptobyte.String
+	if !der.ReadOptionalASN1(&certsRaw, nil, cryptobyte_asn1.Tag(0).ContextSpecific().Constructed()) {
+		return nil, errors.New("malformed certificates")
+	}
+	certs, err := x509.ParseCertificates(certsRaw)
+	if err != nil {
+		return nil, fmt.Errorf("cannot parse certificates: %w", err)
+	}
+	sd.certificates = certs
+
+	if !der.SkipOptionalASN1(cryptobyte_asn1.Tag(1).ContextSpecific().Constructed()) {
+		return nil, errors.New("malformed crls")
+	}
+
+	var sisRaw cryptobyte.String
+	if !der.ReadASN1(&sisRaw, cryptobyte_asn1.SET) {
+		return nil, errors.New("malformed signerInfos")
+	}
+	for !sisRaw.Empty() {
+		var siRaw cryptobyte.String
+		if !sisRaw.ReadASN1Element(&siRaw, cryptobyte_asn1.SEQUENCE) {
+			return nil, errors.New("malformed signerInfo")
+		}
+		si, err := readSignerInfo(siRaw)
+		if err != nil {
+			return nil, fmt.Errorf("cannot read signedInfo: %w", err)
+		}
+		sd.signerInfos = append(sd.signerInfos, *si)
+	}
+
+	return sd, nil
+}
+
+func unwrapSignedData(der *cryptobyte.String) error {
+	s := *der
+	if !s.ReadASN1(&s, cryptobyte_asn1.SEQUENCE) {
+		return errors.New("malformed input")
+	}
+	if !s.PeekASN1Tag(cryptobyte_asn1.OBJECT_IDENTIFIER) {
+		return nil
+	}
+
+	ci, err := readContentInfo(*der)
+	if err != nil {
+		return fmt.Errorf("cannot read contentInfo: %w", err)
+	}
+	if !ci.contentType.Equal(oidSignedData) {
+		return errors.New("not signed data")
+	}
+
+	*der = cryptobyte.String(ci.content)
+	return nil
+}
+
+type SignedData struct {
 	Certificates []*x509.Certificate
 	contentInfo  contentInfo
-	signers      []issuerAndSerial
+	signers      []issuerAndSerialNumber
 }
 
-func UnmarshalPKCS7(data []byte) (*PKCS7, error) {
-	data, err := fixupBER(data)
+func UnmarshalSignedData(data []byte) (*SignedData, error) {
+	data, err := fixupDERLengths(data)
 	if err != nil {
 		return nil, err
 	}
 
-	var sd signedData
-	rest, err := asn1.Unmarshal(data, &sd)
+	der := cryptobyte.String(data)
+	if err := unwrapSignedData(&der); err != nil {
+		return nil, fmt.Errorf("cannot unwrap signedData: %w", err)
+	}
+
+	sd, err := readSignedData(der)
 	if err != nil {
-		return nil, err
-	}
-	if len(rest) > 0 {
-		return nil, asn1.StructuralError{Msg: "trailing data"}
+		return nil, fmt.Errorf("cannot read signedData: %w", err)
 	}
 
-	certs, err := sd.Certificates.Parse()
-	if err != nil {
-		return nil, err
+	var signers []issuerAndSerialNumber
+	for _, s := range sd.signerInfos {
+		signers = append(signers, s.issuerAndSerialNumber)
 	}
 
-	var signers []issuerAndSerial
-	for _, s := range sd.SignerInfos {
-		signers = append(signers, s.IssuerAndSerialNumber)
-	}
-
-	return &PKCS7{
-		Certificates: certs,
-		contentInfo:  sd.ContentInfo,
+	return &SignedData{
+		Certificates: sd.certificates,
+		contentInfo:  sd.contentInfo,
 		signers:      signers}, nil
 }
 
-func UnmarshalAuthenticode(data []byte) (*PKCS7, error) {
-	data, err := fixupBER(data)
-	if err != nil {
-		return nil, err
-	}
-
-	var info contentInfo
-	rest, err := asn1.Unmarshal(data, &info)
-	if err != nil {
-		return nil, err
-	}
-	if len(rest) > 0 {
-		return nil, asn1.StructuralError{Msg: "trailing data 2"}
-	}
-
-	if !info.ContentType.Equal(oidSignedData) {
-		return nil, asn1.StructuralError{Msg: "not signed data"}
-	}
-
-	return UnmarshalPKCS7(info.Content.Bytes)
-}
-
-func (p *PKCS7) getCertFrom(ias *issuerAndSerial) *x509.Certificate {
+func (p *SignedData) getCertFrom(ias *issuerAndSerialNumber) *x509.Certificate {
 	for _, c := range p.Certificates {
-		if c.SerialNumber.Cmp(ias.SerialNumber) == 0 && bytes.Equal(c.RawIssuer, ias.IssuerName.FullBytes) {
+		if c.SerialNumber.Cmp(&ias.serialNumber) == 0 && bytes.Equal(c.RawIssuer, ias.issuerNameRaw) {
 			return c
 		}
 	}
 	return nil
 }
 
-func (p *PKCS7) GetSigners() []*x509.Certificate {
+func (p *SignedData) GetSigners() []*x509.Certificate {
 	var certs []*x509.Certificate
 
 	for _, s := range p.signers {
@@ -149,10 +252,10 @@ func (p *PKCS7) GetSigners() []*x509.Certificate {
 	return certs
 }
 
-func (p *PKCS7) ContentType() asn1.ObjectIdentifier {
-	return p.contentInfo.ContentType
+func (p *SignedData) ContentType() asn1.ObjectIdentifier {
+	return p.contentInfo.contentType
 }
 
-func (p *PKCS7) Content() []byte {
-	return p.contentInfo.Content.Bytes
+func (p *SignedData) Content() []byte {
+	return p.contentInfo.content
 }
