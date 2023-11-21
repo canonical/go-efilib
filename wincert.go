@@ -252,14 +252,25 @@ func isSelfSignedCert(cert *x509.Certificate) bool {
 	return certLikelyIssued(cert, cert)
 }
 
+func certsMatch(x, y *x509.Certificate) bool {
+	return bytes.Equal(x.RawSubject, y.RawSubject) &&
+		bytes.Equal(x.SubjectKeyId, y.SubjectKeyId) &&
+		x.SignatureAlgorithm == y.SignatureAlgorithm &&
+		bytes.Equal(x.RawIssuer, y.RawIssuer) &&
+		bytes.Equal(x.AuthorityKeyId, y.AuthorityKeyId) &&
+		x.PublicKeyAlgorithm == y.PublicKeyAlgorithm
+}
+
 func buildCertChains(trusted *x509.Certificate, untrusted []*x509.Certificate, chain []*x509.Certificate, depth *int) (chains [][]*x509.Certificate) {
-	alreadyInChain := func(x *x509.Certificate) bool {
-		for _, c := range chain {
-			if c.Equal(x) {
-				return true
+	removeCert := func(certs []*x509.Certificate, x *x509.Certificate) []*x509.Certificate {
+		var newCerts []*x509.Certificate
+		for _, cert := range certs {
+			if cert == x {
+				continue
 			}
+			newCerts = append(newCerts, cert)
 		}
-		return false
+		return newCerts
 	}
 
 	if depth == nil {
@@ -273,22 +284,30 @@ func buildCertChains(trusted *x509.Certificate, untrusted []*x509.Certificate, c
 	current := chain[len(chain)-1]
 
 	if !isSelfSignedCert(current) {
+		// for certificates that aren't self-signed:
+		// check the list of untrusted certs first
 		for _, x := range untrusted {
-			if alreadyInChain(x) {
-				continue
-			}
 			if !certLikelyIssued(x, current) {
 				continue
 			}
-			chains = append(chains, buildCertChains(trusted, untrusted, append(chain, x), depth)...)
+			// try to build chains with this untrusted cert
+			chains = append(chains, buildCertChains(trusted, removeCert(untrusted, x), append(chain, x), depth)...)
 		}
 
-		if !alreadyInChain(trusted) && certLikelyIssued(trusted, current) {
+		// check the trust anchor
+		if certLikelyIssued(trusted, current) {
+			// we have a complete chain
 			chains = append(chains, append(chain, trusted))
 		}
 	}
 
-	if current.Equal(trusted) {
+	// If we have no chains, check if the current certificate is the
+	// trust anchor. This handles the case where the leaf certificate
+	// is the trust anchor. We should only reach this condition at
+	// depth==1. Checking that there are no chains before comparing
+	// is an optimization because if there are then we know that
+	// current != trusted.
+	if len(chains) == 0 && certsMatch(trusted, current) {
 		chains = append(chains, chain)
 	}
 
