@@ -263,7 +263,7 @@ func certsMatch(x, y *x509.Certificate) bool {
 
 func buildCertChains(trusted *x509.Certificate, untrusted []*x509.Certificate, chain []*x509.Certificate, depth *int) (chains [][]*x509.Certificate) {
 	removeCert := func(certs []*x509.Certificate, x *x509.Certificate) []*x509.Certificate {
-		newCerts := make([]*x509.Certificate, 0)
+		var newCerts []*x509.Certificate
 		for _, cert := range certs {
 			if cert == x {
 				continue
@@ -304,7 +304,9 @@ func buildCertChains(trusted *x509.Certificate, untrusted []*x509.Certificate, c
 	// If we have no chains, check if the current certificate is the
 	// trust anchor. This handles the case where the leaf certificate
 	// is the trust anchor. We should only reach this condition at
-	// depth==1.
+	// depth==1. Checking that there are no chains before comparing
+	// is an optimization because if there are then we know that
+	// current != trusted.
 	if len(chains) == 0 && certsMatch(trusted, current) {
 		chains = append(chains, chain)
 	}
