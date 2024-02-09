@@ -7,9 +7,8 @@ package linux
 import (
 	"path/filepath"
 
+	efi "github.com/canonical/go-efilib"
 	. "gopkg.in/check.v1"
-
-	"github.com/canonical/go-efilib"
 )
 
 type sataSuite struct {
@@ -22,18 +21,18 @@ func (s *sataSuite) TestHandleSATADevicePathNode1(c *C) {
 	restoreSysfs := MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restoreSysfs()
 
-	builder := &devicePathBuilderImpl{
-		iface: interfaceTypeSATA,
-		devPath: efi.DevicePath{
+	state := &devicePathBuilderState{
+		Interface: interfaceTypeSATA,
+		Path: efi.DevicePath{
 			&efi.ACPIDevicePathNode{HID: 0x0a0341d0},
 			&efi.PCIDevicePathNode{Function: 2, Device: 0x1f}},
 		processed: []string{"pci0000:00", "0000:00:1f.2"},
 		remaining: []string{"ata1", "host1", "target1:0:0", "1:0:0:0", "block", "sda"}}
-	c.Check(handleSATADevicePathNode(builder), IsNil)
-	c.Check(builder.processed, DeepEquals, []string{"pci0000:00", "0000:00:1f.2", "ata1", "host1", "target1:0:0", "1:0:0:0", "block", "sda"})
-	c.Check(builder.remaining, DeepEquals, []string{})
-	c.Check(builder.iface, Equals, interfaceTypeSATA)
-	c.Check(builder.devPath, DeepEquals, efi.DevicePath{
+	c.Check(handleSATADevicePathNode(state), IsNil)
+	c.Check(state.processed, DeepEquals, []string{"pci0000:00", "0000:00:1f.2", "ata1", "host1", "target1:0:0", "1:0:0:0", "block", "sda"})
+	c.Check(state.remaining, DeepEquals, []string{})
+	c.Check(state.Interface, Equals, interfaceTypeSATA)
+	c.Check(state.Path, DeepEquals, efi.DevicePath{
 		&efi.ACPIDevicePathNode{HID: 0x0a0341d0},
 		&efi.PCIDevicePathNode{Function: 2, Device: 0x1f},
 		&efi.SATADevicePathNode{
@@ -45,18 +44,18 @@ func (s *sataSuite) TestHandleSATADevicePathNode2(c *C) {
 	restoreSysfs := MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restoreSysfs()
 
-	builder := &devicePathBuilderImpl{
-		iface: interfaceTypeSATA,
-		devPath: efi.DevicePath{
+	state := &devicePathBuilderState{
+		Interface: interfaceTypeSATA,
+		Path: efi.DevicePath{
 			&efi.ACPIDevicePathNode{HID: 0x0a0341d0},
 			&efi.PCIDevicePathNode{Function: 2, Device: 0x1f}},
 		processed: []string{"pci0000:00", "0000:00:1f.2"},
 		remaining: []string{"ata4", "host2", "target2:0:0", "2:0:0:0", "block", "sdb"}}
-	c.Check(handleSATADevicePathNode(builder), IsNil)
-	c.Check(builder.processed, DeepEquals, []string{"pci0000:00", "0000:00:1f.2", "ata4", "host2", "target2:0:0", "2:0:0:0", "block", "sdb"})
-	c.Check(builder.remaining, DeepEquals, []string{})
-	c.Check(builder.iface, Equals, interfaceTypeSATA)
-	c.Check(builder.devPath, DeepEquals, efi.DevicePath{
+	c.Check(handleSATADevicePathNode(state), IsNil)
+	c.Check(state.processed, DeepEquals, []string{"pci0000:00", "0000:00:1f.2", "ata4", "host2", "target2:0:0", "2:0:0:0", "block", "sdb"})
+	c.Check(state.remaining, DeepEquals, []string{})
+	c.Check(state.Interface, Equals, interfaceTypeSATA)
+	c.Check(state.Path, DeepEquals, efi.DevicePath{
 		&efi.ACPIDevicePathNode{HID: 0x0a0341d0},
 		&efi.PCIDevicePathNode{Function: 2, Device: 0x1f},
 		&efi.SATADevicePathNode{

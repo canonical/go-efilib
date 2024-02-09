@@ -7,9 +7,8 @@ package linux
 import (
 	"path/filepath"
 
+	efi "github.com/canonical/go-efilib"
 	. "gopkg.in/check.v1"
-
-	"github.com/canonical/go-efilib"
 )
 
 type acpiSuite struct {
@@ -69,18 +68,18 @@ func (s *acpiSuite) TestHandleACPIDevicePathNode(c *C) {
 	restore := MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restore()
 
-	builder := &devicePathBuilderImpl{remaining: []string{"LNXSYSTM:00", "LNXSYBUS:00", "PNP0A08:00"}}
-	c.Check(handleACPIDevicePathNode(builder), IsNil)
-	c.Check(builder.processed, DeepEquals, []string{"LNXSYSTM:00"})
-	c.Check(builder.remaining, DeepEquals, []string{"LNXSYBUS:00", "PNP0A08:00"})
-	c.Check(builder.iface, Equals, interfaceTypeUnknown)
-	c.Check(builder.devPath, DeepEquals, efi.DevicePath(nil))
+	state := &devicePathBuilderState{remaining: []string{"LNXSYSTM:00", "LNXSYBUS:00", "PNP0A08:00"}}
+	c.Check(handleACPIDevicePathNode(state), IsNil)
+	c.Check(state.processed, DeepEquals, []string{"LNXSYSTM:00"})
+	c.Check(state.remaining, DeepEquals, []string{"LNXSYBUS:00", "PNP0A08:00"})
+	c.Check(state.Interface, Equals, interfaceTypeUnknown)
+	c.Check(state.Path, DeepEquals, efi.DevicePath(nil))
 }
 
 func (s *acpiSuite) TestHandleACPIDevicePathNodeSkip(c *C) {
 	restore := MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restore()
 
-	builder := &devicePathBuilderImpl{remaining: []string{"virtual", "block", "loop1"}}
-	c.Check(handleACPIDevicePathNode(builder), Equals, errSkipDevicePathNodeHandler)
+	state := &devicePathBuilderState{remaining: []string{"virtual", "block", "loop1"}}
+	c.Check(handleACPIDevicePathNode(state), Equals, errSkipDevicePathNodeHandler)
 }

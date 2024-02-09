@@ -10,7 +10,7 @@ import (
 
 	. "gopkg.in/check.v1"
 
-	"github.com/canonical/go-efilib"
+	efi "github.com/canonical/go-efilib"
 	. "github.com/canonical/go-efilib/linux"
 )
 
@@ -141,7 +141,7 @@ func (s *filepathSuite) TestFilePathToDevicePathFullNoDevicePath(c *C) {
 	defer restore()
 
 	_, err := FilePathToDevicePath("/snap/core/11993/bin/ls", FullPath)
-	c.Check(err, ErrorMatches, "cannot map file path to a UEFI device path: encountered an error when handling components virtual/block/loop1 from device path "+sysfs+"/devices/virtual/block/loop1: \\[handler virtual\\]: unsupported device: virtual devices are not supported")
+	c.Check(err, ErrorMatches, "cannot map file path to a UEFI device path: encountered an error when handling components virtual/block/loop1 from device path "+sysfs+"/devices: \\[handler virtual\\]: unsupported device: virtual devices are not supported")
 }
 
 func (s *filepathSuite) TestFilePathToDevicePathFullWithBindMount(c *C) {

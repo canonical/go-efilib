@@ -99,10 +99,10 @@ func newACPIExtendedDevicePathNode(path string) (*efi.ACPIExtendedDevicePathNode
 	return node, nil
 }
 
-func handleACPIDevicePathNode(builder devicePathBuilder) error {
-	component := builder.next(1)
+func handleACPIDevicePathNode(state *devicePathBuilderState) error {
+	state.AdvanceSysfsPath(1)
 
-	subsystem, err := filepath.EvalSymlinks(filepath.Join(builder.absPath(component), "subsystem"))
+	subsystem, err := filepath.EvalSymlinks(filepath.Join(state.SysfsPath(), "subsystem"))
 	switch {
 	case os.IsNotExist(err):
 		return errSkipDevicePathNodeHandler
@@ -114,7 +114,6 @@ func handleACPIDevicePathNode(builder devicePathBuilder) error {
 		return errSkipDevicePathNodeHandler
 	}
 
-	builder.advance(1)
 	return nil
 }
 

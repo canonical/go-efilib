@@ -10,11 +10,10 @@ import (
 	"path/filepath"
 	"syscall"
 
+	efi "github.com/canonical/go-efilib"
 	"golang.org/x/sys/unix"
 
 	. "gopkg.in/check.v1"
-
-	"github.com/canonical/go-efilib"
 )
 
 type FilepathMockMixin struct{}
@@ -172,48 +171,48 @@ func (s *filepathSuite) TestNewDevicePathBuilder(c *C) {
 	dev := &dev{sysfsPath: filepath.Join(sysfs, "devices/pci0000:00/0000:00:1d.0/0000:3d:00.0/nvme/nvme0/nvme0n1")}
 	builder, err := newDevicePathBuilder(dev)
 	c.Check(err, IsNil)
-	c.Check(builder, DeepEquals, &devicePathBuilderImpl{
-		remaining: []string{"pci0000:00", "0000:00:1d.0", "0000:3d:00.0", "nvme", "nvme0", "nvme0n1"}})
+	c.Check(builder, DeepEquals, &devicePathBuilder{
+		devicePathBuilderState: devicePathBuilderState{
+			remaining: []string{"pci0000:00", "0000:00:1d.0", "0000:3d:00.0", "nvme", "nvme0", "nvme0n1"}}})
 }
 
-func (s *filepathSuite) TestDevicePathBuilderNumRemaining(c *C) {
-	builder := &devicePathBuilderImpl{remaining: []string{"pci0000:00", "0000:00:1d.0", "0000:3d:00.0", "nvme", "nvme0", "nvme0n1"}}
-	c.Check(builder.numRemaining(), Equals, 6)
+func (s *filepathSuite) TestDevicePathBuilderStateSysfsComponentsRemaining(c *C) {
+	state := &devicePathBuilderState{remaining: []string{"pci0000:00", "0000:00:1d.0", "0000:3d:00.0", "nvme", "nvme0", "nvme0n1"}}
+	c.Check(state.SysfsComponentsRemaining(), Equals, 6)
 
-	builder.remaining = []string{"0000:3d:00.0", "nvme", "nvme0", "nvme0n1"}
-	c.Check(builder.numRemaining(), Equals, 4)
+	state.remaining = []string{"0000:3d:00.0", "nvme", "nvme0", "nvme0n1"}
+	c.Check(state.SysfsComponentsRemaining(), Equals, 4)
 }
 
-func (s *filepathSuite) TestDevicePathBuilderNext(c *C) {
-	builder := &devicePathBuilderImpl{remaining: []string{"pci0000:00", "0000:00:1d.0", "0000:3d:00.0", "nvme", "nvme0", "nvme0n1"}}
-	c.Check(builder.next(1), Equals, "pci0000:00")
-	c.Check(builder.next(2), Equals, "pci0000:00/0000:00:1d.0")
-	c.Check(builder.next(-1), Equals, "pci0000:00/0000:00:1d.0/0000:3d:00.0/nvme/nvme0/nvme0n1")
+func (s *filepathSuite) TestDevicePathBuilderStatePeekUnhandledSysfsComponents(c *C) {
+	state := &devicePathBuilderState{remaining: []string{"pci0000:00", "0000:00:1d.0", "0000:3d:00.0", "nvme", "nvme0", "nvme0n1"}}
+	c.Check(state.PeekUnhandledSysfsComponents(1), Equals, "pci0000:00")
+	c.Check(state.PeekUnhandledSysfsComponents(2), Equals, "pci0000:00/0000:00:1d.0")
+	c.Check(state.PeekUnhandledSysfsComponents(-1), Equals, "pci0000:00/0000:00:1d.0/0000:3d:00.0/nvme/nvme0/nvme0n1")
 }
 
-func (s *filepathSuite) TestDevicePathBuilderAbsPath(c *C) {
-	builder := &devicePathBuilderImpl{}
-	c.Check(builder.absPath("pci0000:00"), Equals, "/sys/devices/pci0000:00")
-	c.Check(builder.absPath("pci0000:00/0000:00:1d.0"), Equals, "/sys/devices/pci0000:00/0000:00:1d.0")
-
-	builder.processed = []string{"pci0000:00"}
-	c.Check(builder.absPath("0000:00:1d.0"), Equals, "/sys/devices/pci0000:00/0000:00:1d.0")
+func (s *filepathSuite) TestDevicePathBuilderStateSysfsPath(c *C) {
+	state := &devicePathBuilderState{processed: []string{"pci0000:00"}}
+	c.Check(state.SysfsPath(), Equals, "/sys/devices/pci0000:00")
+	state.processed = append(state.processed, "0000:00:1d.0")
+	c.Check(state.SysfsPath(), Equals, "/sys/devices/pci0000:00/0000:00:1d.0")
 }
 
-func (s *filepathSuite) TestDevicePathBuilderAdvance(c *C) {
-	builder := &devicePathBuilderImpl{remaining: []string{"pci0000:00", "0000:00:1d.0", "0000:3d:00.0", "nvme", "nvme0", "nvme0n1"}}
+func (s *filepathSuite) TestDevicePathBuilderStateAdvanceSysfsPath(c *C) {
+	state := &devicePathBuilderState{remaining: []string{"pci0000:00", "0000:00:1d.0", "0000:3d:00.0", "nvme", "nvme0", "nvme0n1"}}
 
-	builder.advance(1)
-	c.Check(builder.processed, DeepEquals, []string{"pci0000:00"})
-	c.Check(builder.remaining, DeepEquals, []string{"0000:00:1d.0", "0000:3d:00.0", "nvme", "nvme0", "nvme0n1"})
+	state.AdvanceSysfsPath(1)
+	c.Check(state.processed, DeepEquals, []string{"pci0000:00"})
+	c.Check(state.remaining, DeepEquals, []string{"0000:00:1d.0", "0000:3d:00.0", "nvme", "nvme0", "nvme0n1"})
 
-	builder.advance(2)
-	c.Check(builder.processed, DeepEquals, []string{"pci0000:00", "0000:00:1d.0", "0000:3d:00.0"})
-	c.Check(builder.remaining, DeepEquals, []string{"nvme", "nvme0", "nvme0n1"})
+	state.AdvanceSysfsPath(2)
+	c.Check(state.processed, DeepEquals, []string{"pci0000:00", "0000:00:1d.0", "0000:3d:00.0"})
+	c.Check(state.remaining, DeepEquals, []string{"nvme", "nvme0", "nvme0n1"})
 }
 
 func (s *filepathSuite) TestDevicePathBuilderDone(c *C) {
-	builder := &devicePathBuilderImpl{remaining: []string{"pci0000:00", "0000:00:1d.0", "0000:3d:00.0", "nvme", "nvme0", "nvme0n1"}}
+	builder := &devicePathBuilder{
+		devicePathBuilderState: devicePathBuilderState{remaining: []string{"pci0000:00", "0000:00:1d.0", "0000:3d:00.0", "nvme", "nvme0", "nvme0n1"}}}
 	c.Check(builder.done(), Equals, false)
 
 	builder.remaining = []string{}
@@ -221,21 +220,22 @@ func (s *filepathSuite) TestDevicePathBuilderDone(c *C) {
 }
 
 func (s *filepathSuite) TestDevicePathBuilderProcessNextComponent(c *C) {
-	builder := &devicePathBuilderImpl{
-		remaining: []string{"pci0000:00", "0000:00:1d.0", "0000:3d:00.0", "nvme", "nvme0", "nvme0n1"}}
+	builder := &devicePathBuilder{
+		devicePathBuilderState: devicePathBuilderState{
+			remaining: []string{"pci0000:00", "0000:00:1d.0", "0000:3d:00.0", "nvme", "nvme0", "nvme0n1"}}}
 
 	hid, _ := efi.NewEISAID("PNP", 0x0a03)
 
 	var skipped int
-	skipHandler := func(_ devicePathBuilder) error {
+	skipHandler := func(state *devicePathBuilderState) error {
 		skipped += 1
-		builder.advance(2)
+		state.AdvanceSysfsPath(2)
 		return errSkipDevicePathNodeHandler
 	}
-	realHandler := func(builder devicePathBuilder) error {
-		builder.setInterfaceType(interfaceTypePCI)
-		builder.append(&efi.ACPIDevicePathNode{HID: hid})
-		builder.advance(1)
+	realHandler := func(state *devicePathBuilderState) error {
+		state.Interface = interfaceTypePCI
+		state.Path = append(state.Path, &efi.ACPIDevicePathNode{HID: hid})
+		state.AdvanceSysfsPath(1)
 		return nil
 	}
 	restore := MockDevicePathNodeHandlers(map[interfaceType][]registeredDpHandler{
@@ -247,10 +247,10 @@ func (s *filepathSuite) TestDevicePathBuilderProcessNextComponent(c *C) {
 			{name: "pci", fn: skipHandler}}})
 	defer restore()
 
-	c.Check(builder.processNextComponent(), IsNil)
+	c.Check(builder.ProcessNextComponent(), IsNil)
 	c.Check(skipped, Equals, 2)
-	c.Check(builder.iface, Equals, interfaceTypePCI)
-	c.Check(builder.devPath, DeepEquals, efi.DevicePath{&efi.ACPIDevicePathNode{HID: hid}})
+	c.Check(builder.Interface, Equals, interfaceTypePCI)
+	c.Check(builder.Path, DeepEquals, efi.DevicePath{&efi.ACPIDevicePathNode{HID: hid}})
 	c.Check(builder.remaining, DeepEquals, []string{"0000:00:1d.0", "0000:3d:00.0", "nvme", "nvme0", "nvme0n1"})
 	c.Check(builder.processed, DeepEquals, []string{"pci0000:00"})
 }
@@ -258,14 +258,15 @@ func (s *filepathSuite) TestDevicePathBuilderProcessNextComponent(c *C) {
 func (s *filepathSuite) TestDevicePathBuilderProcessNextComponentUnhandled(c *C) {
 	hid, _ := efi.NewEISAID("PNP", 0x0a03)
 
-	builder := &devicePathBuilderImpl{
-		iface:     interfaceTypePCI,
-		devPath:   efi.DevicePath{&efi.ACPIDevicePathNode{HID: hid}},
-		processed: []string{"pci0000:00"},
-		remaining: []string{"0000:00:1d.0", "0000:3d:00.0", "nvme", "nvme0", "nvme0n1"}}
+	builder := &devicePathBuilder{
+		devicePathBuilderState: devicePathBuilderState{
+			Interface: interfaceTypePCI,
+			Path:      efi.DevicePath{&efi.ACPIDevicePathNode{HID: hid}},
+			processed: []string{"pci0000:00"},
+			remaining: []string{"0000:00:1d.0", "0000:3d:00.0", "nvme", "nvme0", "nvme0n1"}}}
 
 	var skipped int
-	skipHandler := func(builder devicePathBuilder) error {
+	skipHandler := func(_ *devicePathBuilderState) error {
 		skipped += 1
 		return errSkipDevicePathNodeHandler
 	}
@@ -277,19 +278,20 @@ func (s *filepathSuite) TestDevicePathBuilderProcessNextComponentUnhandled(c *C)
 			{name: "skip2", fn: skipHandler}}})
 	defer restore()
 
-	c.Check(func() { builder.processNextComponent() }, PanicMatches, "all handlers skipped handling interface type 1")
+	c.Check(func() { builder.ProcessNextComponent() }, PanicMatches, "all handlers skipped handling interface type 1")
 	c.Check(skipped, Equals, 2)
 }
 
 func (s *filepathSuite) TestDevicePathBuilderProcessNextComponentUnhandledRoot(c *C) {
-	builder := &devicePathBuilderImpl{
-		iface:     interfaceTypeUnknown,
-		remaining: []string{"pci0000:00", "0000:00:1d.0", "0000:3d:00.0", "nvme", "nvme0", "nvme0n1"}}
+	builder := &devicePathBuilder{
+		devicePathBuilderState: devicePathBuilderState{
+			Interface: interfaceTypeUnknown,
+			remaining: []string{"pci0000:00", "0000:00:1d.0", "0000:3d:00.0", "nvme", "nvme0", "nvme0n1"}}}
 
 	var skipped int
-	skipHandler := func(builder devicePathBuilder) error {
+	skipHandler := func(state *devicePathBuilderState) error {
 		skipped += 1
-		builder.setInterfaceType(interfaceTypePCI)
+		state.Interface = interfaceTypePCI
 		return errSkipDevicePathNodeHandler
 	}
 	restore := MockDevicePathNodeHandlers(map[interfaceType][]registeredDpHandler{
@@ -300,22 +302,23 @@ func (s *filepathSuite) TestDevicePathBuilderProcessNextComponentUnhandledRoot(c
 			{name: "skip2", fn: skipHandler}}})
 	defer restore()
 
-	c.Check(builder.processNextComponent(), ErrorMatches, "unsupported device: unhandled root node")
+	c.Check(builder.ProcessNextComponent(), ErrorMatches, "unsupported device: unhandled root node")
 	c.Check(skipped, Equals, 1)
-	c.Check(builder.iface, Equals, interfaceTypeUnknown)
+	c.Check(builder.Interface, Equals, interfaceTypeUnknown)
 }
 
 func (s *filepathSuite) TestDevicePathBuilderProcessNextComponentError(c *C) {
 	hid, _ := efi.NewEISAID("PNP", 0x0a03)
 
-	builder := &devicePathBuilderImpl{
-		iface:     interfaceTypePCI,
-		devPath:   efi.DevicePath{&efi.ACPIDevicePathNode{HID: hid}},
-		processed: []string{"pci0000:00"},
-		remaining: []string{"0000:00:1d.0", "0000:3d:00.0", "nvme", "nvme0", "nvme0n1"}}
+	builder := &devicePathBuilder{
+		devicePathBuilderState: devicePathBuilderState{
+			Interface: interfaceTypePCI,
+			Path:      efi.DevicePath{&efi.ACPIDevicePathNode{HID: hid}},
+			processed: []string{"pci0000:00"},
+			remaining: []string{"0000:00:1d.0", "0000:3d:00.0", "nvme", "nvme0", "nvme0n1"}}}
 
-	handler := func(builder devicePathBuilder) error {
-		builder.advance(1)
+	handler := func(state *devicePathBuilderState) error {
+		state.AdvanceSysfsPath(1)
 		return errors.New("error")
 	}
 	restore := MockDevicePathNodeHandlers(map[interfaceType][]registeredDpHandler{
@@ -323,7 +326,7 @@ func (s *filepathSuite) TestDevicePathBuilderProcessNextComponentError(c *C) {
 			{name: "pci", fn: handler}}})
 	defer restore()
 
-	c.Check(builder.processNextComponent(), ErrorMatches, "\\[handler pci\\]: error")
+	c.Check(builder.ProcessNextComponent(), ErrorMatches, "\\[handler pci\\]: error")
 	c.Check(builder.remaining, DeepEquals, []string{"0000:00:1d.0", "0000:3d:00.0", "nvme", "nvme0", "nvme0n1"})
 	c.Check(builder.processed, DeepEquals, []string{"pci0000:00"})
 }

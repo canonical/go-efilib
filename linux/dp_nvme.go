@@ -21,18 +21,18 @@ import (
 // nvmeNSRe matches "nvme/nvme<ctrl_id>/nvme<ctrl_id>n<ns_id>", capturing ns_id
 var nvmeNSRe = regexp.MustCompile(`^nvme\/nvme[[:digit:]]+\/nvme[[:digit:]]+n([[:digit:]]+)$`)
 
-func handleNVMEDevicePathNode(builder devicePathBuilder) error {
-	if builder.numRemaining() < 3 {
+func handleNVMEDevicePathNode(state *devicePathBuilderState) error {
+	if state.SysfsComponentsRemaining() < 3 {
 		return errors.New("invalid path: not enough components")
 	}
 
-	components := builder.next(3)
+	components := state.PeekUnhandledSysfsComponents(3)
 	m := nvmeNSRe.FindStringSubmatch(components)
 	if len(m) == 0 {
 		return errors.New("invalid path")
 	}
 
-	builder.advance(3)
+	state.AdvanceSysfsPath(3)
 
 	nsid, err := strconv.ParseUint(m[1], 10, 32)
 	if err != nil {
@@ -41,9 +41,9 @@ func handleNVMEDevicePathNode(builder devicePathBuilder) error {
 
 	var euid [8]uint8
 
-	euidBuf, err := os.ReadFile(filepath.Join(builder.absPath(components), "eui"))
+	euidBuf, err := os.ReadFile(filepath.Join(state.SysfsPath(), "eui"))
 	if os.IsNotExist(err) {
-		euidBuf, err = os.ReadFile(filepath.Join(builder.absPath(components), "device", "eui"))
+		euidBuf, err = os.ReadFile(filepath.Join(state.SysfsPath(), "device", "eui"))
 	}
 	switch {
 	case os.IsNotExist(err):
@@ -61,7 +61,7 @@ func handleNVMEDevicePathNode(builder devicePathBuilder) error {
 		}
 	}
 
-	builder.append(&efi.NVMENamespaceDevicePathNode{
+	state.Path = append(state.Path, &efi.NVMENamespaceDevicePathNode{
 		NamespaceID:   uint32(nsid),
 		NamespaceUUID: uint64(binary.LittleEndian.Uint64(euid[:]))})
 	return nil

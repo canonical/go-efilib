@@ -7,9 +7,8 @@ package linux
 import (
 	"path/filepath"
 
+	efi "github.com/canonical/go-efilib"
 	. "gopkg.in/check.v1"
-
-	"github.com/canonical/go-efilib"
 )
 
 type pciSuite struct {
@@ -22,16 +21,16 @@ func (s *pciSuite) TestHandlePCIDevicePathNodeBridge(c *C) {
 	restoreSysfs := MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restoreSysfs()
 
-	builder := &devicePathBuilderImpl{
-		iface:     interfaceTypePCI,
-		devPath:   efi.DevicePath{&efi.ACPIDevicePathNode{HID: 0x0a0341d0}},
+	state := &devicePathBuilderState{
+		Interface: interfaceTypePCI,
+		Path:      efi.DevicePath{&efi.ACPIDevicePathNode{HID: 0x0a0341d0}},
 		processed: []string{"pci0000:00"},
 		remaining: []string{"0000:00:1d.0"}}
-	c.Check(handlePCIDevicePathNode(builder), IsNil)
-	c.Check(builder.processed, DeepEquals, []string{"pci0000:00", "0000:00:1d.0"})
-	c.Check(builder.remaining, DeepEquals, []string{})
-	c.Check(builder.iface, Equals, interfaceTypePCI)
-	c.Check(builder.devPath, DeepEquals, efi.DevicePath{
+	c.Check(handlePCIDevicePathNode(state), IsNil)
+	c.Check(state.processed, DeepEquals, []string{"pci0000:00", "0000:00:1d.0"})
+	c.Check(state.remaining, DeepEquals, []string{})
+	c.Check(state.Interface, Equals, interfaceTypePCI)
+	c.Check(state.Path, DeepEquals, efi.DevicePath{
 		&efi.ACPIDevicePathNode{HID: 0x0a0341d0},
 		&efi.PCIDevicePathNode{Function: 0, Device: 0x1d}})
 }
@@ -40,18 +39,18 @@ func (s *pciSuite) TestHandlePCIDevicePathNodeNVME(c *C) {
 	restoreSysfs := MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restoreSysfs()
 
-	builder := &devicePathBuilderImpl{
-		iface: interfaceTypePCI,
-		devPath: efi.DevicePath{
+	state := &devicePathBuilderState{
+		Interface: interfaceTypePCI,
+		Path: efi.DevicePath{
 			&efi.ACPIDevicePathNode{HID: 0x0a0341d0},
 			&efi.PCIDevicePathNode{Function: 0, Device: 0x1d}},
 		processed: []string{"pci0000:00", "0000:00:1d.0"},
 		remaining: []string{"0000:3d:00.0"}}
-	c.Check(handlePCIDevicePathNode(builder), IsNil)
-	c.Check(builder.processed, DeepEquals, []string{"pci0000:00", "0000:00:1d.0", "0000:3d:00.0"})
-	c.Check(builder.remaining, DeepEquals, []string{})
-	c.Check(builder.iface, Equals, interfaceTypeNVME)
-	c.Check(builder.devPath, DeepEquals, efi.DevicePath{
+	c.Check(handlePCIDevicePathNode(state), IsNil)
+	c.Check(state.processed, DeepEquals, []string{"pci0000:00", "0000:00:1d.0", "0000:3d:00.0"})
+	c.Check(state.remaining, DeepEquals, []string{})
+	c.Check(state.Interface, Equals, interfaceTypeNVME)
+	c.Check(state.Path, DeepEquals, efi.DevicePath{
 		&efi.ACPIDevicePathNode{HID: 0x0a0341d0},
 		&efi.PCIDevicePathNode{Function: 0, Device: 0x1d},
 		&efi.PCIDevicePathNode{Function: 0, Device: 0}})

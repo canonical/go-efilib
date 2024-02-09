@@ -78,7 +78,7 @@ func (e errUnsupportedDevice) Error() string {
 	return "unsupported device: " + string(e)
 }
 
-type devicePathNodeHandler func(devicePathBuilder) error
+type devicePathNodeHandler func(*devicePathBuilderState) error
 
 type registeredDpHandler struct {
 	name string
@@ -100,98 +100,63 @@ func registerDevicePathNodeHandler(name string, fn devicePathNodeHandler, flags 
 	}
 }
 
-type devicePathBuilder interface {
-	// numRemaining returns the number of remaining sysfs components
-	// to process.
-	numRemaining() int
-
-	// next returns the next n sysfs components to process. -1 returns
-	// all remaining components.
-	next(n int) string
-
-	// absPath turns the supplied sysfs path components into an
-	// absolute path.
-	absPath(path string) string
-
-	// advance marks the specified number of sysfs components
-	// as handled and advances to the next ones.
-	advance(n int)
-
-	// interfaceType returns the type of the interface detected
-	// by the last handler.
-	interfaceType() interfaceType
-
-	// setInterfaceType allows a handler to set the detected interface
-	// type.
-	setInterfaceType(iface interfaceType)
-
-	// append allows a handler to append device path nodes to the current
-	// path.
-	append(nodes ...efi.DevicePathNode)
-}
-
-type devicePathBuilderImpl struct {
-	iface   interfaceType
-	devPath efi.DevicePath
+type devicePathBuilderState struct {
+	Interface interfaceType
+	Path      efi.DevicePath
 
 	processed []string
 	remaining []string
 }
 
-func (b *devicePathBuilderImpl) numRemaining() int {
-	return len(b.remaining)
+func (s *devicePathBuilderState) SysfsPath() string {
+	return filepath.Join(append([]string{sysfsPath, "devices"}, s.processed...)...)
 }
 
-func (b *devicePathBuilderImpl) next(n int) string {
+func (s *devicePathBuilderState) SysfsComponentsRemaining() int {
+	return len(s.remaining)
+}
+
+func (s *devicePathBuilderState) PeekUnhandledSysfsComponents(n int) string {
 	if n < 0 {
-		return filepath.Join(b.remaining...)
+		n = len(s.remaining)
 	}
-	return filepath.Join(b.remaining[:n]...)
+	return filepath.Join(s.remaining[:n]...)
 }
 
-func (b *devicePathBuilderImpl) absPath(path string) string {
-	return filepath.Join(sysfsPath, "devices", filepath.Join(b.processed...), path)
+func (s *devicePathBuilderState) AdvanceSysfsPath(n int) {
+	if n < 0 {
+		n = len(s.remaining)
+	}
+	s.processed = append(s.processed, s.remaining[:n]...)
+	s.remaining = s.remaining[n:]
 }
 
-func (b *devicePathBuilderImpl) advance(n int) {
-	b.processed = append(b.processed, b.remaining[:n]...)
-	b.remaining = b.remaining[n:]
+type devicePathBuilder struct {
+	devicePathBuilderState
 }
 
-func (b *devicePathBuilderImpl) interfaceType() interfaceType {
-	return b.iface
+func (s *devicePathBuilder) done() bool {
+	return len(s.remaining) == 0
 }
 
-func (b *devicePathBuilderImpl) setInterfaceType(iface interfaceType) {
-	b.iface = iface
-}
-
-func (b *devicePathBuilderImpl) append(nodes ...efi.DevicePathNode) {
-	b.devPath = append(b.devPath, nodes...)
-}
-
-func (b *devicePathBuilderImpl) done() bool {
-	return len(b.remaining) == 0
-}
-
-func (b *devicePathBuilderImpl) processNextComponent() error {
+func (b *devicePathBuilder) ProcessNextComponent() error {
 	nProcessed := len(b.processed)
 	remaining := b.remaining
-	iface := b.iface
+	iface := b.Interface
 
-	handlers := devicePathNodeHandlers[b.iface]
+	handlers := devicePathNodeHandlers[b.Interface]
 	if len(handlers) == 0 {
 		// There should always be at least one handler registered for an interface.
-		panic(fmt.Sprintf("no handlers registered for interface type %v", b.iface))
+		panic(fmt.Sprintf("no handlers registered for interface type %v", b.Interface))
 	}
 
 	for _, handler := range handlers {
-		err := handler.fn(b)
+		err := handler.fn(&b.devicePathBuilderState)
 		if err != nil {
 			// Roll back changes
 			b.processed = b.processed[:nProcessed]
 			b.remaining = remaining
-			b.iface = iface
+			b.Interface = iface
 		}
 		if err == errSkipDevicePathNodeHandler {
 			// Try the next handler.
@@ -201,7 +166,7 @@ func (b *devicePathBuilderImpl) processNextComponent() error {
 			return xerrors.Errorf("[handler %s]: %w", handler.name, err)
 		}
 
-		if iface != interfaceTypeUnknown && b.iface == interfaceTypeUnknown {
+		if iface != interfaceTypeUnknown && b.Interface == interfaceTypeUnknown {
 			// The handler set the interface type back to unknown. Turn this
 			// in to a errUnsupportedDevice error.
 			return errUnsupportedDevice("[handler " + handler.name + "]: unrecognized interface")
@@ -211,22 +176,24 @@ func (b *devicePathBuilderImpl) processNextComponent() error {
 
 	// If we get here, then all handlers returned errSkipDevicePathNodeHandler.
 
-	if b.iface != interfaceTypeUnknown {
+	if b.Interface != interfaceTypeUnknown {
 		// If the interface has already been determined, require at least one
 		// handler to handle this node or return an error.
-		panic(fmt.Sprintf("all handlers skipped handling interface type %v", b.iface))
+		panic(fmt.Sprintf("all handlers skipped handling interface type %v", b.Interface))
 	}
 
 	return errUnsupportedDevice("unhandled root node")
 }
 
-func newDevicePathBuilder(dev *dev) (*devicePathBuilderImpl, error) {
+func newDevicePathBuilder(dev *dev) (*devicePathBuilder, error) {
 	path, err := filepath.Rel(filepath.Join(sysfsPath, "devices"), dev.sysfsPath)
 	if err != nil {
 		return nil, err
 	}
 
-	return &devicePathBuilderImpl{remaining: strings.Split(path, string(os.PathSeparator))}, nil
+	return &devicePathBuilder{
+		devicePathBuilderState: devicePathBuilderState{
+			remaining: strings.Split(path, string(os.PathSeparator))}}, nil
 }
 
 type mountPoint struct {
@@ -420,20 +387,20 @@ func FilePathToDevicePath(path string, mode FilePathToDevicePathMode) (out efi.D
 		for !builder.done() {
 			var e errUnsupportedDevice
 
-			err := builder.processNextComponent()
+			err := builder.ProcessNextComponent()
 			switch {
 			case xerrors.As(err, &e):
 				return nil, ErrNoDevicePath("encountered an error when handling components " +
-					builder.next(-1) + " from device path " +
-					builder.absPath(builder.next(-1)) + ": " + err.Error())
+					builder.PeekUnhandledSysfsComponents(-1) + " from device path " +
+					builder.SysfsPath() + ": " + err.Error())
 			case err != nil:
 				return nil, xerrors.Errorf("cannot process components %s from device path %s: %w",
-					builder.next(-1), builder.absPath(builder.next(-1)), err)
+					builder.PeekUnhandledSysfsComponents(-1), builder.SysfsPath(), err)
 			}
 		}
 	}
 
-	out = builder.devPath
+	out = builder.Path
 
 	if mode != ShortFormPathFile && fp.part > 0 {
 		node, err := NewHardDriveDevicePathNodeFromDevice(fp.devPath, fp.part)

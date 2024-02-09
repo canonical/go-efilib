@@ -10,12 +10,12 @@ import (
 
 var virtioRE = regexp.MustCompile(`^virtio[[:digit:]]`)
 
-func handleVirtioDevicePathNode(builder devicePathBuilder) error {
-	if !virtioRE.MatchString(builder.next(1)) {
+func handleVirtioDevicePathNode(state *devicePathBuilderState) error {
+	if !virtioRE.MatchString(state.PeekUnhandledSysfsComponents(1)) {
 		return errSkipDevicePathNodeHandler
 	}
 
-	builder.advance(1)
+	state.AdvanceSysfsPath(1)
 	return nil
 }
 

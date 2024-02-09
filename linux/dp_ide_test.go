@@ -9,7 +9,7 @@ import (
 
 	. "gopkg.in/check.v1"
 
-	"github.com/canonical/go-efilib"
+	efi "github.com/canonical/go-efilib"
 )
 
 type ideSuite struct {
@@ -22,18 +22,18 @@ func (s *ideSuite) TestHandleIDEDevicePathNode1(c *C) {
 	restoreSysfs := MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restoreSysfs()
 
-	builder := &devicePathBuilderImpl{
-		iface: interfaceTypeIDE,
-		devPath: efi.DevicePath{
+	state := &devicePathBuilderState{
+		Interface: interfaceTypeIDE,
+		Path: efi.DevicePath{
 			&efi.ACPIDevicePathNode{HID: 0x0a0341d0},
 			&efi.PCIDevicePathNode{Function: 1, Device: 0x01}},
 		processed: []string{"pci0000:00", "0000:00:01.1"},
 		remaining: []string{"ata7", "host3", "target3:0:0", "3:0:0:0", "block", "sdc"}}
-	c.Check(handleIDEDevicePathNode(builder), IsNil)
-	c.Check(builder.processed, DeepEquals, []string{"pci0000:00", "0000:00:01.1", "ata7", "host3", "target3:0:0", "3:0:0:0", "block", "sdc"})
-	c.Check(builder.remaining, DeepEquals, []string{})
-	c.Check(builder.iface, Equals, interfaceTypeIDE)
-	c.Check(builder.devPath, DeepEquals, efi.DevicePath{
+	c.Check(handleIDEDevicePathNode(state), IsNil)
+	c.Check(state.processed, DeepEquals, []string{"pci0000:00", "0000:00:01.1", "ata7", "host3", "target3:0:0", "3:0:0:0", "block", "sdc"})
+	c.Check(state.remaining, DeepEquals, []string{})
+	c.Check(state.Interface, Equals, interfaceTypeIDE)
+	c.Check(state.Path, DeepEquals, efi.DevicePath{
 		&efi.ACPIDevicePathNode{HID: 0x0a0341d0},
 		&efi.PCIDevicePathNode{Function: 1, Device: 0x01},
 		&efi.ATAPIDevicePathNode{
@@ -45,18 +45,18 @@ func (s *ideSuite) TestHandleIDEDevicePathNode2(c *C) {
 	restoreSysfs := MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restoreSysfs()
 
-	builder := &devicePathBuilderImpl{
-		iface: interfaceTypeIDE,
-		devPath: efi.DevicePath{
+	state := &devicePathBuilderState{
+		Interface: interfaceTypeIDE,
+		Path: efi.DevicePath{
 			&efi.ACPIDevicePathNode{HID: 0x0a0341d0},
 			&efi.PCIDevicePathNode{Function: 1, Device: 0x01}},
 		processed: []string{"pci0000:00", "0000:00:01.1"},
 		remaining: []string{"ata8", "host4", "target4:0:1", "4:0:1:0", "block", "sdd"}}
-	c.Check(handleIDEDevicePathNode(builder), IsNil)
-	c.Check(builder.processed, DeepEquals, []string{"pci0000:00", "0000:00:01.1", "ata8", "host4", "target4:0:1", "4:0:1:0", "block", "sdd"})
-	c.Check(builder.remaining, DeepEquals, []string{})
-	c.Check(builder.iface, Equals, interfaceTypeIDE)
-	c.Check(builder.devPath, DeepEquals, efi.DevicePath{
+	c.Check(handleIDEDevicePathNode(state), IsNil)
+	c.Check(state.processed, DeepEquals, []string{"pci0000:00", "0000:00:01.1", "ata8", "host4", "target4:0:1", "4:0:1:0", "block", "sdd"})
+	c.Check(state.remaining, DeepEquals, []string{})
+	c.Check(state.Interface, Equals, interfaceTypeIDE)
+	c.Check(state.Path, DeepEquals, efi.DevicePath{
 		&efi.ACPIDevicePathNode{HID: 0x0a0341d0},
 		&efi.PCIDevicePathNode{Function: 1, Device: 0x01},
 		&efi.ATAPIDevicePathNode{
