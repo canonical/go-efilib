@@ -14,7 +14,6 @@ import (
 	"strings"
 
 	"golang.org/x/sys/unix"
-	"golang.org/x/xerrors"
 
 	efi "github.com/canonical/go-efilib"
 )
@@ -344,11 +343,11 @@ func newFilePath(path string) (*filePath, error) {
 		out.dev.devPath = filepath.Join("/dev", filepath.Base(parentDev))
 		b, err := os.ReadFile(filepath.Join(childDev, "partition"))
 		if err != nil {
-			return nil, xerrors.Errorf("cannot obtain partition number for %s: %w", mount.dev, err)
+			return nil, fmt.Errorf("cannot obtain partition number for %d: %w", mount.dev, err)
 		}
 		part, err := strconv.Atoi(strings.TrimSpace(string(b)))
 		if err != nil {
-			return nil, xerrors.Errorf("cannot determine partition number for %s: %w", mount.dev, err)
+			return nil, fmt.Errorf("cannot determine partition number for %d: %w", mount.dev, err)
 		}
 		out.dev.part = part
 	}
