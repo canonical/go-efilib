@@ -173,7 +173,7 @@ func (b *devicePathBuilder) ProcessNextComponent() error {
 			continue
 		}
 		if err != nil {
-			return xerrors.Errorf("[handler %s]: %w", handler.name, err)
+			return fmt.Errorf("[handler %s]: %w", handler.name, err)
 		}
 
 		if iface != interfaceTypeUnknown && b.Interface == interfaceTypeUnknown {
@@ -233,11 +233,11 @@ func scanBlockDeviceMounts() (mounts []*mountPoint, err error) {
 		}
 		devMajor, err := strconv.ParseUint(devStr[0], 10, 32)
 		if err != nil {
-			return nil, xerrors.Errorf("invalid mount info: invalid device number: %w", err)
+			return nil, fmt.Errorf("invalid mount info: invalid device number: %w", err)
 		}
 		devMinor, err := strconv.ParseUint(devStr[1], 10, 32)
 		if err != nil {
-			return nil, xerrors.Errorf("invalid mount info: invalid device number: %w", err)
+			return nil, fmt.Errorf("invalid mount info: invalid device number: %w", err)
 		}
 
 		var mountSource string
@@ -257,7 +257,7 @@ func scanBlockDeviceMounts() (mounts []*mountPoint, err error) {
 			mountSource: mountSource})
 	}
 	if scanner.Err() != nil {
-		return nil, xerrors.Errorf("cannot parse mount info: %w", err)
+		return nil, fmt.Errorf("cannot parse mount info: %w", err)
 	}
 
 	return mounts, nil
@@ -266,7 +266,7 @@ func scanBlockDeviceMounts() (mounts []*mountPoint, err error) {
 func getFileMountPoint(path string) (*mountPoint, error) {
 	mounts, err := scanBlockDeviceMounts()
 	if err != nil {
-		return nil, xerrors.Errorf("cannot obtain list of block device mounts: %w", err)
+		return nil, fmt.Errorf("cannot obtain list of block device mounts: %w", err)
 	}
 
 	var candidate *mountPoint
@@ -305,12 +305,12 @@ type filePath struct {
 func newFilePath(path string) (*filePath, error) {
 	path, err := filepathEvalSymlinks(path)
 	if err != nil {
-		return nil, xerrors.Errorf("cannot evaluate symbolic links: %w", err)
+		return nil, fmt.Errorf("cannot evaluate symbolic links: %w", err)
 	}
 
 	mount, err := getFileMountPoint(path)
 	if err != nil {
-		return nil, xerrors.Errorf("cannot obtain mount information for path: %w", err)
+		return nil, fmt.Errorf("cannot obtain mount information for path: %w", err)
 	}
 
 	rel, err := filepath.Rel(mount.mountDir, path)
@@ -404,7 +404,7 @@ func FilePathToDevicePath(path string, mode FilePathToDevicePathMode) (out efi.D
 					builder.PeekUnhandledSysfsComponents(-1) + " from device path " +
 					builder.SysfsPath() + ": " + err.Error())
 			case err != nil:
-				return nil, xerrors.Errorf("cannot process components %s from device path %s: %w",
+				return nil, fmt.Errorf("cannot process components %s from device path %s: %w",
 					builder.PeekUnhandledSysfsComponents(-1), builder.SysfsPath(), err)
 			}
 		}
@@ -415,7 +415,7 @@ func FilePathToDevicePath(path string, mode FilePathToDevicePathMode) (out efi.D
 	if mode != ShortFormPathFile && fp.part > 0 {
 		node, err := NewHardDriveDevicePathNodeFromDevice(fp.devPath, fp.part)
 		if err != nil {
-			return nil, xerrors.Errorf("cannot construct hard drive device path node: %w", err)
+			return nil, fmt.Errorf("cannot construct hard drive device path node: %w", err)
 		}
 		out = append(out, node)
 	}

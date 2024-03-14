@@ -12,8 +12,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-
-	"golang.org/x/xerrors"
 )
 
 // ataRE matches an ATA path component, capturing the ATA print ID.
@@ -44,18 +42,18 @@ func handleATAPath(path string) (*ataParams, error) {
 
 	printId, err := strconv.ParseUint(m[1], 10, 32)
 	if err != nil {
-		return nil, xerrors.Errorf("invalid print ID: %w", err)
+		return nil, fmt.Errorf("invalid print ID: %w", err)
 	}
 
 	// Obtain the ATA port number local to this ATA controller. The kernel
 	// creates one ata%d device per port (see drivers/ata/libata-core.c:ata_host_register).
 	portBytes, err := os.ReadFile(filepath.Join(path, "../../../../..", "ata_port", ata, "port_no"))
 	if err != nil {
-		return nil, xerrors.Errorf("cannot obtain port ID: %w", err)
+		return nil, fmt.Errorf("cannot obtain port ID: %w", err)
 	}
 	port, err := strconv.ParseUint(strings.TrimSpace(string(portBytes)), 10, 16)
 	if err != nil {
-		return nil, xerrors.Errorf("invalid port ID: %w", err)
+		return nil, fmt.Errorf("invalid port ID: %w", err)
 	}
 
 	return &ataParams{

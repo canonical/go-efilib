@@ -106,7 +106,7 @@ func (p DevicePath) Bytes() ([]byte, error) {
 func (p DevicePath) Write(w io.Writer) error {
 	for i, node := range p {
 		if err := node.Write(w); err != nil {
-			return xerrors.Errorf("cannot write node %d: %w", i, err)
+			return fmt.Errorf("cannot write node %d: %w", i, err)
 		}
 	}
 
