@@ -19,8 +19,6 @@ import (
 	"github.com/canonical/go-efilib/internal/ioerr"
 	"github.com/canonical/go-efilib/internal/uefi"
 	"github.com/canonical/go-efilib/mbr"
-
-	"golang.org/x/xerrors"
 )
 
 // DevicePathType is the type of a device path node.
@@ -1107,7 +1105,7 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 		switch {
 		case err == io.EOF:
 			fallthrough
-		case xerrors.Is(err, io.ErrUnexpectedEOF):
+		case errors.Is(err, io.ErrUnexpectedEOF):
 			err = fmt.Errorf("invalid length %d bytes (too small)", h.Length)
 		case err != nil:
 		case buf.Len() > 0:

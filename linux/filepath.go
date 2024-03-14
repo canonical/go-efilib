@@ -399,7 +399,7 @@ func FilePathToDevicePath(path string, mode FilePathToDevicePathMode) (out efi.D
 
 			err := builder.ProcessNextComponent()
 			switch {
-			case xerrors.As(err, &e):
+			case errors.As(err, &e):
 				return nil, ErrNoDevicePath("encountered an error when handling components " +
 					builder.PeekUnhandledSysfsComponents(-1) + " from device path " +
 					builder.SysfsPath() + ": " + err.Error())

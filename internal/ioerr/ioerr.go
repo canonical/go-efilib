@@ -5,12 +5,11 @@
 package ioerr
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"unicode"
 	"unicode/utf8"
-
-	"golang.org/x/xerrors"
 )
 
 // Return the index of the first %w in format, or -1 if none.
@@ -97,7 +96,7 @@ func EOFIsUnexpected(args ...interface{}) error {
 // io.EOF if this is the error.
 func PassRawEOF(format string, args ...interface{}) error {
 	err := fmt.Errorf(format, args...)
-	if xerrors.Is(err, io.EOF) {
+	if errors.Is(err, io.EOF) {
 		return io.EOF
 	}
 	return err
