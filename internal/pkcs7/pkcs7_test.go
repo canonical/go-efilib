@@ -6,7 +6,7 @@ package pkcs7_test
 
 import (
 	"encoding/hex"
-	"io/ioutil"
+	"io"
 	"os"
 	"testing"
 
@@ -26,7 +26,7 @@ func (s *pkcs7Suite) TestUnmarshalSignedDataUnwrapped(c *C) {
 	c.Assert(err, IsNil)
 	defer f.Close()
 
-	b, err := ioutil.ReadAll(f)
+	b, err := io.ReadAll(f)
 	c.Check(err, IsNil)
 
 	p, err := UnmarshalSignedData(b)
@@ -40,7 +40,7 @@ func (s *pkcs7Suite) TestUnmarshalSignedDataWrapped(c *C) {
 	c.Assert(err, IsNil)
 	defer f.Close()
 
-	b, err := ioutil.ReadAll(f)
+	b, err := io.ReadAll(f)
 	c.Check(err, IsNil)
 
 	p, err := UnmarshalSignedData(b)
@@ -55,7 +55,7 @@ func (s *pkcs7Suite) TestUnmarshalSignedDAtaWithTrailingBytes(c *C) {
 	c.Assert(err, IsNil)
 	defer f.Close()
 
-	b, err := ioutil.ReadAll(f)
+	b, err := io.ReadAll(f)
 	c.Check(err, IsNil)
 
 	p, err := UnmarshalSignedData(b)

@@ -5,10 +5,10 @@
 package linux
 
 import (
-	"io/ioutil"
+	"os"
 	"path/filepath"
 
-	"github.com/canonical/go-efilib"
+	efi "github.com/canonical/go-efilib"
 )
 
 var (
@@ -25,7 +25,7 @@ func handleHVDevicePathNode(builder devicePathBuilder) error {
 		return err
 	}
 
-	classIdStr, err := ioutil.ReadFile(filepath.Join(builder.absPath(component), "class_id"))
+	classIdStr, err := os.ReadFile(filepath.Join(builder.absPath(component), "class_id"))
 	if err != nil {
 		return err
 	}

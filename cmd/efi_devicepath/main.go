@@ -7,12 +7,12 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
 	"os"
 
-	"github.com/canonical/go-efilib"
-	"github.com/canonical/go-efilib/linux"
 	"github.com/jessevdk/go-flags"
+
+	efi "github.com/canonical/go-efilib"
+	"github.com/canonical/go-efilib/linux"
 )
 
 type mode linux.FilePathToDevicePathMode
@@ -96,7 +96,7 @@ func run() error {
 			return fmt.Errorf("cannot serialize path: %v", err)
 		}
 
-		if err := ioutil.WriteFile(opts.Output, b, 0644); err != nil {
+		if err := os.WriteFile(opts.Output, b, 0644); err != nil {
 			return err
 		}
 	}

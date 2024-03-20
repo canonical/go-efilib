@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"os"
 	"path/filepath"
@@ -263,7 +262,7 @@ func readVendorDevicePathNode(r io.Reader) (out *VendorDevicePathNode, err error
 	out = &VendorDevicePathNode{
 		Type: DevicePathType(n.Header.Type),
 		GUID: GUID(n.Guid)}
-	data, _ := ioutil.ReadAll(r)
+	data, _ := io.ReadAll(r)
 	out.Data = data
 
 	return out, nil
@@ -1292,7 +1291,7 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 	if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 		return nil, err
 	}
-	data, _ := ioutil.ReadAll(buf)
+	data, _ := io.ReadAll(buf)
 	return &GenericDevicePathNode{Type: DevicePathType(n.Type), SubType: DevicePathSubType(n.SubType), Data: data}, nil
 }
 

@@ -9,7 +9,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -210,7 +209,7 @@ func (v efivarfsVarsBackend) Get(name string, guid GUID) (VariableAttributes, []
 		return 0, nil, err
 	}
 
-	data, err := ioutil.ReadAll(f)
+	data, err := io.ReadAll(f)
 	if err != nil {
 		return 0, nil, err
 	}

@@ -8,7 +8,6 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -17,7 +16,7 @@ import (
 	"golang.org/x/sys/unix"
 	"golang.org/x/xerrors"
 
-	"github.com/canonical/go-efilib"
+	efi "github.com/canonical/go-efilib"
 )
 
 // FilePathToDevicePathMode specifies the mode for FilePathToDevicePath
@@ -366,7 +365,7 @@ func newFilePath(path string) (*filePath, error) {
 		// device.
 		out.dev.sysfsPath = parentDev
 		out.dev.devPath = filepath.Join("/dev", filepath.Base(parentDev))
-		b, err := ioutil.ReadFile(filepath.Join(childDev, "partition"))
+		b, err := os.ReadFile(filepath.Join(childDev, "partition"))
 		if err != nil {
 			return nil, xerrors.Errorf("cannot obtain partition number for %s: %w", mount.dev, err)
 		}

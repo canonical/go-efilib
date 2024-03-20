@@ -6,7 +6,7 @@ package efi
 
 import (
 	"encoding/hex"
-	"io/ioutil"
+	"os"
 	"testing"
 
 	. "gopkg.in/check.v1"
@@ -21,7 +21,7 @@ func DecodeHexString(c *C, s string) []byte {
 }
 
 func ReadFile(c *C, path string) []byte {
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	c.Assert(err, IsNil)
 	return data
 }

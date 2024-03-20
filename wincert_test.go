@@ -7,7 +7,6 @@ package efi_test
 import (
 	"crypto"
 	"crypto/x509"
-	"io/ioutil"
 	"os"
 	"time"
 
@@ -41,14 +40,14 @@ func (s *wincertSuite) TestReadWinCertificateGUID(c *C) {
 	h.Write(signers[0].RawTBSCertificate)
 	c.Check(h.Sum(nil), DeepEquals, DecodeHexString(c, "607af875b99b8711204eede2c04bdf58d8f65adad8f3013a341503ca878175ea"))
 
-	caBytes, err := ioutil.ReadFile("testdata/certs/MicCorKEKCA2011_2011-06-24.crt")
+	caBytes, err := os.ReadFile("testdata/certs/MicCorKEKCA2011_2011-06-24.crt")
 	c.Check(err, IsNil)
 	ca, err := x509.ParseCertificate(caBytes)
 	c.Assert(err, IsNil)
 
 	c.Check(p7cert.CertLikelyTrustAnchor(ca), Equals, true)
 
-	caBytes, err = ioutil.ReadFile("testdata/certs/canonical-uefi-ca.der")
+	caBytes, err = os.ReadFile("testdata/certs/canonical-uefi-ca.der")
 	c.Check(err, IsNil)
 	ca, err = x509.ParseCertificate(caBytes)
 	c.Assert(err, IsNil)
@@ -70,14 +69,14 @@ func (s *wincertSuite) TestReadWinCertificateAuthenticode(c *C) {
 	h.Write(authenticodeCert.GetSigner().RawTBSCertificate)
 	c.Check(h.Sum(nil), DeepEquals, DecodeHexString(c, "08954ce3da028da0128a81435159f543d70ccd789ee86ea55630dab9a765644e"))
 
-	caBytes, err := ioutil.ReadFile("testdata/certs/canonical-uefi-ca.der")
+	caBytes, err := os.ReadFile("testdata/certs/canonical-uefi-ca.der")
 	c.Check(err, IsNil)
 	ca, err := x509.ParseCertificate(caBytes)
 	c.Assert(err, IsNil)
 
 	c.Check(authenticodeCert.CertLikelyTrustAnchor(ca), Equals, true)
 
-	caBytes, err = ioutil.ReadFile("testdata/certs/MicCorKEKCA2011_2011-06-24.crt")
+	caBytes, err = os.ReadFile("testdata/certs/MicCorKEKCA2011_2011-06-24.crt")
 	c.Check(err, IsNil)
 	ca, err = x509.ParseCertificate(caBytes)
 	c.Assert(err, IsNil)
@@ -98,7 +97,7 @@ func (s *wincertSuite) TestWinCertificationAuthenticodeCertLikelyTrustAnchorWith
 	authenticodeCert, ok := cert.(*WinCertificateAuthenticode)
 	c.Check(ok, Equals, true)
 
-	caBytes, err := ioutil.ReadFile("testdata/certs/canonical-uefi-ca.der")
+	caBytes, err := os.ReadFile("testdata/certs/canonical-uefi-ca.der")
 	c.Check(err, IsNil)
 	ca, err := x509.ParseCertificate(caBytes)
 	c.Assert(err, IsNil)
@@ -113,7 +112,7 @@ func (s *wincertSuite) TestWinCertificationAuthenticodeCertLikelyTrustAnchorWith
 	}
 	c.Check(authenticodeCert.CertLikelyTrustAnchor(ca), Equals, true)
 
-	caBytes, err = ioutil.ReadFile("testdata/certs/MicCorKEKCA2011_2011-06-24.crt")
+	caBytes, err = os.ReadFile("testdata/certs/MicCorKEKCA2011_2011-06-24.crt")
 	c.Check(err, IsNil)
 	ca, err = x509.ParseCertificate(caBytes)
 	c.Assert(err, IsNil)
@@ -143,14 +142,14 @@ func (s *wincertSuite) TestWinCertificationAuthenticodeSelfSigned(c *C) {
 	h.Write(authenticodeCert.GetSigner().RawTBSCertificate)
 	c.Check(h.Sum(nil), DeepEquals, DecodeHexString(c, "9f7950889a4a2195d9e3959123db19877617b95a3027ce8beef9b9c92fd4b438"))
 
-	caBytes, err := ioutil.ReadFile("testdata/certs/PkKek-1-snakeoil.der")
+	caBytes, err := os.ReadFile("testdata/certs/PkKek-1-snakeoil.der")
 	c.Check(err, IsNil)
 	ca, err := x509.ParseCertificate(caBytes)
 	c.Assert(err, IsNil)
 
 	c.Check(authenticodeCert.CertLikelyTrustAnchor(ca), Equals, true)
 
-	caBytes, err = ioutil.ReadFile("testdata/certs/MicCorKEKCA2011_2011-06-24.crt")
+	caBytes, err = os.ReadFile("testdata/certs/MicCorKEKCA2011_2011-06-24.crt")
 	c.Check(err, IsNil)
 	ca, err = x509.ParseCertificate(caBytes)
 	c.Assert(err, IsNil)
@@ -171,7 +170,7 @@ func (s *wincertSuite) TestWinCertificationAuthenticodeCertLikelyTrustAnchorWith
 	authenticodeCert, ok := cert.(*WinCertificateAuthenticode)
 	c.Check(ok, Equals, true)
 
-	caBytes, err := ioutil.ReadFile("testdata/certs/PkKek-1-snakeoil.der")
+	caBytes, err := os.ReadFile("testdata/certs/PkKek-1-snakeoil.der")
 	c.Check(err, IsNil)
 	ca, err := x509.ParseCertificate(caBytes)
 	c.Assert(err, IsNil)
@@ -186,7 +185,7 @@ func (s *wincertSuite) TestWinCertificationAuthenticodeCertLikelyTrustAnchorWith
 	}
 	c.Check(authenticodeCert.CertLikelyTrustAnchor(ca), Equals, true)
 
-	caBytes, err = ioutil.ReadFile("testdata/certs/MicCorKEKCA2011_2011-06-24.crt")
+	caBytes, err = os.ReadFile("testdata/certs/MicCorKEKCA2011_2011-06-24.crt")
 	c.Check(err, IsNil)
 	ca, err = x509.ParseCertificate(caBytes)
 	c.Assert(err, IsNil)
