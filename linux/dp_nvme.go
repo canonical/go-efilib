@@ -66,7 +66,3 @@ func handleNVMEDevicePathNode(state *devicePathBuilderState) error {
 		NamespaceUUID: uint64(binary.LittleEndian.Uint64(euid[:]))})
 	return nil
 }
-
-func init() {
-	registerDevicePathNodeHandler("nvme", handleNVMEDevicePathNode, 0, interfaceTypeNVME)
-}

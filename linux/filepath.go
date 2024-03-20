@@ -19,6 +19,27 @@ import (
 	efi "github.com/canonical/go-efilib"
 )
 
+func init() {
+	registerDevicePathNodeHandler("pci-root", handlePCIRootDevicePathNode)
+	registerDevicePathNodeHandler("vmbus-root", handleVMBusRootDevicePathNode)
+	registerDevicePathNodeHandler("virtual", handleVirtualDevicePathNode)
+	registerDevicePathNodeHandler("acpi", handleACPIDevicePathNode)
+
+	registerDevicePathNodeHandler("pci", handlePCIDevicePathNode, interfaceTypePCI)
+
+	registerDevicePathNodeHandler("virtio", handleVirtioDevicePathNode, interfaceTypeSCSI)
+	registerDevicePathNodeHandler("scsi", handleSCSIDevicePathNode, interfaceTypeSCSI)
+
+	registerDevicePathNodeHandler("ide", handleIDEDevicePathNode, interfaceTypeIDE)
+
+	registerDevicePathNodeHandler("sata", handleSATADevicePathNode, interfaceTypeSATA)
+
+	registerDevicePathNodeHandler("nvme", handleNVMEDevicePathNode, interfaceTypeNVME)
+
+	registerDevicePathNodeHandler("hv", handleHVDevicePathNode, interfaceTypeVMBus)
+
+}
+
 // FilePathToDevicePathMode specifies the mode for FilePathToDevicePath
 type FilePathToDevicePathMode int
 
@@ -57,13 +78,6 @@ const (
 	interfaceTypeVMBus
 )
 
-const (
-	// prependHandler indicates that a handler wants to be tried
-	// before handlers registered without this flag. These handlers
-	// should use errSkipDevicePathNodeHandler on unhandled nodes.
-	prependHandler = 1 << 0
-)
-
 var (
 	// errSkipDevicePathNodeHandler is returned from a handler when it
 	// wants to defer handling to another handler.
@@ -87,16 +101,12 @@ type registeredDpHandler struct {
 
 var devicePathNodeHandlers = make(map[interfaceType][]registeredDpHandler)
 
-func registerDevicePathNodeHandler(name string, fn devicePathNodeHandler, flags int, interfaces ...interfaceType) {
+func registerDevicePathNodeHandler(name string, fn devicePathNodeHandler, interfaces ...interfaceType) {
 	if len(interfaces) == 0 {
 		interfaces = []interfaceType{interfaceTypeUnknown}
 	}
 	for _, i := range interfaces {
-		if flags&prependHandler > 0 {
-			devicePathNodeHandlers[i] = append([]registeredDpHandler{{name, fn}}, devicePathNodeHandlers[i]...)
-		} else {
-			devicePathNodeHandlers[i] = append(devicePathNodeHandlers[i], registeredDpHandler{name, fn})
-		}
+		devicePathNodeHandlers[i] = append(devicePathNodeHandlers[i], registeredDpHandler{name, fn})
 	}
 }
 

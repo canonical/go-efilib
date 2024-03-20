@@ -116,7 +116,3 @@ func handleACPIDevicePathNode(state *devicePathBuilderState) error {
 
 	return nil
 }
-
-func init() {
-	registerDevicePathNodeHandler("acpi", handleACPIDevicePathNode, 0)
-}

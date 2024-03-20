@@ -86,7 +86,3 @@ func handleSCSIDevicePathNode(state *devicePathBuilderState) error {
 		LUN: uint16(params.lun)})
 	return nil
 }
-
-func init() {
-	registerDevicePathNodeHandler("scsi", handleSCSIDevicePathNode, 0, interfaceTypeSCSI)
-}

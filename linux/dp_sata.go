@@ -68,7 +68,3 @@ func handleSATADevicePathNode(state *devicePathBuilderState) error {
 		LUN:                      uint16(params.lun)})
 	return nil
 }
-
-func init() {
-	registerDevicePathNodeHandler("sata", handleSATADevicePathNode, 0, interfaceTypeSATA)
-}

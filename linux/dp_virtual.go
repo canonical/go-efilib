@@ -10,7 +10,3 @@ func handleVirtualDevicePathNode(state *devicePathBuilderState) error {
 	}
 	return errSkipDevicePathNodeHandler
 }
-
-func init() {
-	registerDevicePathNodeHandler("virtual", handleVirtualDevicePathNode, 0)
-}

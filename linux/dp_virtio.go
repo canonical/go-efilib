@@ -18,7 +18,3 @@ func handleVirtioDevicePathNode(state *devicePathBuilderState) error {
 	state.AdvanceSysfsPath(1)
 	return nil
 }
-
-func init() {
-	registerDevicePathNodeHandler("virtio", handleVirtioDevicePathNode, prependHandler, interfaceTypeSCSI)
-}

@@ -54,7 +54,3 @@ func handleHVDevicePathNode(state *devicePathBuilderState) error {
 		Data: data})
 	return nil
 }
-
-func init() {
-	registerDevicePathNodeHandler("hv", handleHVDevicePathNode, 0, interfaceTypeVMBus)
-}

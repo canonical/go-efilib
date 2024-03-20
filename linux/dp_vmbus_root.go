@@ -38,7 +38,3 @@ func handleVMBusRootDevicePathNode(state *devicePathBuilderState) error {
 	state.Path = append(state.Path, maybeUseSimpleACPIDevicePathNode(node))
 	return nil
 }
-
-func init() {
-	registerDevicePathNodeHandler("vmbus-root", handleVMBusRootDevicePathNode, prependHandler)
-}

@@ -68,7 +68,3 @@ func handlePCIDevicePathNode(state *devicePathBuilderState) error {
 		Device:   uint8(devNum)})
 	return nil
 }
-
-func init() {
-	registerDevicePathNodeHandler("pci", handlePCIDevicePathNode, 0, interfaceTypePCI)
-}
