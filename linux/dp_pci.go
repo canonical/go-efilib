@@ -8,14 +8,14 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 
 	"golang.org/x/xerrors"
 
-	"github.com/canonical/go-efilib"
+	efi "github.com/canonical/go-efilib"
 )
 
 var classRE = regexp.MustCompile(`^0x([[:xdigit:]]+)$`)
@@ -36,7 +36,7 @@ func handlePCIDevicePathNode(builder devicePathBuilder) error {
 	devNum, _ := strconv.ParseUint(m[1], 16, 8)
 	fun, _ := strconv.ParseUint(m[2], 10, 8)
 
-	classBytes, err := ioutil.ReadFile(filepath.Join(builder.absPath(component), "class"))
+	classBytes, err := os.ReadFile(filepath.Join(builder.absPath(component), "class"))
 	if err != nil {
 		return xerrors.Errorf("cannot read device class: %w", err)
 	}

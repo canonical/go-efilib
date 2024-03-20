@@ -9,14 +9,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 
-	"github.com/canonical/go-efilib"
+	efi "github.com/canonical/go-efilib"
 )
 
 // acpiIdRE matches a ACPI or PNP ID, capturing the vendor and product.
@@ -56,7 +55,7 @@ func decodeACPIOrPNPId(str string) (efi.EISAID, string) {
 func newACPIExtendedDevicePathNode(path string) (*efi.ACPIExtendedDevicePathNode, error) {
 	node := new(efi.ACPIExtendedDevicePathNode)
 
-	hidBytes, err := ioutil.ReadFile(filepath.Join(path, "hid"))
+	hidBytes, err := os.ReadFile(filepath.Join(path, "hid"))
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +64,7 @@ func newACPIExtendedDevicePathNode(path string) (*efi.ACPIExtendedDevicePathNode
 	node.HID = hid
 	node.HIDStr = hidStr
 
-	modalias, err := ioutil.ReadFile(filepath.Join(path, "modalias"))
+	modalias, err := os.ReadFile(filepath.Join(path, "modalias"))
 	switch {
 	case os.IsNotExist(err):
 	case err != nil:
@@ -82,7 +81,7 @@ func newACPIExtendedDevicePathNode(path string) (*efi.ACPIExtendedDevicePathNode
 		}
 	}
 
-	uidBytes, err := ioutil.ReadFile(filepath.Join(path, "uid"))
+	uidBytes, err := os.ReadFile(filepath.Join(path, "uid"))
 	switch {
 	case os.IsNotExist(err):
 	case err != nil:

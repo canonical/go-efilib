@@ -7,7 +7,6 @@ package linux
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -50,7 +49,7 @@ func handleATAPath(path string) (*ataParams, error) {
 
 	// Obtain the ATA port number local to this ATA controller. The kernel
 	// creates one ata%d device per port (see drivers/ata/libata-core.c:ata_host_register).
-	portBytes, err := ioutil.ReadFile(filepath.Join(path, "../../../../..", "ata_port", ata, "port_no"))
+	portBytes, err := os.ReadFile(filepath.Join(path, "../../../../..", "ata_port", ata, "port_no"))
 	if err != nil {
 		return nil, xerrors.Errorf("cannot obtain port ID: %w", err)
 	}

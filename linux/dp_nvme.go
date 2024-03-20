@@ -8,7 +8,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -16,7 +15,7 @@ import (
 
 	"golang.org/x/xerrors"
 
-	"github.com/canonical/go-efilib"
+	efi "github.com/canonical/go-efilib"
 )
 
 // nvmeNSRe matches "nvme/nvme<ctrl_id>/nvme<ctrl_id>n<ns_id>", capturing ns_id
@@ -42,9 +41,9 @@ func handleNVMEDevicePathNode(builder devicePathBuilder) error {
 
 	var euid [8]uint8
 
-	euidBuf, err := ioutil.ReadFile(filepath.Join(builder.absPath(components), "eui"))
+	euidBuf, err := os.ReadFile(filepath.Join(builder.absPath(components), "eui"))
 	if os.IsNotExist(err) {
-		euidBuf, err = ioutil.ReadFile(filepath.Join(builder.absPath(components), "device", "eui"))
+		euidBuf, err = os.ReadFile(filepath.Join(builder.absPath(components), "device", "eui"))
 	}
 	switch {
 	case os.IsNotExist(err):

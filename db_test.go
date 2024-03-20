@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 
 	. "github.com/canonical/go-efilib"
@@ -422,7 +421,7 @@ func (s *dbSuite) TestWriteSignatureData(c *C) {
 	c.Check(err, IsNil)
 	c.Check(owner, Equals, d.Owner)
 
-	data, err := ioutil.ReadAll(&b)
+	data, err := io.ReadAll(&b)
 	c.Check(err, IsNil)
 	c.Check(data, DeepEquals, d.Data)
 }
