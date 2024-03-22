@@ -13,8 +13,6 @@ import (
 	"regexp"
 	"strconv"
 
-	"golang.org/x/xerrors"
-
 	efi "github.com/canonical/go-efilib"
 )
 
@@ -36,7 +34,7 @@ func handleNVMEDevicePathNode(state *devicePathBuilderState) error {
 
 	nsid, err := strconv.ParseUint(m[1], 10, 32)
 	if err != nil {
-		return xerrors.Errorf("cannot parse nsid: %w", err)
+		return fmt.Errorf("cannot parse nsid: %w", err)
 	}
 
 	var euid [8]uint8
@@ -49,12 +47,12 @@ func handleNVMEDevicePathNode(state *devicePathBuilderState) error {
 	case os.IsNotExist(err):
 		// Nothing to do
 	case err != nil:
-		return xerrors.Errorf("cannot determine euid: %w", err)
+		return fmt.Errorf("cannot determine euid: %w", err)
 	default:
 		n, err := fmt.Sscanf(string(euidBuf), "%02x %02x %02x %02x %02x %02x %02x %02x",
 			&euid[0], &euid[1], &euid[2], &euid[3], &euid[4], &euid[5], &euid[6], &euid[7])
 		if err != nil {
-			return xerrors.Errorf("cannot parse euid: %w", err)
+			return fmt.Errorf("cannot parse euid: %w", err)
 		}
 		if n != 8 {
 			return errors.New("invalid euid")

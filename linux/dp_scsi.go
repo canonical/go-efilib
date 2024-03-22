@@ -15,8 +15,6 @@ import (
 	"strings"
 
 	efi "github.com/canonical/go-efilib"
-
-	"golang.org/x/xerrors"
 )
 
 // scsiRE matches a SCSI path, capturing the channel, target and LUN.
@@ -42,15 +40,15 @@ func handleSCSIPath(path string) (*scsiParams, error) {
 
 	channel, err := strconv.ParseUint(m[1], 10, 32)
 	if err != nil {
-		return nil, xerrors.Errorf("invalid channel: %w", err)
+		return nil, fmt.Errorf("invalid channel: %w", err)
 	}
 	target, err := strconv.ParseUint(m[2], 10, 32)
 	if err != nil {
-		return nil, xerrors.Errorf("invalid target: %w", err)
+		return nil, fmt.Errorf("invalid target: %w", err)
 	}
 	lun, err := strconv.ParseUint(m[3], 10, 64)
 	if err != nil {
-		return nil, xerrors.Errorf("invalid lun: %w", err)
+		return nil, fmt.Errorf("invalid lun: %w", err)
 	}
 
 	return &scsiParams{

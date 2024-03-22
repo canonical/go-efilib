@@ -11,8 +11,6 @@ import (
 	"io"
 	"math"
 
-	"golang.org/x/xerrors"
-
 	"github.com/canonical/go-efilib/internal/uefi"
 )
 
@@ -89,7 +87,7 @@ func ReadLoadOption(r io.Reader) (out *LoadOption, err error) {
 
 	dp, err := ReadDevicePath(bytes.NewReader(opt.FilePathList))
 	if err != nil {
-		return nil, xerrors.Errorf("cannot read device path: %w", err)
+		return nil, fmt.Errorf("cannot read device path: %w", err)
 	}
 	out.FilePath = dp
 

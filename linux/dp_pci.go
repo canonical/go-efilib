@@ -13,8 +13,6 @@ import (
 	"regexp"
 	"strconv"
 
-	"golang.org/x/xerrors"
-
 	efi "github.com/canonical/go-efilib"
 )
 
@@ -40,7 +38,7 @@ func handlePCIDevicePathNode(state *devicePathBuilderState) error {
 
 	classBytes, err := os.ReadFile(filepath.Join(state.SysfsPath(), "class"))
 	if err != nil {
-		return xerrors.Errorf("cannot read device class: %w", err)
+		return fmt.Errorf("cannot read device class: %w", err)
 	}
 
 	var class []byte

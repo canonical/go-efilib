@@ -7,6 +7,7 @@ package efi
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -15,7 +16,6 @@ import (
 	"syscall"
 
 	"golang.org/x/sys/unix"
-	"golang.org/x/xerrors"
 
 	internal_unix "github.com/canonical/go-efilib/internal/unix"
 )
@@ -110,7 +110,7 @@ func maybeRetry(n int, fn func() (bool, error)) error {
 func processEfivarfsFileAccessError(err error) (retry bool, errOut error) {
 	if os.IsPermission(err) {
 		var se syscall.Errno
-		if !xerrors.As(err, &se) {
+		if !errors.As(err, &se) {
 			// This shouldn't happen, but just return ErrVarPermission
 			// in this case and don't retry.
 			return false, ErrVarPermission
