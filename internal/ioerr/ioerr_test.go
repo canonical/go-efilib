@@ -35,14 +35,14 @@ func (s *ioerrSuite) TestEOFIsUnexpectedWithoutEOFAndWithFormatString(c *C) {
 
 func (s *ioerrSuite) TestEOFIsUnexpectedWithEOFAndWithFormatString2(c *C) {
 	err := EOFIsUnexpected("foo %w %d", io.EOF, 5)
-	c.Check(err, ErrorMatches, "foo unexpected EOF 5: unexpected EOF")
+	c.Check(err, ErrorMatches, "foo unexpected EOF 5")
 	c.Check(errors.Is(err, io.ErrUnexpectedEOF), Equals, true)
 }
 
 func (s *ioerrSuite) TestEOFIsUnexpectedWithoutEOFAndWithFormatString2(c *C) {
 	err1 := errors.New("bar")
 	err2 := EOFIsUnexpected("foo %w %d", err1, 5)
-	c.Check(err2, ErrorMatches, "foo bar 5: bar")
+	c.Check(err2, ErrorMatches, "foo bar 5")
 	c.Check(errors.Is(err2, err1), Equals, true)
 }
 
