@@ -129,11 +129,17 @@ func (s *devicePathBuilderState) PeekUnhandledSysfsComponents(n int) string {
 	if n < 0 {
 		n = len(s.remaining)
 	}
+	if n > len(s.remaining) {
+		n = len(s.remaining)
+	}
 	return filepath.Join(s.remaining[:n]...)
 }
 
 func (s *devicePathBuilderState) AdvanceSysfsPath(n int) {
 	if n < 0 {
+		n = len(s.remaining)
+	}
+	if n > len(s.remaining) {
 		n = len(s.remaining)
 	}
 	s.processed = append(s.processed, s.remaining[:n]...)
