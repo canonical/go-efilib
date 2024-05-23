@@ -14,19 +14,30 @@ import (
 	"github.com/canonical/go-efilib/internal/uefi"
 )
 
+// LoadOptionAttributes corresponds to the attributes of a load option
 type LoadOptionAttributes uint32
-
-func (a LoadOptionAttributes) Category() LoadOptionAttributes {
-	return a & LoadOptionAttributes(uefi.LOAD_OPTION_CATEGORY)
-}
 
 const (
 	LoadOptionActive         LoadOptionAttributes = uefi.LOAD_OPTION_ACTIVE
 	LoadOptionForceReconnect LoadOptionAttributes = uefi.LOAD_OPTION_FORCE_RECONNECT
 	LoadOptionHidden         LoadOptionAttributes = uefi.LOAD_OPTION_HIDDEN
-	LoadOptionCategoryBoot   LoadOptionAttributes = uefi.LOAD_OPTION_CATEGORY_BOOT
-	LoadOptionCategoryApp    LoadOptionAttributes = uefi.LOAD_OPTION_CATEGORY_APP
+	LoadOptionCategory       LoadOptionAttributes = uefi.LOAD_OPTION_CATEGORY
+
+	LoadOptionCategoryBoot LoadOptionAttributes = uefi.LOAD_OPTION_CATEGORY_BOOT
+	LoadOptionCategoryApp  LoadOptionAttributes = uefi.LOAD_OPTION_CATEGORY_APP
 )
+
+// IsBootCategory indicates whether the attributes has the LOAD_OPTION_CATEGORY_BOOT
+// flag set. These applications are typically part of the boot process.
+func (a LoadOptionAttributes) IsBootCategory() bool {
+	return a&LoadOptionCategory == LoadOptionCategoryBoot
+}
+
+// IsAppCategory indicates whether the attributes has the LOAD_OPTION_CATEGORY_APP
+// flag set.
+func (a LoadOptionAttributes) IsAppCategory() bool {
+	return a&LoadOptionCategory == LoadOptionCategoryApp
+}
 
 // LoadOption corresponds to the EFI_LOAD_OPTION type.
 type LoadOption struct {
@@ -68,6 +79,30 @@ func (o *LoadOption) Write(w io.Writer) error {
 	opt.FilePathListLength = uint16(dp.Len())
 
 	return opt.Write(w)
+}
+
+// IsActive indicates whether the attributes has the LOAD_OPTION_ACTIVE flag set.
+// These will be tried automaitcally if they are in BootOrder.
+func (o *LoadOption) IsActive() bool {
+	return o.Attributes&LoadOptionActive > 0
+}
+
+// IsVisible indicates whether the attributes does not have the LOAD_OPTION_HIDDEN
+// flag set.
+func (o *LoadOption) IsVisible() bool {
+	return o.Attributes&LoadOptionHidden == 0
+}
+
+// IsBootCategory indicates whether the attributes has the LOAD_OPTION_CATEGORY_BOOT
+// flag set. These applications are typically part of the boot process.
+func (o *LoadOption) IsBootCategory() bool {
+	return o.Attributes.IsBootCategory()
+}
+
+// IsAppCategory indicates whether the attributes has the LOAD_OPTION_CATEGORY_APP
+// flag set.
+func (o *LoadOption) IsAppCategory() bool {
+	return o.Attributes.IsAppCategory()
 }
 
 // ReadLoadOption reads a LoadOption from the supplied io.Reader. Due to the

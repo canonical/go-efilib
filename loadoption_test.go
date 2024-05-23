@@ -21,6 +21,26 @@ type testReadLoadOptionData struct {
 	expected *LoadOption
 }
 
+func (s *loadoptionSuite) TestLoadOptionAttributesIsBootCategoryTrue(c *C) {
+	opt := LoadOptionAttributes(0x1)
+	c.Check(opt.IsBootCategory(), Equals, true)
+}
+
+func (s *loadoptionSuite) TestLoadOptionAttributesIsBootCategoryFalse(c *C) {
+	opt := LoadOptionAttributes(0x101)
+	c.Check(opt.IsBootCategory(), Equals, false)
+}
+
+func (s *loadoptionSuite) TestLoadOptionAttributesIsAppCategoryTrue(c *C) {
+	opt := LoadOptionAttributes(0x101)
+	c.Check(opt.IsAppCategory(), Equals, true)
+}
+
+func (s *loadoptionSuite) TestLoadOptionAttributesIsAppCategoryFalse(c *C) {
+	opt := LoadOptionAttributes(0x1)
+	c.Check(opt.IsAppCategory(), Equals, false)
+}
+
 func (s *loadoptionSuite) testReadLoadOption(c *C, data *testReadLoadOptionData) {
 	opt, err := ReadLoadOption(bytes.NewReader(data.data))
 	c.Check(err, IsNil)
@@ -157,4 +177,76 @@ func (s *loadoptionSuite) TestLoadOptionBytes(c *C) {
 		"0100000062007500620075006e0074007500000004012a0001000000000800000000000000001000000000007b94de66b2fd25"+
 			"45b75230d66bb2b9600202040434005c004500460049005c007500620075006e00740075005c007300680069006d007800360034002e006500660069"+
 			"0000007fff0400"))
+}
+
+func (s *loadoptionSuite) TestLoadOptionIsActiveTrue(c *C) {
+	option := &LoadOption{
+		Attributes:  1,
+		Description: "ubuntu",
+		FilePath: DevicePath{
+			FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}}
+	c.Check(option.IsActive(), Equals, true)
+}
+
+func (s *loadoptionSuite) TestLoadOptionIsActiveFalse(c *C) {
+	option := &LoadOption{
+		Attributes:  0,
+		Description: "ubuntu",
+		FilePath: DevicePath{
+			FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}}
+	c.Check(option.IsActive(), Equals, false)
+}
+
+func (s *loadoptionSuite) TestLoadOptionIsVisibleTrue(c *C) {
+	option := &LoadOption{
+		Attributes:  1,
+		Description: "ubuntu",
+		FilePath: DevicePath{
+			FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}}
+	c.Check(option.IsVisible(), Equals, true)
+}
+
+func (s *loadoptionSuite) TestLoadOptionIsVisibleFalse(c *C) {
+	option := &LoadOption{
+		Attributes:  9,
+		Description: "ubuntu",
+		FilePath: DevicePath{
+			FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}}
+	c.Check(option.IsVisible(), Equals, false)
+}
+
+func (s *loadoptionSuite) TestLoadOptionIsBootCategoryTrue(c *C) {
+	option := &LoadOption{
+		Attributes:  1,
+		Description: "ubuntu",
+		FilePath: DevicePath{
+			FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}}
+	c.Check(option.IsBootCategory(), Equals, true)
+}
+
+func (s *loadoptionSuite) TestLoadOptionIsBootCategoryFalse(c *C) {
+	option := &LoadOption{
+		Attributes:  0x101,
+		Description: "ubuntu",
+		FilePath: DevicePath{
+			FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}}
+	c.Check(option.IsBootCategory(), Equals, false)
+}
+
+func (s *loadoptionSuite) TestLoadOptionIsAppCategoryTrue(c *C) {
+	option := &LoadOption{
+		Attributes:  0x101,
+		Description: "ubuntu",
+		FilePath: DevicePath{
+			FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}}
+	c.Check(option.IsAppCategory(), Equals, true)
+}
+
+func (s *loadoptionSuite) TestLoadOptionIsAppCategoryFalse(c *C) {
+	option := &LoadOption{
+		Attributes:  1,
+		Description: "ubuntu",
+		FilePath: DevicePath{
+			FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}}
+	c.Check(option.IsAppCategory(), Equals, false)
 }
