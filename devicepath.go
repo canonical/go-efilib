@@ -49,7 +49,8 @@ const (
 	BBSDevicePath       DevicePathType = uefi.BBS_DEVICE_PATH
 )
 
-// DevicePathSubType is the sub-type of a device path node.
+// DevicePathSubType is the sub-type of a device path node. The meaning of
+// this depends on the [DevicePathType].
 type DevicePathSubType uint8
 
 // DevicePathToStringFlags defines flags for [DevicePath.ToString] and
@@ -115,11 +116,12 @@ func (p DevicePath) Write(w io.Writer) error {
 	return binary.Write(w, binary.LittleEndian, &end)
 }
 
-// GenericDevicePathNode corresponds to a device path nodes with an unhandled type.
+// GenericDevicePathNode corresponds to a device path nodes with a type that is
+// not handled by this package
 type GenericDevicePathNode struct {
 	Type    DevicePathType
-	SubType DevicePathSubType
-	Data    []byte
+	SubType DevicePathSubType // the meaning of the sub-type depends on the Type field.
+	Data    []byte            // An opaque blob of data associated with this node
 }
 
 func (d *GenericDevicePathNode) ToString(_ DevicePathToStringFlags) string {
@@ -163,8 +165,8 @@ func (d *GenericDevicePathNode) Write(w io.Writer) error {
 
 // PCIDevicePathNode corresponds to a PCI device path node.
 type PCIDevicePathNode struct {
-	Function uint8
-	Device   uint8
+	Function uint8 // Function of device
+	Device   uint8 // Device number of PCI bus
 }
 
 func (d *PCIDevicePathNode) ToString(_ DevicePathToStringFlags) string {
@@ -187,10 +189,11 @@ func (d *PCIDevicePathNode) Write(w io.Writer) error {
 	return binary.Write(w, binary.LittleEndian, &data)
 }
 
+// VendorDevicePathNode corresponds to a vendor specific node.
 type VendorDevicePathNode struct {
-	Type DevicePathType
-	GUID GUID
-	Data []byte
+	Type DevicePathType // The type of this node
+	GUID GUID           // The vendor specific GUID
+	Data []byte         // Vendor specific data
 }
 
 func (d *VendorDevicePathNode) ToString(_ DevicePathToStringFlags) string {
@@ -305,8 +308,8 @@ func NewEISAID(vendor string, product uint16) (EISAID, error) {
 
 // ACPIDevicePathNode corresponds to an ACPI device path node.
 type ACPIDevicePathNode struct {
-	HID EISAID
-	UID uint32
+	HID EISAID // Compressed hardware ID
+	UID uint32 // Unique ID
 }
 
 func (d *ACPIDevicePathNode) ToString(_ DevicePathToStringFlags) string {
@@ -345,6 +348,9 @@ func (d *ACPIDevicePathNode) Write(w io.Writer) error {
 	return binary.Write(w, binary.LittleEndian, &data)
 }
 
+// ACPIExtendedDevicePathNode corresponds to an ACPI device path node
+// and is used where a CID field is required or a string field is
+// required for HID or UID.
 type ACPIExtendedDevicePathNode struct {
 	HID    EISAID
 	UID    uint32
@@ -442,6 +448,7 @@ func (d *ACPIExtendedDevicePathNode) Write(w io.Writer) error {
 	return nil
 }
 
+// ATAPIControllerRole describes the port that an IDE device is connected to.
 type ATAPIControllerRole uint8
 
 func (r ATAPIControllerRole) String() string {
@@ -460,6 +467,7 @@ const (
 	ATAPIControllerSecondary ATAPIControllerRole = 1
 )
 
+// ATAPIDriveRole describes the role of a device on a specific IDE port.
 type ATAPIDriveRole uint8
 
 func (r ATAPIDriveRole) String() string {
@@ -482,7 +490,7 @@ const (
 type ATAPIDevicePathNode struct {
 	Controller ATAPIControllerRole
 	Drive      ATAPIDriveRole
-	LUN        uint16
+	LUN        uint16 // Logical unit number
 }
 
 func (d *ATAPIDevicePathNode) ToString(flags DevicePathToStringFlags) string {
@@ -511,8 +519,8 @@ func (d *ATAPIDevicePathNode) Write(w io.Writer) error {
 
 // SCSIDevicePathNode corresponds to a SCSI device path node.
 type SCSIDevicePathNode struct {
-	PUN uint16
-	LUN uint16
+	PUN uint16 // Target ID on the SCSI bus
+	LUN uint16 // Logical unit number
 }
 
 func (d *SCSIDevicePathNode) ToString(_ DevicePathToStringFlags) string {
@@ -701,9 +709,9 @@ func (d *DeviceLogicalUnitDevicePathNode) Write(w io.Writer) error {
 
 // SATADevicePathNode corresponds to a SATA device path node.
 type SATADevicePathNode struct {
-	HBAPortNumber            uint16
-	PortMultiplierPortNumber uint16
-	LUN                      uint16
+	HBAPortNumber            uint16 // The zero indexed port number on the HBA
+	PortMultiplierPortNumber uint16 // The port multiplier (or 0xFFFF if the device is connected directly to the HBA)
+	LUN                      uint16 // Logical unit number
 }
 
 func (d *SATADevicePathNode) ToString(_ DevicePathToStringFlags) string {
@@ -729,8 +737,8 @@ func (d *SATADevicePathNode) Write(w io.Writer) error {
 
 // NVMENamespaceDevicePathNode corresponds to a NVME namespace device path node.
 type NVMENamespaceDevicePathNode struct {
-	NamespaceID   uint32
-	NamespaceUUID uint64
+	NamespaceID   uint32 // Namespace identifier
+	NamespaceUUID uint64 // EUI-64 (extended unique identifier). This is set to 0 where not supported
 }
 
 func (d *NVMENamespaceDevicePathNode) ToString(_ DevicePathToStringFlags) string {
@@ -756,6 +764,7 @@ func (d *NVMENamespaceDevicePathNode) Write(w io.Writer) error {
 	return binary.Write(w, binary.LittleEndian, &data)
 }
 
+// MBRType describes a disk header type
 type MBRType uint8
 
 func (t MBRType) String() string {
@@ -787,38 +796,45 @@ func (t HardDriveSignatureType) String() string {
 	}
 }
 
+// HardDriveSignature is an abstraction for a unique hard drive identifier
 type HardDriveSignature interface {
 	fmt.Stringer
-	Data() [16]uint8
-	Type() HardDriveSignatureType
+	Data() [16]uint8              // the raw signature data
+	Type() HardDriveSignatureType // Signature type
 }
 
+// GUIDHardDriveSignature is a [HardDriveSignature] for GPT drives.
 type GUIDHardDriveSignature GUID
 
 func (s GUIDHardDriveSignature) String() string {
 	return GUID(s).String()
 }
 
+// Data implements [HardDriveSignature.Data].
 func (s GUIDHardDriveSignature) Data() (out [16]uint8) {
 	copy(out[:], s[:])
 	return out
 }
 
+// Type implements [HardDriveSignature.Type].
 func (GUIDHardDriveSignature) Type() HardDriveSignatureType {
 	return HardDriveSignatureType(uefi.SIGNATURE_TYPE_GUID)
 }
 
+// MBRHardDriveSignature is a [HardDriveSignature] for legacy MBR drives.
 type MBRHardDriveSignature uint32
 
 func (s MBRHardDriveSignature) String() string {
 	return fmt.Sprintf("0x%08x", uint32(s))
 }
 
+// Data implements [HardDriveSignature.Data].
 func (s MBRHardDriveSignature) Data() (out [16]uint8) {
 	binary.LittleEndian.PutUint32(out[:], uint32(s))
 	return out
 }
 
+// Type implements [HardDriveSignature.Type].
 func (s MBRHardDriveSignature) Type() HardDriveSignatureType {
 	return HardDriveSignatureType(uefi.SIGNATURE_TYPE_MBR)
 }
@@ -842,11 +858,11 @@ func (s *genericHardDriveSignature) Type() HardDriveSignatureType {
 
 // HardDriveDevicePathNode corresponds to a hard drive device path node.
 type HardDriveDevicePathNode struct {
-	PartitionNumber uint32
-	PartitionStart  uint64
-	PartitionSize   uint64
-	Signature       HardDriveSignature
-	MBRType         MBRType
+	PartitionNumber uint32             // 1-indexed partition number
+	PartitionStart  uint64             // Starting LBA
+	PartitionSize   uint64             // Size in number of LBAs
+	Signature       HardDriveSignature // Signature,the type of which is implementation specific (GPT vs MBR)
+	MBRType         MBRType            // Legacy MBR or GPT
 }
 
 func (d *HardDriveDevicePathNode) ToString(flags DevicePathToStringFlags) string {
@@ -1293,7 +1309,8 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 	return &GenericDevicePathNode{Type: DevicePathType(n.Type), SubType: DevicePathSubType(n.SubType), Data: data}, nil
 }
 
-// ReadDevicePath decodes a device path from the supplied io.Reader.
+// ReadDevicePath decodes a device path from the supplied io.Reader. It will read
+// until it finds a termination node or an error occurs.
 func ReadDevicePath(r io.Reader) (out DevicePath, err error) {
 	for i := 0; ; i++ {
 		node, err := decodeDevicePathNode(r)
