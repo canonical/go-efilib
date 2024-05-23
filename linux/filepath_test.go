@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"golang.org/x/sys/unix"
 	. "gopkg.in/check.v1"
 
 	efi "github.com/canonical/go-efilib"
@@ -37,6 +38,10 @@ func (s *filepathSuite) TestFilePathToDevicePathShortFormFile(c *C) {
 	defer restore()
 	restore = MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restore()
+	restore = s.MockUnixStat(map[string]unix.Stat_t{
+		"/boot/efi/EFI/ubuntu/shimx64.efi": unix.Stat_t{Dev: unix.Mkdev(259, 1)},
+	})
+	defer restore()
 
 	path, err := FilePathToDevicePath("/boot/efi/EFI/ubuntu/shimx64.efi", ShortFormPathFile)
 	c.Check(err, IsNil)
@@ -51,6 +56,10 @@ func (s *filepathSuite) TestFilePathToDevicePathShortFormHD(c *C) {
 	restore = s.mockOsOpen(map[string]string{"/dev/nvme0n1": "testdata/disk.img"})
 	defer restore()
 	restore = MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
+	defer restore()
+	restore = s.MockUnixStat(map[string]unix.Stat_t{
+		"/boot/efi/EFI/ubuntu/shimx64.efi": unix.Stat_t{Dev: unix.Mkdev(259, 1)},
+	})
 	defer restore()
 
 	path, err := FilePathToDevicePath("/boot/efi/EFI/ubuntu/shimx64.efi", ShortFormPathHD)
@@ -72,6 +81,10 @@ func (s *filepathSuite) TestFilePathToDevicePathShortFormHDUnpartitioned(c *C) {
 	defer restore()
 	restore = MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restore()
+	restore = s.MockUnixStat(map[string]unix.Stat_t{
+		"/snap/core/11993/bin/ls": unix.Stat_t{Dev: unix.Mkdev(7, 1)},
+	})
+	defer restore()
 
 	_, err := FilePathToDevicePath("/snap/core/11993/bin/ls", ShortFormPathHD)
 	c.Check(err, ErrorMatches, "cannot map file path to a UEFI device path: file is not inside partitioned media - use linux.ShortFormPathFile")
@@ -85,6 +98,10 @@ func (s *filepathSuite) TestFilePathToDevicePathFullNVME(c *C) {
 	restore = s.mockOsOpen(map[string]string{"/dev/nvme0n1": "testdata/disk.img"})
 	defer restore()
 	restore = MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
+	defer restore()
+	restore = s.MockUnixStat(map[string]unix.Stat_t{
+		"/boot/efi/EFI/ubuntu/shimx64.efi": unix.Stat_t{Dev: unix.Mkdev(259, 1)},
+	})
 	defer restore()
 
 	path, err := FilePathToDevicePath("/boot/efi/EFI/ubuntu/shimx64.efi", FullPath)
@@ -112,6 +129,10 @@ func (s *filepathSuite) TestFilePathToDevicePathFullSATA(c *C) {
 	defer restore()
 	restore = MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
 	defer restore()
+	restore = s.MockUnixStat(map[string]unix.Stat_t{
+		"/boot/efi/EFI/ubuntu/shimx64.efi": unix.Stat_t{Dev: unix.Mkdev(8, 1)},
+	})
+	defer restore()
 
 	path, err := FilePathToDevicePath("/boot/efi/EFI/ubuntu/shimx64.efi", FullPath)
 	c.Check(err, IsNil)
@@ -135,6 +156,10 @@ func (s *filepathSuite) TestFilePathToDevicePathFullNoDevicePath(c *C) {
 	defer restore()
 	restore = MockMountsPath("testdata/mounts-nvme")
 	defer restore()
+	restore = s.MockUnixStat(map[string]unix.Stat_t{
+		"/snap/core/11993/bin/ls": unix.Stat_t{Dev: unix.Mkdev(7, 1)},
+	})
+	defer restore()
 
 	sysfs := filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys")
 	restore = MockSysfsPath(sysfs)
@@ -152,6 +177,10 @@ func (s *filepathSuite) TestFilePathToDevicePathFullWithBindMount(c *C) {
 	restore = s.mockOsOpen(map[string]string{"/dev/nvme0n1": "testdata/disk.img"})
 	defer restore()
 	restore = MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
+	defer restore()
+	restore = s.MockUnixStat(map[string]unix.Stat_t{
+		"/efi/ubuntu/shimx64.efi": unix.Stat_t{Dev: unix.Mkdev(259, 1)},
+	})
 	defer restore()
 
 	path, err := FilePathToDevicePath("/efi/ubuntu/shimx64.efi", FullPath)
@@ -178,6 +207,10 @@ func (s *filepathSuite) TestFilePathToDevicePathFullWithSymlink(c *C) {
 	restore = s.mockOsOpen(map[string]string{"/dev/nvme0n1": "testdata/disk.img"})
 	defer restore()
 	restore = MockSysfsPath(filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys"))
+	defer restore()
+	restore = s.MockUnixStat(map[string]unix.Stat_t{
+		"/efi/ubuntu/shimx64.efi": unix.Stat_t{Dev: unix.Mkdev(259, 1)},
+	})
 	defer restore()
 
 	path, err := FilePathToDevicePath("/foo/bar/shimx64.efi", FullPath)

@@ -269,6 +269,11 @@ func scanBlockDeviceMounts() (mounts []*mountPoint, err error) {
 }
 
 func getFileMountPoint(path string) (*mountPoint, error) {
+	var st unix.Stat_t
+	if err := unixStat(path, &st); err != nil {
+		return nil, fmt.Errorf("cannot stat %s: %w", path, err)
+	}
+
 	mounts, err := scanBlockDeviceMounts()
 	if err != nil {
 		return nil, fmt.Errorf("cannot obtain list of block device mounts: %w", err)
@@ -277,10 +282,14 @@ func getFileMountPoint(path string) (*mountPoint, error) {
 	var candidate *mountPoint
 
 	for _, mount := range mounts {
-		if !strings.HasPrefix(path, mount.mountDir) {
+		if mount.dev != st.Dev {
 			continue
 		}
 
+		rel, err := filepath.Rel(mount.mountDir, path)
+		if err != nil || strings.HasPrefix(rel, "..") {
+			continue
+		}
 		if candidate == nil {
 			candidate = mount
 		}

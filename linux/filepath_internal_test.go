@@ -37,6 +37,21 @@ func (s *FilepathMockMixin) MockFilepathEvalSymlinks(m map[string]string) (resto
 	}
 }
 
+func (s *FilepathMockMixin) MockUnixStat(m map[string]unix.Stat_t) (restore func()) {
+	orig := unixStat
+	unixStat = func(path string, st *unix.Stat_t) error {
+		if s, ok := m[path]; ok {
+			*st = s
+			return nil
+		}
+		return orig(path, st)
+	}
+
+	return func() {
+		unixStat = orig
+	}
+}
+
 type filepathSuite struct {
 	FilepathMockMixin
 	TarFileMixin
@@ -66,6 +81,10 @@ func (s *filepathSuite) TestGetFileMountPoint(c *C) {
 	defer restore()
 	restore = MockMountsPath("testdata/mounts-nvme")
 	defer restore()
+	restore = s.MockUnixStat(map[string]unix.Stat_t{
+		"/boot/efi/EFI/ubuntu/shimx64.efi": unix.Stat_t{Dev: unix.Mkdev(259, 1)},
+	})
+	defer restore()
 
 	mount, err := getFileMountPoint("/boot/efi/EFI/ubuntu/shimx64.efi")
 	c.Check(err, IsNil)
@@ -77,6 +96,10 @@ func (s *filepathSuite) TestGetFileMountPointBindMount(c *C) {
 	defer restore()
 	restore = MockMountsPath("testdata/mounts-nvme")
 	defer restore()
+	restore = s.MockUnixStat(map[string]unix.Stat_t{
+		"/efi/ubuntu/shimx64.efi": unix.Stat_t{Dev: unix.Mkdev(259, 1)},
+	})
+	defer restore()
 
 	mount, err := getFileMountPoint("/efi/ubuntu/shimx64.efi")
 	c.Check(err, IsNil)
@@ -87,6 +110,10 @@ func (s *filepathSuite) TestNewFilePath(c *C) {
 	restore := s.MockFilepathEvalSymlinks(map[string]string{})
 	defer restore()
 	restore = MockMountsPath("testdata/mounts-nvme")
+	defer restore()
+	restore = s.MockUnixStat(map[string]unix.Stat_t{
+		"/boot/efi/EFI/ubuntu/shimx64.efi": unix.Stat_t{Dev: unix.Mkdev(259, 1)},
+	})
 	defer restore()
 
 	sysfs := filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys")
@@ -108,6 +135,10 @@ func (s *filepathSuite) TestNewFilePathBindMount(c *C) {
 	defer restore()
 	restore = MockMountsPath("testdata/mounts-nvme")
 	defer restore()
+	restore = s.MockUnixStat(map[string]unix.Stat_t{
+		"/efi/ubuntu/shimx64.efi": unix.Stat_t{Dev: unix.Mkdev(259, 1)},
+	})
+	defer restore()
 
 	sysfs := filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys")
 	restore = MockSysfsPath(sysfs)
@@ -128,6 +159,10 @@ func (s *filepathSuite) TestNewFilePathSymlink(c *C) {
 	defer restore()
 	restore = MockMountsPath("testdata/mounts-nvme")
 	defer restore()
+	restore = s.MockUnixStat(map[string]unix.Stat_t{
+		"/efi/ubuntu/shimx64.efi": unix.Stat_t{Dev: unix.Mkdev(259, 1)},
+	})
+	defer restore()
 
 	sysfs := filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys")
 	restore = MockSysfsPath(sysfs)
@@ -147,6 +182,10 @@ func (s *filepathSuite) TestNewFilePathNotPartitioned(c *C) {
 	restore := s.MockFilepathEvalSymlinks(map[string]string{})
 	defer restore()
 	restore = MockMountsPath("testdata/mounts-nvme")
+	defer restore()
+	restore = s.MockUnixStat(map[string]unix.Stat_t{
+		"/snap/core/11993/bin/ls": unix.Stat_t{Dev: unix.Mkdev(7, 1)},
+	})
 	defer restore()
 
 	sysfs := filepath.Join(s.UnpackTar(c, "testdata/sys.tar"), "sys")
