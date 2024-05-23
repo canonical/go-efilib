@@ -42,11 +42,31 @@ func handlePCIDevicePathNode(state *devicePathBuilderState) error {
 	}
 
 	var class []byte
-	if n, err := fmt.Sscanf(string(classBytes), "0x%x", &class); err != nil || n != 1 {
-		return errors.New("cannot decode device class")
+	n, err := fmt.Sscanf(string(classBytes), "0x%x", &class)
+	if err != nil {
+		return fmt.Errorf("cannot decode device class: %w", err)
+	}
+	if n != 1 {
+		return errors.New("invalid device class")
+	}
+
+	vendorBytes, err := os.ReadFile(filepath.Join(state.SysfsPath(), "vendor"))
+	if err != nil {
+		return fmt.Errorf("cannot read device vendor: %w", err)
+	}
+
+	var vendor uint16
+	n, err = fmt.Sscanf(string(vendorBytes), "0x%04x", &vendor)
+	if err != nil {
+		return fmt.Errorf("cannot decode device vendor: %w", err)
+	}
+	if n != 1 {
+		return errors.New("invalid device vendor")
 	}
 
 	switch {
+	case vendor == 0x1af4:
+		state.Interface = interfaceTypeVirtio
 	case bytes.HasPrefix(class, []byte{0x01, 0x00}):
 		state.Interface = interfaceTypeSCSI
 	case bytes.HasPrefix(class, []byte{0x01, 0x01}):

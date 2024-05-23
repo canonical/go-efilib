@@ -26,7 +26,6 @@ func init() {
 
 	registerDevicePathNodeHandler("pci", handlePCIDevicePathNode, interfaceTypePCI)
 
-	registerDevicePathNodeHandler("virtio", handleVirtioDevicePathNode, interfaceTypeSCSI)
 	registerDevicePathNodeHandler("scsi", handleSCSIDevicePathNode, interfaceTypeSCSI)
 
 	registerDevicePathNodeHandler("ide", handleIDEDevicePathNode, interfaceTypeIDE)
@@ -36,6 +35,8 @@ func init() {
 	registerDevicePathNodeHandler("nvme", handleNVMEDevicePathNode, interfaceTypeNVME)
 
 	registerDevicePathNodeHandler("hv", handleHVDevicePathNode, interfaceTypeVMBus)
+
+	registerDevicePathNodeHandler("virtio", handleVirtioDevicePathNode, interfaceTypeVirtio)
 
 }
 
@@ -75,6 +76,7 @@ const (
 	interfaceTypeSATA
 	interfaceTypeNVME
 	interfaceTypeVMBus
+	interfaceTypeVirtio
 )
 
 var (
