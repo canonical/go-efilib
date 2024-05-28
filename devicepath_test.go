@@ -256,3 +256,221 @@ func (d *dpSuite) TestNewHardDriveDevicePathNodeFromMBRDevice(c *C) {
 		Signature:       MBRHardDriveSignature(0xa773bf3f),
 		MBRType:         LegacyMBR})
 }
+
+func (d *dpSuite) TestDevicePathMatchesFull(c *C) {
+	path := DevicePath{
+		&ACPIDevicePathNode{
+			HID: 0x0a0341d0,
+			UID: 0x0},
+		&PCIDevicePathNode{
+			Function: 0x0,
+			Device:   0x1d},
+		&PCIDevicePathNode{
+			Function: 0x0,
+			Device:   0x0},
+		&NVMENamespaceDevicePathNode{
+			NamespaceID:   0x1,
+			NamespaceUUID: 0x0},
+		&HardDriveDevicePathNode{
+			PartitionNumber: 1,
+			PartitionStart:  0x800,
+			PartitionSize:   0x100000,
+			Signature:       GUIDHardDriveSignature(MakeGUID(0x66de947b, 0xfdb2, 0x4525, 0xb752, [...]uint8{0x30, 0xd6, 0x6b, 0xb2, 0xb9, 0x60})),
+			MBRType:         GPT},
+		FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}
+	c.Check(path.Matches(path), Equals, DevicePathFullMatch)
+}
+
+func (d *dpSuite) TestDevicePathMatchesShortHD(c *C) {
+	path := DevicePath{
+		&ACPIDevicePathNode{
+			HID: 0x0a0341d0,
+			UID: 0x0},
+		&PCIDevicePathNode{
+			Function: 0x0,
+			Device:   0x1d},
+		&PCIDevicePathNode{
+			Function: 0x0,
+			Device:   0x0},
+		&NVMENamespaceDevicePathNode{
+			NamespaceID:   0x1,
+			NamespaceUUID: 0x0},
+		&HardDriveDevicePathNode{
+			PartitionNumber: 1,
+			PartitionStart:  0x800,
+			PartitionSize:   0x100000,
+			Signature:       GUIDHardDriveSignature(MakeGUID(0x66de947b, 0xfdb2, 0x4525, 0xb752, [...]uint8{0x30, 0xd6, 0x6b, 0xb2, 0xb9, 0x60})),
+			MBRType:         GPT},
+		FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}
+
+	hdPath := DevicePath{
+		&HardDriveDevicePathNode{
+			PartitionNumber: 1,
+			PartitionStart:  0x800,
+			PartitionSize:   0x100000,
+			Signature:       GUIDHardDriveSignature(MakeGUID(0x66de947b, 0xfdb2, 0x4525, 0xb752, [...]uint8{0x30, 0xd6, 0x6b, 0xb2, 0xb9, 0x60})),
+			MBRType:         GPT},
+		FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}
+	c.Check(path.Matches(hdPath), Equals, DevicePathShortFormHDMatch)
+}
+
+func (d *dpSuite) TestDevicePathMatchesShortFile(c *C) {
+	path := DevicePath{
+		&ACPIDevicePathNode{
+			HID: 0x0a0341d0,
+			UID: 0x0},
+		&PCIDevicePathNode{
+			Function: 0x0,
+			Device:   0x1d},
+		&PCIDevicePathNode{
+			Function: 0x0,
+			Device:   0x0},
+		&NVMENamespaceDevicePathNode{
+			NamespaceID:   0x1,
+			NamespaceUUID: 0x0},
+		&HardDriveDevicePathNode{
+			PartitionNumber: 1,
+			PartitionStart:  0x800,
+			PartitionSize:   0x100000,
+			Signature:       GUIDHardDriveSignature(MakeGUID(0x66de947b, 0xfdb2, 0x4525, 0xb752, [...]uint8{0x30, 0xd6, 0x6b, 0xb2, 0xb9, 0x60})),
+			MBRType:         GPT},
+		FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}
+
+	filePath := DevicePath{
+		FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}
+	c.Check(path.Matches(filePath), Equals, DevicePathShortFormFileMatch)
+}
+
+func (d *dpSuite) TestDevicePathMatchesEmpty(c *C) {
+	p := DevicePath{}
+	c.Check(p.Matches(DevicePath{}), Equals, DevicePathFullMatch)
+}
+
+func (d *dpSuite) TestDevicePathMatchesEmptyOtherNoMatch(c *C) {
+	path := DevicePath{
+		&ACPIDevicePathNode{
+			HID: 0x0a0341d0,
+			UID: 0x0},
+		&PCIDevicePathNode{
+			Function: 0x0,
+			Device:   0x1d},
+		&PCIDevicePathNode{
+			Function: 0x0,
+			Device:   0x0},
+		&NVMENamespaceDevicePathNode{
+			NamespaceID:   0x1,
+			NamespaceUUID: 0x0},
+		&HardDriveDevicePathNode{
+			PartitionNumber: 1,
+			PartitionStart:  0x800,
+			PartitionSize:   0x100000,
+			Signature:       GUIDHardDriveSignature(MakeGUID(0x66de947b, 0xfdb2, 0x4525, 0xb752, [...]uint8{0x30, 0xd6, 0x6b, 0xb2, 0xb9, 0x60})),
+			MBRType:         GPT},
+		FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}
+	c.Check(path.Matches(DevicePath{}), Equals, DevicePathNoMatch)
+}
+
+func (d *dpSuite) TestDevicePathMatchesFullNoMatch(c *C) {
+	path := DevicePath{
+		&ACPIDevicePathNode{
+			HID: 0x0a0341d0,
+			UID: 0x0},
+		&PCIDevicePathNode{
+			Function: 0x0,
+			Device:   0x1d},
+		&PCIDevicePathNode{
+			Function: 0x0,
+			Device:   0x0},
+		&NVMENamespaceDevicePathNode{
+			NamespaceID:   0x1,
+			NamespaceUUID: 0x0},
+		&HardDriveDevicePathNode{
+			PartitionNumber: 1,
+			PartitionStart:  0x800,
+			PartitionSize:   0x100000,
+			Signature:       GUIDHardDriveSignature(MakeGUID(0x66de947b, 0xfdb2, 0x4525, 0xb752, [...]uint8{0x30, 0xd6, 0x6b, 0xb2, 0xb9, 0x60})),
+			MBRType:         GPT},
+		FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}
+
+	other := DevicePath{
+		&ACPIDevicePathNode{
+			HID: 0x0a0341d0,
+			UID: 0x0},
+		&PCIDevicePathNode{
+			Function: 0x0,
+			Device:   0x1d},
+		&PCIDevicePathNode{
+			Function: 0x0,
+			Device:   0x2},
+		&NVMENamespaceDevicePathNode{
+			NamespaceID:   0x1,
+			NamespaceUUID: 0x0},
+		&HardDriveDevicePathNode{
+			PartitionNumber: 1,
+			PartitionStart:  0x800,
+			PartitionSize:   0x100000,
+			Signature:       GUIDHardDriveSignature(MakeGUID(0x66de947b, 0xfdb2, 0x4525, 0xb752, [...]uint8{0x30, 0xd6, 0x6b, 0xb2, 0xb9, 0x60})),
+			MBRType:         GPT},
+		FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}
+	c.Check(path.Matches(other), Equals, DevicePathNoMatch)
+}
+
+func (d *dpSuite) TestDevicePathMatchesShortHDNoMatch(c *C) {
+	path := DevicePath{
+		&ACPIDevicePathNode{
+			HID: 0x0a0341d0,
+			UID: 0x0},
+		&PCIDevicePathNode{
+			Function: 0x0,
+			Device:   0x1d},
+		&PCIDevicePathNode{
+			Function: 0x0,
+			Device:   0x0},
+		&NVMENamespaceDevicePathNode{
+			NamespaceID:   0x1,
+			NamespaceUUID: 0x0},
+		&HardDriveDevicePathNode{
+			PartitionNumber: 1,
+			PartitionStart:  0x800,
+			PartitionSize:   0x100000,
+			Signature:       GUIDHardDriveSignature(MakeGUID(0x66de947b, 0xfdb2, 0x4525, 0xb752, [...]uint8{0x31, 0xd6, 0x6b, 0xb2, 0xb9, 0x60})),
+			MBRType:         GPT},
+		FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}
+
+	hdPath := DevicePath{
+		&HardDriveDevicePathNode{
+			PartitionNumber: 1,
+			PartitionStart:  0x800,
+			PartitionSize:   0x100000,
+			Signature:       GUIDHardDriveSignature(MakeGUID(0x66de947b, 0xfdb2, 0x4525, 0xb752, [...]uint8{0x30, 0xd6, 0x6b, 0xb2, 0xb9, 0x60})),
+			MBRType:         GPT},
+		FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}
+	c.Check(path.Matches(hdPath), Equals, DevicePathNoMatch)
+}
+
+func (d *dpSuite) TestDevicePathMatchesShortFileNoMatch(c *C) {
+	path := DevicePath{
+		&ACPIDevicePathNode{
+			HID: 0x0a0341d0,
+			UID: 0x0},
+		&PCIDevicePathNode{
+			Function: 0x0,
+			Device:   0x1d},
+		&PCIDevicePathNode{
+			Function: 0x0,
+			Device:   0x0},
+		&NVMENamespaceDevicePathNode{
+			NamespaceID:   0x1,
+			NamespaceUUID: 0x0},
+		&HardDriveDevicePathNode{
+			PartitionNumber: 1,
+			PartitionStart:  0x800,
+			PartitionSize:   0x100000,
+			Signature:       GUIDHardDriveSignature(MakeGUID(0x66de947b, 0xfdb2, 0x4525, 0xb752, [...]uint8{0x30, 0xd6, 0x6b, 0xb2, 0xb9, 0x60})),
+			MBRType:         GPT},
+		FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}
+
+	filePath := DevicePath{
+		FilePathDevicePathNode("\\EFI\\ubuntu\\sgrubx64.efi")}
+	c.Check(path.Matches(filePath), Equals, DevicePathNoMatch)
+}

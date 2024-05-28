@@ -21,6 +21,25 @@ import (
 	"github.com/canonical/go-efilib/mbr"
 )
 
+// DevicePathMatch indicates how a device path matched
+type DevicePathMatch int
+
+const (
+	// DevicePathNoMatch indicates that a pair of device paths did not match.
+	DevicePathNoMatch DevicePathMatch = iota
+
+	// DevicePathFullMatch indicates that a pair of device paths fully matched.
+	DevicePathFullMatch
+
+	// DevicePathShortFormHDMatch indicates that one device path begins with a
+	// *[HardDriveDevicePathNode] and matches the end of the longer device path.
+	DevicePathShortFormHDMatch
+
+	// DevicePathShortFormFileMatch indicates that one device path begins with a
+	// [FilePathDevicePathNode] and matches the end of the longer device path.
+	DevicePathShortFormFileMatch
+)
+
 // DevicePathType is the type of a device path node.
 type DevicePathType uint8
 
@@ -114,6 +133,65 @@ func (p DevicePath) Write(w io.Writer) error {
 		SubType: uefi.END_ENTIRE_DEVICE_PATH_SUBTYPE,
 		Length:  4}
 	return binary.Write(w, binary.LittleEndian, &end)
+}
+
+func devicePathFindFirst[T DevicePathNode](p DevicePath) DevicePath {
+	for i, n := range p {
+		if _, ok := n.(T); ok {
+			return p[i:]
+		}
+	}
+	return nil
+}
+
+func (p DevicePath) matchesInternal(other DevicePath, onlyFull bool) DevicePathMatch {
+	pBytes := new(bytes.Buffer)
+	if err := p.Write(pBytes); err != nil {
+		return DevicePathNoMatch
+	}
+	otherBytes := new(bytes.Buffer)
+	if err := other.Write(otherBytes); err != nil {
+		return DevicePathNoMatch
+	}
+	if bytes.Equal(pBytes.Bytes(), otherBytes.Bytes()) {
+		return DevicePathFullMatch
+	}
+
+	if onlyFull {
+		return DevicePathNoMatch
+	}
+	if len(other) == 0 {
+		return DevicePathNoMatch
+	}
+
+	switch n := other[0].(type) {
+	case *HardDriveDevicePathNode:
+		_ = n
+		p = devicePathFindFirst[*HardDriveDevicePathNode](p)
+		if res := p.matchesInternal(other, true); res == DevicePathFullMatch && len(p) == 2 {
+			return DevicePathShortFormHDMatch
+		}
+	case FilePathDevicePathNode:
+		_ = n
+		p = devicePathFindFirst[FilePathDevicePathNode](p)
+		if res := p.matchesInternal(other, true); res == DevicePathFullMatch && len(p) == 1 {
+			return DevicePathShortFormFileMatch
+		}
+	default:
+		// TODO: handle short form USB WWID, USB Class and URI device paths
+	}
+
+	return DevicePathNoMatch
+}
+
+// Matches indicates whether other matches this path in some way, and returns
+// the type of match. If other begins with *[HardDriveDevicePathNode] and is 2
+// nodes long, this may return DevicePathShortFormHDMatch. If other begins with
+// [FilePathDevicePathNode] and is a single node long, this may return
+// DevicePathShortFormFileMatch. This returns DevicePathFullMatch if the supplied
+// path fully matches, and DevicePathNoMatch if there is no match.
+func (p DevicePath) Matches(other DevicePath) DevicePathMatch {
+	return p.matchesInternal(other, false)
 }
 
 // GenericDevicePathNode corresponds to a device path nodes with a type that is
