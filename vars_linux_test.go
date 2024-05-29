@@ -234,7 +234,7 @@ func (m *mockEfiVarfs) Open(name string, flags int, perm os.FileMode) (VarFile, 
 func (m *mockEfiVarfs) Remove(path string) error {
 	v, ok := m.vars[path]
 	if !ok {
-		return &os.PathError{Op: "unlink", Path: path, Err: syscall.EEXIST}
+		return &os.PathError{Op: "unlink", Path: path, Err: syscall.ENOENT}
 	}
 
 	if v.flags&immutableFlag != 0 {
@@ -382,6 +382,12 @@ func (s *varsLinuxSuite) TestDeleteVariableMutable(c *C) {
 
 	_, ok := s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/Test2-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"]
 	c.Check(ok, Equals, false)
+}
+
+func (s *varsLinuxSuite) TestDeleteVariableNotExist(c *C) {
+	err := WriteVariable("NotFound", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}),
+		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, nil)
+	c.Check(err, IsNil)
 }
 
 func (s *varsLinuxSuite) TestWriteVariableEACCES(c *C) {

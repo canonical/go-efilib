@@ -164,7 +164,14 @@ func writeEfivarfsFile(path string, attrs VariableAttributes, data []byte) (retr
 	}
 
 	if len(data) == 0 {
-		return processEfivarfsFileAccessError(removeVarFile(path))
+		// short-cut for unauthenticated variable delete - efivarfs will perform a
+		// zero-byte write to delete the variable if we unlink the entry here.
+		err := removeVarFile(path)
+		if os.IsNotExist(err) {
+			// it shouldn't be an error if the variable already doesn't exist.
+			return false, nil
+		}
+		return processEfivarfsFileAccessError(err)
 	}
 
 	flags := os.O_WRONLY | os.O_CREATE
