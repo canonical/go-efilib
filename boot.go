@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 
@@ -37,8 +38,7 @@ const (
 )
 
 // OSIndications provides a way for the firmware to advertise features to the OS
-// and a way to request the firmware perform a specific action on the next boot,
-// although this latter case is not supported by this package.
+// and a way to request the firmware perform a specific action on the next boot.
 type OSIndications uint64
 
 const (
@@ -81,6 +81,19 @@ func ReadOSIndicationsSupportedVariable() (OSIndications, error) {
 	return OSIndications(binary.LittleEndian.Uint64(data)), nil
 }
 
+// WriteOSIndicationsVariable writes the supplied value to the OsIndications
+// global variable in order to send commands to the firmware for the next
+// boot.
+func WriteOSIndicationsVariable(value OSIndications) error {
+	if value&^(OSIndicationBootToFWUI|OSIndicationFileCapsuleDeliverySupported|OSIndicationStartOSRecovery|OSIndicationStartPlatformRecovery|OSIndicationJSONConfigDataRefresh) > 0 {
+		return errors.New("supplied value contains bits set that have no function")
+	}
+	var data [8]byte
+	binary.LittleEndian.PutUint64(data[:], uint64(value))
+
+	return WriteVariable("OsIndications", GlobalVariable, AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, data[:])
+}
+
 // ReadBootOptionSupportVariable returns the value of the BootOptionSupport
 // variable in the global namespace.
 func ReadBootOptionSupportVariable() (BootOptionSupport, error) {
@@ -102,7 +115,7 @@ func ReadLoadOrderVariable(class LoadOptionClass) ([]uint16, error) {
 	case LoadOptionClassDriver, LoadOptionClassSysPrep, LoadOptionClassBoot:
 		// ok
 	default:
-		return nil, fmt.Errorf("invalid class %q: function only suitable for Driver, SysPrep or Boot", class)
+		return nil, fmt.Errorf("invalid class %q: only suitable for Driver, SysPrep or Boot", class)
 	}
 
 	data, _, err := ReadVariable(string(class)+"Order", GlobalVariable)
@@ -121,6 +134,35 @@ func ReadLoadOrderVariable(class LoadOptionClass) ([]uint16, error) {
 	}
 
 	return out, nil
+}
+
+// WriteLoadOrderVariable writes the load option order for the specified class,
+// which must be one of LoadOptionClassDriver, LoadOptionClassSysprep, or
+// LoadOptionClassBoot.
+//
+// This will check that each entry corresponds to a valid load option before
+// writing the new order.
+func WriteLoadOrderVariable(class LoadOptionClass, order []uint16) error {
+	switch class {
+	case LoadOptionClassDriver, LoadOptionClassSysPrep, LoadOptionClassBoot:
+		// ok
+	default:
+		return fmt.Errorf("invalid class %q: only suitable for Driver, SysPrep or Boot", class)
+	}
+
+	// Check each load option
+	for _, n := range order {
+		if _, err := ReadLoadOptionVariable(class, n); err != nil {
+			return fmt.Errorf("invalid load option %d: %w", n, err)
+		}
+	}
+
+	w := new(bytes.Buffer)
+	if err := binary.Write(w, binary.LittleEndian, order); err != nil {
+		return err
+	}
+
+	return WriteVariable(string(class)+"Order", GlobalVariable, AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, w.Bytes())
 }
 
 // ReadLoadOptionVariable returns the LoadOption for the specified class and option number.
@@ -148,6 +190,100 @@ func ReadLoadOptionVariable(class LoadOptionClass, n uint16) (*LoadOption, error
 	return option, nil
 }
 
+// WriteLoadOptionVariable writes the supplied LoadOption to a variable for the specified
+// class and option number. The variable is written to the global namespace. This will
+// overwrite any variable that already exists. The class must be one of LoadOptionClassDriver,
+// LoadOptionClassSysprep, or LoadOptionClassBoot.
+func WriteLoadOptionVariable(class LoadOptionClass, n uint16, option *LoadOption) error {
+	switch class {
+	case LoadOptionClassDriver, LoadOptionClassSysPrep, LoadOptionClassBoot:
+		// ok
+	default:
+		return fmt.Errorf("invalid class %q: only suitable for Driver, SysPrep or Boot", class)
+	}
+
+	w := new(bytes.Buffer)
+	if err := option.Write(w); err != nil {
+		return fmt.Errorf("cannot serialize load option: %w", err)
+	}
+
+	return WriteVariable(fmt.Sprintf("%s%04x", class, n), GlobalVariable, AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, w.Bytes())
+}
+
+// DeleteLoadOptionVariable deletes the load option variable for the specified
+// class and option number. The variable is written to the global namespace. This will
+// succeed even if the variable doesn't alreeady exist. The class must be one of
+// LoadOptionClassDriver, LoadOptionClassSysprep, or LoadOptionClassBoot.
+func DeleteLoadOptionVariable(class LoadOptionClass, n uint16) error {
+	switch class {
+	case LoadOptionClassDriver, LoadOptionClassSysPrep, LoadOptionClassBoot:
+		// ok
+	default:
+		return fmt.Errorf("invalid class %q: only suitable for Driver, SysPrep or Boot", class)
+	}
+
+	return WriteVariable(fmt.Sprintf("%s%04x", class, n), GlobalVariable, AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, nil)
+}
+
+// ListLoadOptionNumbers lists the numbers of all of the load option variables
+// for the specified class from the global namespace. The returned numbers will be
+// sorted in ascending order.
+func ListLoadOptionNumbers(class LoadOptionClass) ([]uint16, error) {
+	names, err := ListVariables()
+	if err != nil {
+		return nil, err
+	}
+
+	var out []uint16
+	for _, name := range names {
+		if name.GUID != GlobalVariable {
+			continue
+		}
+		if !strings.HasPrefix(name.Name, string(class)) {
+			continue
+		}
+		if len(name.Name) != len(class)+4 {
+			continue
+		}
+
+		var x uint16
+		if n, err := fmt.Sscanf(name.Name, string(class)+"%x", &x); err != nil || n != 1 {
+			continue
+		}
+
+		out = append(out, x)
+	}
+
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	return out, nil
+}
+
+// NextAvailableLoadOptionNumber returns the next available load option number for
+// the specified class, which must be one of LoadOptionClassDriver,
+// LoadOptionClassSysprep, or LoadOptionClassBoot.
+func NextAvailableLoadOptionNumber(class LoadOptionClass) (uint16, error) {
+	switch class {
+	case LoadOptionClassDriver, LoadOptionClassSysPrep, LoadOptionClassBoot:
+		// ok
+	default:
+		return 0, fmt.Errorf("invalid class %q: only suitable for Driver, SysPrep or Boot", class)
+	}
+
+	used, err := ListLoadOptionNumbers(class)
+	if err != nil {
+		return 0, err
+	}
+	if len(used) > math.MaxUint16 {
+		return 0, errors.New("no load option number available")
+	}
+	for i, n := range used {
+		if uint16(i) != n {
+			return uint16(i), nil
+		}
+	}
+	return uint16(len(used)), nil
+}
+
 // ReadBootNextVariable returns the option number of the boot entry to try next.
 func ReadBootNextVariable() (uint16, error) {
 	data, _, err := ReadVariable("BootNext", GlobalVariable)
@@ -160,6 +296,23 @@ func ReadBootNextVariable() (uint16, error) {
 	}
 
 	return binary.LittleEndian.Uint16(data), nil
+}
+
+// WriteBootNextVariable writes the option number of the boot entry to try next.
+func WriteBootNextVariable(n uint16) error {
+	if _, err := ReadLoadOptionVariable(LoadOptionClassBoot, n); err != nil {
+		return fmt.Errorf("invalid load option %d: %w", n, err)
+	}
+
+	var data [2]byte
+	binary.LittleEndian.PutUint16(data[:], n)
+
+	return WriteVariable("BootNext", GlobalVariable, AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, data[:])
+}
+
+// DeleteBootNextVariable deletes the option number of the boot entry to try next.
+func DeleteBootNextVariable() error {
+	return WriteVariable("BootNext", GlobalVariable, AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, nil)
 }
 
 // ReadBootNextLoadOptionVariable returns the LoadOption for the boot entry to try next.
@@ -186,9 +339,12 @@ func ReadBootCurrentVariable() (uint16, error) {
 	return binary.LittleEndian.Uint16(data), nil
 }
 
-// ReadOrderedLoadOptionVariables returns an ordered list of LoadOptions for the specified
-// class. The variables are all read from the global namespace. This will skip entries
-// for which there isn't a corresponding variable.
+// ReadOrderedLoadOptionVariables returns a list of LoadOptions in the order in which
+// they will be tried by the boot manager for the specified class. The variables are all
+// read from the global namespace. Where class is LoadOptionClassDriver, LoadOptionClassSysPrep,
+// or LoadOptionClassBoot, this will use the corresponding *Order variable. It will skip entries
+// for which there isn't a corresponding variable. Where class is LoadOptionClassPlatformRecovery,
+// the order is determined by the variable names.
 func ReadOrderedLoadOptionVariables(class LoadOptionClass) ([]*LoadOption, error) {
 	var optNumbers []uint16
 	switch class {
@@ -199,31 +355,11 @@ func ReadOrderedLoadOptionVariables(class LoadOptionClass) ([]*LoadOption, error
 			return nil, fmt.Errorf("cannot obtain order: %w", err)
 		}
 	case LoadOptionClassPlatformRecovery:
-		vars, err := ListVariables()
+		var err error
+		optNumbers, err = ListLoadOptionNumbers(LoadOptionClassPlatformRecovery)
 		if err != nil {
-			return nil, fmt.Errorf("cannot list variables: %w", err)
+			return nil, fmt.Errorf("cannot obtain load option numbers: %w", err)
 		}
-		for _, desc := range vars {
-			fmt.Println(desc)
-			if desc.GUID != GlobalVariable {
-				continue
-			}
-			if !strings.HasPrefix(desc.Name, string(LoadOptionClassPlatformRecovery)) {
-				continue
-			}
-			if len(desc.Name) != len(LoadOptionClassPlatformRecovery)+4 {
-				continue
-			}
-
-			var x uint16
-			if n, err := fmt.Sscanf(desc.Name, "PlatformRecovery%x", &x); err != nil || n != 1 {
-				continue
-			}
-
-			optNumbers = append(optNumbers, x)
-		}
-
-		sort.Slice(optNumbers, func(i, j int) bool { return optNumbers[i] < optNumbers[j] })
 	}
 
 	var opts []*LoadOption
