@@ -6,6 +6,7 @@ package efi
 
 import (
 	"errors"
+	"sync"
 
 	"github.com/canonical/go-efilib/internal/uefi"
 )
@@ -35,7 +36,10 @@ type VariableDescriptor struct {
 	GUID GUID
 }
 
-type varsBackend interface {
+// VarsBackend is used by the [ReadVariable], [WriteVariable] and [ListVariables]
+// functions, and indirectly by other functions in this package to abstract access
+// to a specific backend. A default backend is initialized at process initialization.
+type VarsBackend interface {
 	Get(name string, guid GUID) (VariableAttributes, []byte, error)
 	Set(name string, guid GUID, attrs VariableAttributes, data []byte) error
 	List() ([]VariableDescriptor, error)
@@ -55,12 +59,21 @@ func (v nullVarsBackend) List() ([]VariableDescriptor, error) {
 	return nil, ErrVarsUnavailable
 }
 
-var vars varsBackend = nullVarsBackend{}
+var (
+	varsMu sync.Mutex
+	vars   VarsBackend = nullVarsBackend{}
+)
+
+func getVars() VarsBackend {
+	varsMu.Lock()
+	defer varsMu.Unlock()
+	return vars
+}
 
 // ReadVariable returns the value and attributes of the EFI variable with the specified
 // name and GUID.
 func ReadVariable(name string, guid GUID) ([]byte, VariableAttributes, error) {
-	attrs, data, err := vars.Get(name, guid)
+	attrs, data, err := getVars().Get(name, guid)
 	return data, attrs, err
 }
 
@@ -72,10 +85,26 @@ func ReadVariable(name string, guid GUID) ([]byte, VariableAttributes, error) {
 //
 // If the variable does not exist, it will be created.
 func WriteVariable(name string, guid GUID, attrs VariableAttributes, data []byte) error {
-	return vars.Set(name, guid, attrs, data)
+	return getVars().Set(name, guid, attrs, data)
 }
 
 // ListVariables returns a list of variables that can be accessed.
 func ListVariables() ([]VariableDescriptor, error) {
-	return vars.List()
+	return getVars().List()
+}
+
+// MockVarsBackend allows the VarsBackend to be mocked for testing or to provide variables
+// from an alternative host in production code. It returns a function that will restore the
+// original backend when called.
+func MockVarsBackend(backend VarsBackend) (restore func()) {
+	varsMu.Lock()
+	defer varsMu.Unlock()
+	orig := vars
+	vars = backend
+
+	return func() {
+		varsMu.Lock()
+		defer varsMu.Unlock()
+		vars = orig
+	}
 }

@@ -6,13 +6,4 @@ package efi
 
 type (
 	NullVarsBackend = nullVarsBackend
-	VarsBackend     = varsBackend
 )
-
-func MockVarsBackend(backend VarsBackend) (restore func()) {
-	orig := vars
-	vars = backend
-	return func() {
-		vars = orig
-	}
-}
