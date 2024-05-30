@@ -17,13 +17,10 @@ type mockBootVarData struct {
 	data  []byte
 }
 
-type mockBootVars map[GUID]map[string]*mockBootVarData
+type mockBootVars map[VariableDescriptor]*mockBootVarData
 
 func (v mockBootVars) Get(name string, guid GUID) (VariableAttributes, []byte, error) {
-	if _, exists := v[guid]; !exists {
-		return 0, nil, ErrVarNotExist
-	}
-	data, exists := v[guid][name]
+	data, exists := v[VariableDescriptor{Name: name, GUID: guid}]
 	if !exists {
 		return 0, nil, ErrVarNotExist
 	}
@@ -34,22 +31,19 @@ func (v mockBootVars) Set(name string, guid GUID, attrs VariableAttributes, data
 	if attrs&^(AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess) > 0 {
 		return errors.New("invalid attributes")
 	}
-	if _, exists := v[guid]; !exists {
-		v[guid] = make(map[string]*mockBootVarData)
-	}
-	mockData, exists := v[guid][name]
+	mockData, exists := v[VariableDescriptor{Name: name, GUID: guid}]
 	if !exists {
 		if len(data) == 0 {
 			return nil
 		}
-		v[guid][name] = &mockBootVarData{attrs: attrs, data: data}
+		v[VariableDescriptor{Name: name, GUID: guid}] = &mockBootVarData{attrs: attrs, data: data}
 		return nil
 	}
 	if attrs != mockData.attrs {
 		return errors.New("invalid attributes")
 	}
 	if len(data) == 0 {
-		delete(v[guid], name)
+		delete(v, VariableDescriptor{Name: name, GUID: guid})
 		return nil
 	}
 	mockData.data = data
@@ -58,19 +52,14 @@ func (v mockBootVars) Set(name string, guid GUID, attrs VariableAttributes, data
 
 func (v mockBootVars) List() ([]VariableDescriptor, error) {
 	var out []VariableDescriptor
-	for guid := range v {
-		for name := range v[guid] {
-			out = append(out, VariableDescriptor{Name: name, GUID: guid})
-		}
+	for desc := range v {
+		out = append(out, desc)
 	}
 	return out, nil
 }
 
 func (v mockBootVars) add(name string, guid GUID, attrs VariableAttributes, data []byte) {
-	if _, exists := v[guid]; !exists {
-		v[guid] = make(map[string]*mockBootVarData)
-	}
-	v[guid][name] = &mockBootVarData{attrs: attrs, data: data}
+	v[VariableDescriptor{Name: name, GUID: guid}] = &mockBootVarData{attrs: attrs, data: data}
 }
 
 type varsSuite struct {
