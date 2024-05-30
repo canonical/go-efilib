@@ -169,35 +169,3 @@ func ReadSignatureDatabase(r io.Reader) (SignatureDatabase, error) {
 
 	return db, nil
 }
-
-func ReadPlatformKeyVariable() (*SignatureList, error) {
-	data, _, err := ReadVariable(PKVariable.Name, PKVariable.GUID)
-	if err != nil {
-		return nil, err
-	}
-	r := bytes.NewReader(data)
-	l, err := ReadSignatureList(r)
-	if err != nil {
-		return nil, err
-	}
-	if r.Len() > 0 {
-		return nil, fmt.Errorf("%d trailing bytes", r.Len())
-	}
-
-	return l, nil
-}
-
-var (
-	PKVariable  VariableDescriptor = VariableDescriptor{Name: "PK", GUID: GlobalVariable}
-	KEKVariable VariableDescriptor = VariableDescriptor{Name: "KEK", GUID: GlobalVariable}
-	DbVariable  VariableDescriptor = VariableDescriptor{Name: "db", GUID: ImageSecurityDatabaseGuid}
-	DbxVariable VariableDescriptor = VariableDescriptor{Name: "dbx", GUID: ImageSecurityDatabaseGuid}
-)
-
-func ReadSignatureDatabaseVariable(desc VariableDescriptor) (SignatureDatabase, error) {
-	data, _, err := ReadVariable(desc.Name, desc.GUID)
-	if err != nil {
-		return nil, err
-	}
-	return ReadSignatureDatabase(bytes.NewReader(data))
-}
