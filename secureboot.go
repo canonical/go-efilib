@@ -6,6 +6,7 @@ package efi
 
 import (
 	"bytes"
+	"crypto/x509"
 	"errors"
 	"fmt"
 )
@@ -42,10 +43,10 @@ func ReadSecureBootVariable() (bool, error) {
 	return readBinaryVariable("SecureBoot", GlobalVariable)
 }
 
-// ReadPlatformKeyVariable reads the PK global variable and returns the corresponding
-// signature list, if a platform key is enrolled. If no platform key is enrolled, this
+// ReadPlatformKeyCertificate reads the PK global variable and returns the corresponding
+// certificate, if a platform key is enrolled. If no platform key is enrolled, this
 // will return nil.
-func ReadPlatformKeyVariable() (*SignatureList, error) {
+func ReadPlatformKeyCertificate() (*x509.Certificate, error) {
 	db, err := ReadSignatureDatabaseVariable(PKVariable)
 	if err != nil {
 		return nil, err
@@ -55,7 +56,14 @@ func ReadPlatformKeyVariable() (*SignatureList, error) {
 	case 0:
 		return nil, nil
 	case 1:
-		return db[0], nil
+		esl := db[0]
+		if esl.Type != CertX509Guid {
+			return nil, fmt.Errorf("invalid PK contents: unexpected signature list type: %v", esl.Type)
+		}
+		if len(esl.Signatures) != 1 {
+			return nil, fmt.Errorf("invalid PK contents: unexpected number of signature data entries (%d)", len(esl.Signatures))
+		}
+		return x509.ParseCertificate(esl.Signatures[0].Data)
 	default:
 		return nil, errors.New("invalid PK contents: more than one signature list")
 	}
@@ -197,7 +205,7 @@ func ComputeSecureBootMode() (SecureBootMode, error) {
 	if err != nil {
 		return 0, fmt.Errorf("cannot read SecureBoot variable: %w", err)
 	}
-	pk, err := ReadPlatformKeyVariable()
+	pk, err := ReadPlatformKeyCertificate()
 	if err != nil {
 		return 0, fmt.Errorf("cannot read PK variable: %w", err)
 	}
