@@ -9,10 +9,10 @@ package guids
 
 import efi "github.com/canonical/go-efilib"
 
-// FileNameString returns whether then supplied GUID corresponds to
-// a well known name used for files in firmware volumes (see
-// [efi.MediaFvFileDevicePathNode]. If it is not well known by
-// this package, then ("", false) will be returned.
+// FileNameString returns the semi-readable name for the supplied
+// GUID if it corresponds to a well known name used for files in
+// firmware volumes (see [efi.MediaFvFileDevicePathNode]). If it is
+// not well known by this package, then ("", false) will be returned.
 func FileNameString(guid efi.GUID) (name string, wellKnown bool) {
 	name, wellKnown = guidToNameMap[guid]
 	return name, wellKnown
