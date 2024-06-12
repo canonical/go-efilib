@@ -10,9 +10,7 @@ import (
 	"github.com/canonical/go-efilib"
 )
 
-var (
-	guidToNameMap map[efi.GUID]string
-)
+var guidToNameMap map[efi.GUID]string
 
 func init() {
 	guidToNameMap = map[efi.GUID]string{

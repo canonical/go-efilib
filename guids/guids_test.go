@@ -37,3 +37,8 @@ func (s *guidsSuite) TestUnknown(c *C) {
 	_, known := FileNameString(guid)
 	c.Check(known, Equals, false)
 }
+
+func (s *guidsSuite) TestListAll(c *C) {
+	guids := ListAllKnown()
+	c.Check(guids, DeepEquals, allGuids)
+}
