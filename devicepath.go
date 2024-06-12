@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/canonical/go-efilib/internal/ioerr"
 	"github.com/canonical/go-efilib/internal/uefi"
@@ -1112,7 +1113,18 @@ func NewFilePathDevicePathNode(path string) (out FilePathDevicePathNode) {
 // MediaFvFileDevicePathNode corresponds to a firmware volume file device path node.
 type MediaFvFileDevicePathNode GUID
 
-func (d MediaFvFileDevicePathNode) ToString(_ DevicePathToStringFlags) string {
+func (d MediaFvFileDevicePathNode) ToString(flags DevicePathToStringFlags) string {
+	if flags.DisplayOnly() {
+		fvFileNameLookupMu.Lock()
+		defer fvFileNameLookupMu.Unlock()
+
+		if fvFileNameLookup != nil {
+			name, known := fvFileNameLookup(GUID(d))
+			if known {
+				return fmt.Sprintf("FvFile(%s)", name)
+			}
+		}
+	}
 	return fmt.Sprintf("FvFile(%s)", GUID(d))
 }
 
@@ -1129,6 +1141,29 @@ func (d MediaFvFileDevicePathNode) Write(w io.Writer) error {
 	data.Header.Length = uint16(binary.Size(data))
 
 	return binary.Write(w, binary.LittleEndian, &data)
+}
+
+var (
+	fvFileNameLookupMu sync.Mutex
+	fvFileNameLookup   func(GUID) (string, bool)
+)
+
+// RegisterMediaFvFileNameLookup registers a function that can map guids to
+// strings for well known names, and these will be displayed by
+// [MediaFvFileDevicePathNode.String] and [MediaFvFileDevicePathNode.ToString]
+// if the flags argument is marked as display only. Note that this does make the
+// string representation of the path unparseable, if the string is being used
+// in such a way (this package doesn't yet have any ways of parsing device paths
+// that are in string form).
+//
+// Just importing [github.com/canonical/go-efilib/guids] is sufficient to register
+// a function that does this. It's included in a separate and optional package for
+// systems that are concerned about binary size.
+func RegisterMediaFvFileNameLookup(fn func(GUID) (string, bool)) {
+	fvFileNameLookupMu.Lock()
+	defer fvFileNameLookupMu.Unlock()
+
+	fvFileNameLookup = fn
 }
 
 // MediaFvDevicePathNode corresponds to a firmware volume device path node.

@@ -37,3 +37,7 @@ func ListAllKnown() []efi.GUID {
 	sort.Slice(out, func(i, j int) bool { return bytes.Compare(out[i][:], out[j][:]) < 0 })
 	return out
 }
+
+func init() {
+	efi.RegisterMediaFvFileNameLookup(FileNameString)
+}
