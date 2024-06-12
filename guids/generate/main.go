@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"encoding/csv"
 	"fmt"
 	"os"
+	"sort"
 
 	efi "github.com/canonical/go-efilib"
 )
@@ -15,7 +17,6 @@ func run() error {
 
 	src := os.Args[1]
 	out := os.Args[2]
-	_ = out
 
 	r, err := os.Open(src)
 	if err != nil {
@@ -23,7 +24,8 @@ func run() error {
 	}
 	defer r.Close()
 
-	guids := make(map[efi.GUID]string)
+	var orderedGuids []efi.GUID
+	guidMap := make(map[efi.GUID]string)
 
 	csvReader := csv.NewReader(r)
 	records, err := csvReader.ReadAll()
@@ -35,8 +37,10 @@ func run() error {
 		if err != nil {
 			return fmt.Errorf("cannot decode GUID at record %d: %w", i, err)
 		}
-		guids[guid] = record[1]
+		guidMap[guid] = record[1]
+		orderedGuids = append(orderedGuids, guid)
 	}
+	sort.Slice(orderedGuids, func(i, j int) bool { return bytes.Compare(orderedGuids[i][:], orderedGuids[j][:]) < 0 })
 
 	w, err := os.Create(out)
 	if err != nil {
@@ -56,22 +60,30 @@ import (
 	"github.com/canonical/go-efilib"
 )
 
-var guidToNameMap map[efi.GUID]string
+var (
+	guidToNameMap map[efi.GUID]string
+)
 
 func init() {
-	guidToNameMap = map[efi.GUID]string{
 `); err != nil {
-		return fmt.Errorf("cannot write init function prologue: %w", err)
+		return fmt.Errorf("cannot write header and init function prologue: %w", err)
 	}
 
-	for k, v := range guids {
-		if _, err := fmt.Fprintf(w, "		efi.GUID{%#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x, %#x}:%q,\n", k[0], k[1], k[2], k[3], k[4], k[5], k[6], k[7], k[8], k[9], k[10], k[11], k[12], k[13], k[14], k[15], v); err != nil {
-			return fmt.Errorf("cannot output string for %v: %w", k, err)
+	if _, err := fmt.Fprintf(w, "	guidToNameMap = map[efi.GUID]string{\n"); err != nil {
+		return fmt.Errorf("cannot write map initializer: %w", err)
+	}
+
+	for _, guid := range orderedGuids {
+		name := guidMap[guid]
+		if _, err := fmt.Fprintf(w, "		efi.GUID{%#02x, %#02x, %#02x, %#02x, %#02x, %#02x, %#02x, %#02x, %#02x, %#02x, %#02x, %#02x, %#02x, %#02x, %#02x, %#02x}: %q,\n", guid[0], guid[1], guid[2], guid[3], guid[4], guid[5], guid[6], guid[7], guid[8], guid[9], guid[10], guid[11], guid[12], guid[13], guid[14], guid[15], name); err != nil {
+			return fmt.Errorf("cannot output map entry for %q: %w", name, err)
 		}
 	}
 
-	if _, err := fmt.Fprintf(w, "	}\n}"); err != nil {
-		return fmt.Errorf("cannot write init function epilogue: %w", err)
+	if _, err := fmt.Fprintf(w, `	}
+}
+`); err != nil {
+		return fmt.Errorf("cannot write int function epilogoue: %w", err)
 	}
 
 	return nil
