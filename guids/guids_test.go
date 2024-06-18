@@ -20,21 +20,21 @@ var _ = Suite(&guidsSuite{})
 
 func (s *guidsSuite) TestAbsoluteAbtInstaller(c *C) {
 	guid := efi.MakeGUID(0x821aca26, 0x29ea, 0x4993, 0x839f, [...]byte{0x59, 0x7f, 0xc0, 0x21, 0x70, 0x8d})
-	name, known := FileNameString(guid)
+	name, known := FileOrVolumeNameString(guid)
 	c.Check(name, Equals, "AbsoluteAbtInstaller")
 	c.Check(known, Equals, true)
 }
 
 func (s *guidsSuite) TestCpuDxe(c *C) {
 	guid := efi.MakeGUID(0xee993080, 0x5197, 0x4d4e, 0xb63c, [...]byte{0xf1, 0xf7, 0x41, 0x3e, 0x33, 0xce})
-	name, known := FileNameString(guid)
+	name, known := FileOrVolumeNameString(guid)
 	c.Check(name, Equals, "CpuDxe")
 	c.Check(known, Equals, true)
 }
 
 func (s *guidsSuite) TestUnknown(c *C) {
 	guid := efi.MakeGUID(0x840ae51a, 0x12a5, 0x4cc5, 0x9c1c, [...]byte{0x3c, 0x84, 0x4c, 0xc4, 0x6b, 0x53})
-	_, known := FileNameString(guid)
+	_, known := FileOrVolumeNameString(guid)
 	c.Check(known, Equals, false)
 }
 

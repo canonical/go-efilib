@@ -1169,7 +1169,7 @@ func RegisterMediaFvFileNameLookup(fn func(GUID) (string, bool)) {
 // MediaFvDevicePathNode corresponds to a firmware volume device path node.
 type MediaFvDevicePathNode GUID
 
-func (d MediaFvDevicePathNode) ToString(_ DevicePathToStringFlags) string {
+func (d MediaFvDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	if flags.DisplayOnly() {
 		fvNameLookupMu.Lock()
 		defer fvNameLookupMu.Unlock()
