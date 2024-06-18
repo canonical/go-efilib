@@ -1170,6 +1170,17 @@ func RegisterMediaFvFileNameLookup(fn func(GUID) (string, bool)) {
 type MediaFvDevicePathNode GUID
 
 func (d MediaFvDevicePathNode) ToString(_ DevicePathToStringFlags) string {
+	if flags.DisplayOnly() {
+		fvNameLookupMu.Lock()
+		defer fvNameLookupMu.Unlock()
+
+		if fvNameLookup != nil {
+			name, known := fvNameLookup(GUID(d))
+			if known {
+				return fmt.Sprintf("Fv(%s)", name)
+			}
+		}
+	}
 	return fmt.Sprintf("Fv(%s)", GUID(d))
 }
 
@@ -1186,6 +1197,29 @@ func (d MediaFvDevicePathNode) Write(w io.Writer) error {
 	data.Header.Length = uint16(binary.Size(data))
 
 	return binary.Write(w, binary.LittleEndian, &data)
+}
+
+var (
+	fvNameLookupMu sync.Mutex
+	fvNameLookup   func(GUID) (string, bool)
+)
+
+// RegisterMediaFvNameLookup registers a function that can map guids to
+// strings for well known names, and these will be displayed by
+// [MediaFvDevicePathNode.String] and [MediaFvDevicePathNode.ToString]
+// if the flags argument is marked as display only. Note that this does make the
+// string representation of the path unparseable, if the string is being used
+// in such a way (this package doesn't yet have any ways of parsing device paths
+// that are in string form).
+//
+// Just importing [github.com/canonical/go-efilib/guids] is sufficient to register
+// a function that does this. It's included in a separate and optional package for
+// systems that are concerned about binary size.
+func RegisterMediaFvNameLookup(fn func(GUID) (string, bool)) {
+	fvNameLookupMu.Lock()
+	defer fvNameLookupMu.Unlock()
+
+	fvNameLookup = fn
 }
 
 type MediaRelOffsetRangeDevicePathNode struct {
