@@ -6,6 +6,7 @@ package efi
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -69,9 +70,10 @@ func (s BootOptionSupport) KeyCount() uint8 {
 }
 
 // ReadOSIndicationsSupportedVariable returns the value of the OSIndicationsSupported
-// variable in the global namespace.
-func ReadOSIndicationsSupportedVariable() (OSIndications, error) {
-	data, _, err := ReadVariable("OsIndicationsSupported", GlobalVariable)
+// variable in the global namespace. In general [DefaultVarContext] should be supplied
+// to this.
+func ReadOSIndicationsSupportedVariable(ctx context.Context) (OSIndications, error) {
+	data, _, err := ReadVariable(ctx, "OsIndicationsSupported", GlobalVariable)
 	if err != nil {
 		return 0, err
 	}
@@ -83,21 +85,22 @@ func ReadOSIndicationsSupportedVariable() (OSIndications, error) {
 
 // WriteOSIndicationsVariable writes the supplied value to the OsIndications
 // global variable in order to send commands to the firmware for the next
-// boot.
-func WriteOSIndicationsVariable(value OSIndications) error {
+// boot. In general [DefaultVarContext] should be supplied to this.
+func WriteOSIndicationsVariable(ctx context.Context, value OSIndications) error {
 	if value&^(OSIndicationBootToFWUI|OSIndicationFileCapsuleDeliverySupported|OSIndicationStartOSRecovery|OSIndicationStartPlatformRecovery|OSIndicationJSONConfigDataRefresh) > 0 {
 		return errors.New("supplied value contains bits set that have no function")
 	}
 	var data [8]byte
 	binary.LittleEndian.PutUint64(data[:], uint64(value))
 
-	return WriteVariable("OsIndications", GlobalVariable, AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, data[:])
+	return WriteVariable(ctx, "OsIndications", GlobalVariable, AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, data[:])
 }
 
 // ReadBootOptionSupportVariable returns the value of the BootOptionSupport
-// variable in the global namespace.
-func ReadBootOptionSupportVariable() (BootOptionSupport, error) {
-	data, _, err := ReadVariable("BootOptionSupport", GlobalVariable)
+// variable in the global namespace. In general [DefaultVarContext] should be supplied
+// to this.
+func ReadBootOptionSupportVariable(ctx context.Context) (BootOptionSupport, error) {
+	data, _, err := ReadVariable(ctx, "BootOptionSupport", GlobalVariable)
 	if err != nil {
 		return 0, err
 	}
@@ -109,8 +112,9 @@ func ReadBootOptionSupportVariable() (BootOptionSupport, error) {
 
 // ReadLoadOrderVariable returns the load option order for the specified class,
 // which must be one of LoadOptionClassDriver, LoadOptionClassSysPrep, or
-// LoadOptionClassBoot.
-func ReadLoadOrderVariable(class LoadOptionClass) ([]uint16, error) {
+// LoadOptionClassBoot. In general [DefaultVarContext] should be supplied
+// to this.
+func ReadLoadOrderVariable(ctx context.Context, class LoadOptionClass) ([]uint16, error) {
 	switch class {
 	case LoadOptionClassDriver, LoadOptionClassSysPrep, LoadOptionClassBoot:
 		// ok
@@ -118,7 +122,7 @@ func ReadLoadOrderVariable(class LoadOptionClass) ([]uint16, error) {
 		return nil, fmt.Errorf("invalid class %q: only suitable for Driver, SysPrep or Boot", class)
 	}
 
-	data, _, err := ReadVariable(string(class)+"Order", GlobalVariable)
+	data, _, err := ReadVariable(ctx, string(class)+"Order", GlobalVariable)
 	if err != nil {
 		return nil, err
 	}
@@ -138,11 +142,12 @@ func ReadLoadOrderVariable(class LoadOptionClass) ([]uint16, error) {
 
 // WriteLoadOrderVariable writes the load option order for the specified class,
 // which must be one of LoadOptionClassDriver, LoadOptionClassSysprep, or
-// LoadOptionClassBoot.
+// LoadOptionClassBoot. In general [DefaultVarContext] should be supplied
+// to this.
 //
 // This will check that each entry corresponds to a valid load option before
 // writing the new order.
-func WriteLoadOrderVariable(class LoadOptionClass, order []uint16) error {
+func WriteLoadOrderVariable(ctx context.Context, class LoadOptionClass, order []uint16) error {
 	switch class {
 	case LoadOptionClassDriver, LoadOptionClassSysPrep, LoadOptionClassBoot:
 		// ok
@@ -152,7 +157,7 @@ func WriteLoadOrderVariable(class LoadOptionClass, order []uint16) error {
 
 	// Check each load option
 	for _, n := range order {
-		if _, err := ReadLoadOptionVariable(class, n); err != nil {
+		if _, err := ReadLoadOptionVariable(ctx, class, n); err != nil {
 			return fmt.Errorf("invalid load option %d: %w", n, err)
 		}
 	}
@@ -162,12 +167,13 @@ func WriteLoadOrderVariable(class LoadOptionClass, order []uint16) error {
 		return err
 	}
 
-	return WriteVariable(string(class)+"Order", GlobalVariable, AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, w.Bytes())
+	return WriteVariable(ctx, string(class)+"Order", GlobalVariable, AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, w.Bytes())
 }
 
 // ReadLoadOptionVariable returns the LoadOption for the specified class and option number.
-// The variable is read from the global namespace.
-func ReadLoadOptionVariable(class LoadOptionClass, n uint16) (*LoadOption, error) {
+// The variable is read from the global namespace. In general [DefaultVarContext] should be
+// supplied to this.
+func ReadLoadOptionVariable(ctx context.Context, class LoadOptionClass, n uint16) (*LoadOption, error) {
 	switch class {
 	case LoadOptionClassDriver, LoadOptionClassSysPrep, LoadOptionClassBoot, LoadOptionClassPlatformRecovery:
 		// ok
@@ -175,7 +181,7 @@ func ReadLoadOptionVariable(class LoadOptionClass, n uint16) (*LoadOption, error
 		return nil, fmt.Errorf("invalid class %q: only suitable for Driver, SysPrep, Boot, or PlatformRecovery", class)
 	}
 
-	data, _, err := ReadVariable(fmt.Sprintf("%s%04x", class, n), GlobalVariable)
+	data, _, err := ReadVariable(ctx, fmt.Sprintf("%s%04x", class, n), GlobalVariable)
 	if err != nil {
 		return nil, err
 	}
@@ -193,8 +199,9 @@ func ReadLoadOptionVariable(class LoadOptionClass, n uint16) (*LoadOption, error
 // WriteLoadOptionVariable writes the supplied LoadOption to a variable for the specified
 // class and option number. The variable is written to the global namespace. This will
 // overwrite any variable that already exists. The class must be one of LoadOptionClassDriver,
-// LoadOptionClassSysprep, or LoadOptionClassBoot.
-func WriteLoadOptionVariable(class LoadOptionClass, n uint16, option *LoadOption) error {
+// LoadOptionClassSysprep, or LoadOptionClassBoot. In general [DefaultVarContext] should be
+// supplied to this.
+func WriteLoadOptionVariable(ctx context.Context, class LoadOptionClass, n uint16, option *LoadOption) error {
 	switch class {
 	case LoadOptionClassDriver, LoadOptionClassSysPrep, LoadOptionClassBoot:
 		// ok
@@ -207,14 +214,15 @@ func WriteLoadOptionVariable(class LoadOptionClass, n uint16, option *LoadOption
 		return fmt.Errorf("cannot serialize load option: %w", err)
 	}
 
-	return WriteVariable(fmt.Sprintf("%s%04x", class, n), GlobalVariable, AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, w.Bytes())
+	return WriteVariable(ctx, fmt.Sprintf("%s%04x", class, n), GlobalVariable, AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, w.Bytes())
 }
 
 // DeleteLoadOptionVariable deletes the load option variable for the specified
 // class and option number. The variable is written to the global namespace. This will
 // succeed even if the variable doesn't alreeady exist. The class must be one of
-// LoadOptionClassDriver, LoadOptionClassSysprep, or LoadOptionClassBoot.
-func DeleteLoadOptionVariable(class LoadOptionClass, n uint16) error {
+// LoadOptionClassDriver, LoadOptionClassSysprep, or LoadOptionClassBoot. In general
+// [DefaultVarContext] should be supplied to this.
+func DeleteLoadOptionVariable(ctx context.Context, class LoadOptionClass, n uint16) error {
 	switch class {
 	case LoadOptionClassDriver, LoadOptionClassSysPrep, LoadOptionClassBoot:
 		// ok
@@ -222,14 +230,15 @@ func DeleteLoadOptionVariable(class LoadOptionClass, n uint16) error {
 		return fmt.Errorf("invalid class %q: only suitable for Driver, SysPrep or Boot", class)
 	}
 
-	return WriteVariable(fmt.Sprintf("%s%04x", class, n), GlobalVariable, AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, nil)
+	return WriteVariable(ctx, fmt.Sprintf("%s%04x", class, n), GlobalVariable, AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, nil)
 }
 
 // ListLoadOptionNumbers lists the numbers of all of the load option variables
 // for the specified class from the global namespace. The returned numbers will be
-// sorted in ascending order.
-func ListLoadOptionNumbers(class LoadOptionClass) ([]uint16, error) {
-	names, err := ListVariables()
+// sorted in ascending order. In general [DefaultVarContext] should be supplied to
+// this.
+func ListLoadOptionNumbers(ctx context.Context, class LoadOptionClass) ([]uint16, error) {
+	names, err := ListVariables(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -260,8 +269,9 @@ func ListLoadOptionNumbers(class LoadOptionClass) ([]uint16, error) {
 
 // NextAvailableLoadOptionNumber returns the next available load option number for
 // the specified class, which must be one of LoadOptionClassDriver,
-// LoadOptionClassSysprep, or LoadOptionClassBoot.
-func NextAvailableLoadOptionNumber(class LoadOptionClass) (uint16, error) {
+// LoadOptionClassSysprep, or LoadOptionClassBoot. In general [DefaultVarContext]
+// should be supplied to this.
+func NextAvailableLoadOptionNumber(ctx context.Context, class LoadOptionClass) (uint16, error) {
 	switch class {
 	case LoadOptionClassDriver, LoadOptionClassSysPrep, LoadOptionClassBoot:
 		// ok
@@ -269,7 +279,7 @@ func NextAvailableLoadOptionNumber(class LoadOptionClass) (uint16, error) {
 		return 0, fmt.Errorf("invalid class %q: only suitable for Driver, SysPrep or Boot", class)
 	}
 
-	used, err := ListLoadOptionNumbers(class)
+	used, err := ListLoadOptionNumbers(ctx, class)
 	if err != nil {
 		return 0, err
 	}
@@ -285,8 +295,9 @@ func NextAvailableLoadOptionNumber(class LoadOptionClass) (uint16, error) {
 }
 
 // ReadBootNextVariable returns the option number of the boot entry to try next.
-func ReadBootNextVariable() (uint16, error) {
-	data, _, err := ReadVariable("BootNext", GlobalVariable)
+// In general [DefaultVarContext] should be supplied to this.
+func ReadBootNextVariable(ctx context.Context) (uint16, error) {
+	data, _, err := ReadVariable(ctx, "BootNext", GlobalVariable)
 	if err != nil {
 		return 0, err
 	}
@@ -299,35 +310,39 @@ func ReadBootNextVariable() (uint16, error) {
 }
 
 // WriteBootNextVariable writes the option number of the boot entry to try next.
-func WriteBootNextVariable(n uint16) error {
-	if _, err := ReadLoadOptionVariable(LoadOptionClassBoot, n); err != nil {
+// In general [DefaultVarContext] should be supplied to this.
+func WriteBootNextVariable(ctx context.Context, n uint16) error {
+	if _, err := ReadLoadOptionVariable(ctx, LoadOptionClassBoot, n); err != nil {
 		return fmt.Errorf("invalid load option %d: %w", n, err)
 	}
 
 	var data [2]byte
 	binary.LittleEndian.PutUint16(data[:], n)
 
-	return WriteVariable("BootNext", GlobalVariable, AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, data[:])
+	return WriteVariable(ctx, "BootNext", GlobalVariable, AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, data[:])
 }
 
 // DeleteBootNextVariable deletes the option number of the boot entry to try next.
-func DeleteBootNextVariable() error {
-	return WriteVariable("BootNext", GlobalVariable, AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, nil)
+// In general [DefaultVarContext] should be supplied to this.
+func DeleteBootNextVariable(ctx context.Context) error {
+	return WriteVariable(ctx, "BootNext", GlobalVariable, AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, nil)
 }
 
 // ReadBootNextLoadOptionVariable returns the LoadOption for the boot entry to try next.
-func ReadBootNextLoadOptionVariable() (*LoadOption, error) {
-	n, err := ReadBootNextVariable()
+// In general [DefaultVarContext] should be supplied to this.
+func ReadBootNextLoadOptionVariable(ctx context.Context) (*LoadOption, error) {
+	n, err := ReadBootNextVariable(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return ReadLoadOptionVariable(LoadOptionClassBoot, n)
+	return ReadLoadOptionVariable(ctx, LoadOptionClassBoot, n)
 }
 
 // ReadBootCurrentVariable returns the option number used for the current boot.
-func ReadBootCurrentVariable() (uint16, error) {
-	data, _, err := ReadVariable("BootCurrent", GlobalVariable)
+// In general [DefaultVarContext] should be supplied to this.
+func ReadBootCurrentVariable(ctx context.Context) (uint16, error) {
+	data, _, err := ReadVariable(ctx, "BootCurrent", GlobalVariable)
 	if err != nil {
 		return 0, err
 	}
@@ -345,18 +360,19 @@ func ReadBootCurrentVariable() (uint16, error) {
 // or LoadOptionClassBoot, this will use the corresponding *Order variable. It will skip entries
 // for which there isn't a corresponding variable. Where class is LoadOptionClassPlatformRecovery,
 // the order is determined by the variable names.
-func ReadOrderedLoadOptionVariables(class LoadOptionClass) ([]*LoadOption, error) {
+// In general [DefaultVarContext] should be supplied to this.
+func ReadOrderedLoadOptionVariables(ctx context.Context, class LoadOptionClass) ([]*LoadOption, error) {
 	var optNumbers []uint16
 	switch class {
 	case LoadOptionClassDriver, LoadOptionClassSysPrep, LoadOptionClassBoot:
 		var err error
-		optNumbers, err = ReadLoadOrderVariable(class)
+		optNumbers, err = ReadLoadOrderVariable(ctx, class)
 		if err != nil {
 			return nil, fmt.Errorf("cannot obtain order: %w", err)
 		}
 	case LoadOptionClassPlatformRecovery:
 		var err error
-		optNumbers, err = ListLoadOptionNumbers(LoadOptionClassPlatformRecovery)
+		optNumbers, err = ListLoadOptionNumbers(ctx, LoadOptionClassPlatformRecovery)
 		if err != nil {
 			return nil, fmt.Errorf("cannot obtain load option numbers: %w", err)
 		}
@@ -364,7 +380,7 @@ func ReadOrderedLoadOptionVariables(class LoadOptionClass) ([]*LoadOption, error
 
 	var opts []*LoadOption
 	for _, n := range optNumbers {
-		opt, err := ReadLoadOptionVariable(class, n)
+		opt, err := ReadLoadOptionVariable(ctx, class, n)
 		switch {
 		case errors.Is(err, ErrVarNotExist):
 			// skip and ignore missing number

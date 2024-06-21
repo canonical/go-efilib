@@ -5,8 +5,8 @@
 package efi
 
 import (
+	"context"
 	"errors"
-	"sync"
 
 	"github.com/canonical/go-efilib/internal/uefi"
 )
@@ -36,13 +36,25 @@ type VariableDescriptor struct {
 	GUID GUID
 }
 
+// VarsBackendKey is used to identify the [VarsBackend] on a [context.Context].
+type VarsBackendKey struct{}
+
 // VarsBackend is used by the [ReadVariable], [WriteVariable] and [ListVariables]
 // functions, and indirectly by other functions in this package to abstract access
-// to a specific backend. A default backend is initialized at process initialization.
+// to a specific backend. A default backend is initialized at process initialization
+// and is available via [DefaultVarContext].
 type VarsBackend interface {
 	Get(name string, guid GUID) (VariableAttributes, []byte, error)
 	Set(name string, guid GUID, attrs VariableAttributes, data []byte) error
 	List() ([]VariableDescriptor, error)
+}
+
+func getVarsBackend(ctx context.Context) VarsBackend {
+	value := ctx.Value(VarsBackendKey{})
+	if value == nil {
+		return nullVarsBackend{}
+	}
+	return value.(VarsBackend)
 }
 
 type nullVarsBackend struct{}
@@ -59,52 +71,34 @@ func (v nullVarsBackend) List() ([]VariableDescriptor, error) {
 	return nil, ErrVarsUnavailable
 }
 
-var (
-	varsMu sync.Mutex
-	vars   VarsBackend = nullVarsBackend{}
-)
-
-func getVars() VarsBackend {
-	varsMu.Lock()
-	defer varsMu.Unlock()
-	return vars
-}
+var nullContext = context.WithValue(context.Background(), VarsBackendKey{}, nullVarsBackend{})
 
 // ReadVariable returns the value and attributes of the EFI variable with the specified
-// name and GUID.
-func ReadVariable(name string, guid GUID) ([]byte, VariableAttributes, error) {
-	attrs, data, err := getVars().Get(name, guid)
+// name and GUID. In general, [DefaultVarContext] should be supplied to this.
+func ReadVariable(ctx context.Context, name string, guid GUID) ([]byte, VariableAttributes, error) {
+	attrs, data, err := getVarsBackend(ctx).Get(name, guid)
 	return data, attrs, err
 }
 
 // WriteVariable writes the supplied data value with the specified attributes to the
-// EFI variable with the specified name and GUID.
+// EFI variable with the specified name and GUID. In general, [DefaultVarContext] should
+// be supplied to this.
 //
 // If the variable already exists, the specified attributes must match the existing
 // attributes with the exception of AttributeAppendWrite.
 //
 // If the variable does not exist, it will be created.
-func WriteVariable(name string, guid GUID, attrs VariableAttributes, data []byte) error {
-	return getVars().Set(name, guid, attrs, data)
+func WriteVariable(ctx context.Context, name string, guid GUID, attrs VariableAttributes, data []byte) error {
+	return getVarsBackend(ctx).Set(name, guid, attrs, data)
 }
 
-// ListVariables returns a list of variables that can be accessed.
-func ListVariables() ([]VariableDescriptor, error) {
-	return getVars().List()
+// ListVariables returns a list of variables that can be accessed. In general,
+// [DefaultVarContext] should be supplied to this.
+func ListVariables(ctx context.Context) ([]VariableDescriptor, error) {
+	return getVarsBackend(ctx).List()
 }
 
-// MockVarsBackend allows the VarsBackend to be mocked for testing or to provide variables
-// from an alternative host in production code. It returns a function that will restore the
-// original backend when called.
-func MockVarsBackend(backend VarsBackend) (restore func()) {
-	varsMu.Lock()
-	defer varsMu.Unlock()
-	orig := vars
-	vars = backend
-
-	return func() {
-		varsMu.Lock()
-		defer varsMu.Unlock()
-		vars = orig
-	}
-}
+// DefaultVarContext should be passed to functions that interact with EFI
+// variables in order to use the default system backend for accessing
+// EFI variables.
+var DefaultVarContext = newDefaultVarContext()

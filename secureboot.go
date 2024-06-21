@@ -6,13 +6,14 @@ package efi
 
 import (
 	"bytes"
+	"context"
 	"crypto/x509"
 	"errors"
 	"fmt"
 )
 
-func readBinaryVariable(name string, guid GUID) (bool, error) {
-	data, _, err := ReadVariable(name, guid)
+func readBinaryVariable(ctx context.Context, name string, guid GUID) (bool, error) {
+	data, _, err := ReadVariable(ctx, name, guid)
 	if err != nil {
 		return false, err
 	}
@@ -32,22 +33,23 @@ func readBinaryVariable(name string, guid GUID) (bool, error) {
 // ReadSecureBootVariable reads the SecureBoot global variable which provides
 // an indication of whether secure boot is enabled. If it returns false, then
 // secure boot is disabled. If it returns true, then it is an indication that
-// secure boot is enabled.
+// secure boot is enabled. In general, [DefaultVarContext] should be supplied
+// to this.
 //
 // Note that this function cannot prove that secure boot is enabled. If a platform
 // provides a way to disable secure boot and execute arbitrary code, then the
 // platform or kernel may not tell the truth about this. Obtaining proof that
 // secure boot is enabled would involve the use of attestations and a third
 // party verifier.
-func ReadSecureBootVariable() (bool, error) {
-	return readBinaryVariable("SecureBoot", GlobalVariable)
+func ReadSecureBootVariable(ctx context.Context) (bool, error) {
+	return readBinaryVariable(ctx, "SecureBoot", GlobalVariable)
 }
 
 // ReadPlatformKeyCertificate reads the PK global variable and returns the corresponding
 // certificate, if a platform key is enrolled. If no platform key is enrolled, this
-// will return nil.
-func ReadPlatformKeyCertificate() (*x509.Certificate, error) {
-	db, err := ReadSignatureDatabaseVariable(PKVariable)
+// will return nil. In general, [DefaultVarContext] should be supplied to this.
+func ReadPlatformKeyCertificate(ctx context.Context) (*x509.Certificate, error) {
+	db, err := ReadSignatureDatabaseVariable(ctx, PKVariable)
 	if err != nil {
 		return nil, err
 	}
@@ -84,9 +86,9 @@ var (
 )
 
 // ReadSignatureDatabaseVariable reads the signature database from the supplied
-// variable.
-func ReadSignatureDatabaseVariable(desc VariableDescriptor) (SignatureDatabase, error) {
-	data, _, err := ReadVariable(desc.Name, desc.GUID)
+// variable. In general, [DefaultVarContext] should be supplied to this.
+func ReadSignatureDatabaseVariable(ctx context.Context, desc VariableDescriptor) (SignatureDatabase, error) {
+	data, _, err := ReadVariable(ctx, desc.Name, desc.GUID)
 	if err != nil {
 		return nil, err
 	}
@@ -173,16 +175,17 @@ const (
 	secureBootModeFeaturesBeforeUefi2_5
 )
 
-// ComputeSecureBootMode determines the secure boot mode of a platform.
-func ComputeSecureBootMode() (SecureBootMode, error) {
-	setupMode, err := readBinaryVariable("SetupMode", GlobalVariable)
+// ComputeSecureBootMode determines the secure boot mode of a platform. In general,
+// [DefaultVarContext] should be supplied to this.
+func ComputeSecureBootMode(ctx context.Context) (SecureBootMode, error) {
+	setupMode, err := readBinaryVariable(ctx, "SetupMode", GlobalVariable)
 	if err != nil {
 		return 0, fmt.Errorf("cannot read SetupMode variable: %w", err)
 	}
 
 	var features secureBootModeFeatures
 
-	auditMode, err := readBinaryVariable("AuditMode", GlobalVariable)
+	auditMode, err := readBinaryVariable(ctx, "AuditMode", GlobalVariable)
 	switch {
 	case errors.Is(err, ErrVarNotExist):
 		features = secureBootModeFeaturesBeforeUefi2_5
@@ -195,17 +198,17 @@ func ComputeSecureBootMode() (SecureBootMode, error) {
 	var deployedMode bool
 	if features == secureBootModeFeaturesAtLeastUefi2_5 {
 		var err error
-		deployedMode, err = readBinaryVariable("DeployedMode", GlobalVariable)
+		deployedMode, err = readBinaryVariable(ctx, "DeployedMode", GlobalVariable)
 		if err != nil {
 			return 0, fmt.Errorf("cannot read DeployedMode variable: %w", err)
 		}
 	}
 
-	secureBoot, err := ReadSecureBootVariable()
+	secureBoot, err := ReadSecureBootVariable(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("cannot read SecureBoot variable: %w", err)
 	}
-	pk, err := ReadPlatformKeyCertificate()
+	pk, err := ReadPlatformKeyCertificate(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("cannot read PK variable: %w", err)
 	}
@@ -256,8 +259,9 @@ func ComputeSecureBootMode() (SecureBootMode, error) {
 }
 
 // IsDeployedModeSupported indicates whether the firmware is new enough (ie based on
-// at least UEFI 2.5) to support deployed mode.
-func IsDeployedModeSupported() bool {
-	_, _, err := ReadVariable("DeployedMode", GlobalVariable)
+// at least UEFI 2.5) to support deployed mode. In general, [DefaultVarContext] should
+// be supplied to this.
+func IsDeployedModeSupported(ctx context.Context) bool {
+	_, _, err := ReadVariable(ctx, "DeployedMode", GlobalVariable)
 	return err == nil
 }

@@ -12,11 +12,13 @@ import (
 )
 
 type (
-	EfivarfsVarsBackend = efivarfsVarsBackend
-	VarFile             = varFile
+	VarFile = varFile
 )
 
-var Defer = errors.New("")
+var (
+	Defer              = errors.New("")
+	EfivarfsVarContext = efivarfsVarContext
+)
 
 func MockOpenVarFile(fn func(string, int, os.FileMode) (VarFile, error)) (restore func()) {
 	orig := openVarFile

@@ -6,6 +6,7 @@ package efi
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -283,9 +284,11 @@ func (v efivarfsVarsBackend) List() ([]VariableDescriptor, error) {
 	return entries, nil
 }
 
-func init() {
+var efivarfsVarContext = context.WithValue(context.Background(), VarsBackendKey{}, efivarfsVarsBackend{})
+
+func newDefaultVarContext() context.Context {
 	if !probeEfivarfs() {
-		return
+		return nullContext
 	}
-	vars = efivarfsVarsBackend{}
+	return efivarfsVarContext
 }
