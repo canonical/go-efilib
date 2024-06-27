@@ -6,6 +6,7 @@ package efi_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"errors"
 	"io"
@@ -245,6 +246,8 @@ func (m *mockEfiVarfs) Remove(path string) error {
 	return nil
 }
 
+var efivarfsVarContext = WithVarsBackend(context.Background(), EfivarfsVarsBackend{})
+
 type varsLinuxSuite struct {
 	mockEfiVarfs         *mockEfiVarfs
 	restoreOpenVarFile   func()
@@ -278,7 +281,7 @@ type testReadVariableData struct {
 }
 
 func (s *varsLinuxSuite) testReadVariable(c *C, data *testReadVariableData) {
-	val, attrs, err := ReadVariable(EfivarfsVarContext, data.name, data.guid)
+	val, attrs, err := ReadVariable(efivarfsVarContext, data.name, data.guid)
 	c.Check(err, IsNil)
 	c.Check(val, DeepEquals, data.expectedData)
 	c.Check(attrs, Equals, data.expectedAttrs)
@@ -309,18 +312,18 @@ func (s *varsLinuxSuite) TestReadVariable3(c *C) {
 }
 
 func (s *varsLinuxSuite) TestReadVariableNotFound1(c *C) {
-	_, _, err := ReadVariable(EfivarfsVarContext, "NotFound", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}))
+	_, _, err := ReadVariable(efivarfsVarContext, "NotFound", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}))
 	c.Check(err, Equals, ErrVarNotExist)
 }
 
 func (s *varsLinuxSuite) TestReadVariableNotFound2(c *C) {
 	s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/NotFound-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"] = &mockEfiVar{}
-	_, _, err := ReadVariable(EfivarfsVarContext, "NotFound", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}))
+	_, _, err := ReadVariable(efivarfsVarContext, "NotFound", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}))
 	c.Check(err, Equals, ErrVarNotExist)
 }
 
 func (s *varsLinuxSuite) TestWriteVariableImmutable(c *C) {
-	err := WriteVariable(EfivarfsVarContext, "Test", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}),
+	err := WriteVariable(efivarfsVarContext, "Test", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}),
 		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, DecodeHexString(c, "080808080808"))
 	c.Check(err, IsNil)
 
@@ -331,7 +334,7 @@ func (s *varsLinuxSuite) TestWriteVariableImmutable(c *C) {
 }
 
 func (s *varsLinuxSuite) TestWriteVariableMutable(c *C) {
-	err := WriteVariable(EfivarfsVarContext, "BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}),
+	err := WriteVariable(efivarfsVarContext, "BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}),
 		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, DecodeHexString(c, "0001"))
 	c.Check(err, IsNil)
 
@@ -342,7 +345,7 @@ func (s *varsLinuxSuite) TestWriteVariableMutable(c *C) {
 }
 
 func (s *varsLinuxSuite) TestWriteVariableAppend(c *C) {
-	err := WriteVariable(EfivarfsVarContext, "BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}),
+	err := WriteVariable(efivarfsVarContext, "BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}),
 		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess|AttributeAppendWrite,
 		DecodeHexString(c, "0001"))
 	c.Check(err, IsNil)
@@ -354,7 +357,7 @@ func (s *varsLinuxSuite) TestWriteVariableAppend(c *C) {
 }
 
 func (s *varsLinuxSuite) TestCreateVariable(c *C) {
-	err := WriteVariable(EfivarfsVarContext, "Test3", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}),
+	err := WriteVariable(efivarfsVarContext, "Test3", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}),
 		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, DecodeHexString(c, "a5a5a5a5"))
 	c.Assert(err, IsNil)
 
@@ -365,7 +368,7 @@ func (s *varsLinuxSuite) TestCreateVariable(c *C) {
 }
 
 func (s *varsLinuxSuite) TestDeleteVariableImmutable(c *C) {
-	err := WriteVariable(EfivarfsVarContext, "Test", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}),
+	err := WriteVariable(efivarfsVarContext, "Test", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}),
 		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, nil)
 	c.Check(err, IsNil)
 
@@ -374,7 +377,7 @@ func (s *varsLinuxSuite) TestDeleteVariableImmutable(c *C) {
 }
 
 func (s *varsLinuxSuite) TestDeleteVariableMutable(c *C) {
-	err := WriteVariable(EfivarfsVarContext, "Test2", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}),
+	err := WriteVariable(efivarfsVarContext, "Test2", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}),
 		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, nil)
 	c.Check(err, IsNil)
 
@@ -383,7 +386,7 @@ func (s *varsLinuxSuite) TestDeleteVariableMutable(c *C) {
 }
 
 func (s *varsLinuxSuite) TestDeleteVariableNotExist(c *C) {
-	err := WriteVariable(EfivarfsVarContext, "NotFound", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}),
+	err := WriteVariable(efivarfsVarContext, "NotFound", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}),
 		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, nil)
 	c.Check(err, IsNil)
 }
@@ -406,7 +409,7 @@ func (s *varsLinuxSuite) TestWriteVariableEACCES(c *C) {
 		restore()
 	}()
 
-	err := WriteVariable(EfivarfsVarContext, "BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}),
+	err := WriteVariable(efivarfsVarContext, "BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}),
 		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, DecodeHexString(c, "0001"))
 	c.Check(err, Equals, ErrVarPermission)
 }
@@ -430,7 +433,7 @@ func (s *varsLinuxSuite) TestWriteVariableRace(c *C) {
 		restore()
 	}()
 
-	err := WriteVariable(EfivarfsVarContext, "BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}),
+	err := WriteVariable(efivarfsVarContext, "BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}),
 		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, DecodeHexString(c, "0001"))
 	c.Check(err, IsNil)
 }
@@ -448,7 +451,7 @@ func (s *varsLinuxSuite) TestWriteVariableRaceGiveUp(c *C) {
 	})
 	defer restore()
 
-	err := WriteVariable(EfivarfsVarContext, "BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}),
+	err := WriteVariable(efivarfsVarContext, "BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}),
 		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, DecodeHexString(c, "0001"))
 	c.Check(err, Equals, ErrVarPermission)
 	c.Check(count, Equals, 5)
@@ -471,7 +474,7 @@ func (s *varsLinuxSuite) TestDeleteVariableRace(c *C) {
 		restore()
 	}()
 
-	err := WriteVariable(EfivarfsVarContext, "Test", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}),
+	err := WriteVariable(efivarfsVarContext, "Test", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}),
 		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, nil)
 	c.Check(err, IsNil)
 
@@ -489,14 +492,14 @@ func (s *varsLinuxSuite) TestDeleteVariableRaceGiveUp(c *C) {
 	})
 	defer restore()
 
-	err := WriteVariable(EfivarfsVarContext, "Test", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}),
+	err := WriteVariable(efivarfsVarContext, "Test", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}),
 		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, nil)
 	c.Check(err, Equals, ErrVarPermission)
 	c.Check(count, Equals, 5)
 }
 
 func (s *varsLinuxSuite) TestListVariables(c *C) {
-	ents, err := ListVariables(EfivarfsVarContext)
+	ents, err := ListVariables(efivarfsVarContext)
 	c.Check(err, IsNil)
 	c.Check(ents, DeepEquals, []VariableDescriptor{
 		{Name: "BootOrder", GUID: MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c})},
@@ -516,7 +519,7 @@ func (s *varsLinuxSuite) TestListVariablesInvalidNames(c *C) {
 	restore := MockOpenVarFile(fs.Open)
 	defer restore()
 
-	ents, err := ListVariables(EfivarfsVarContext)
+	ents, err := ListVariables(efivarfsVarContext)
 	c.Check(err, IsNil)
 	c.Check(ents, DeepEquals, []VariableDescriptor{{Name: "Test", GUID: MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20})}})
 }

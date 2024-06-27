@@ -20,7 +20,7 @@ type securebootSuite struct {
 
 func (s *securebootSuite) SetUpTest(c *C) {
 	s.mockVars = make(mockBootVars)
-	s.mockCtx = context.WithValue(context.Background(), VarsBackendKey{}, s.mockVars)
+	s.mockCtx = WithVarsBackend(context.Background(), s.mockVars)
 }
 
 func (s *securebootSuite) TearDownTest(c *C) {

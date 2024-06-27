@@ -36,8 +36,7 @@ type VariableDescriptor struct {
 	GUID GUID
 }
 
-// VarsBackendKey is used to identify the [VarsBackend] on a [context.Context].
-type VarsBackendKey struct{}
+type varsBackendKey struct{}
 
 // VarsBackend is used by the [ReadVariable], [WriteVariable] and [ListVariables]
 // functions, and indirectly by other functions in this package to abstract access
@@ -50,7 +49,7 @@ type VarsBackend interface {
 }
 
 func getVarsBackend(ctx context.Context) VarsBackend {
-	value := ctx.Value(VarsBackendKey{})
+	value := ctx.Value(varsBackendKey{})
 	if value == nil {
 		return nullVarsBackend{}
 	}
@@ -70,8 +69,6 @@ func (v nullVarsBackend) Set(name string, guid GUID, attrs VariableAttributes, d
 func (v nullVarsBackend) List() ([]VariableDescriptor, error) {
 	return nil, ErrVarsUnavailable
 }
-
-var nullContext = context.WithValue(context.Background(), VarsBackendKey{}, nullVarsBackend{})
 
 // ReadVariable returns the value and attributes of the EFI variable with the specified
 // name and GUID. In general, [DefaultVarContext] should be supplied to this.
@@ -98,7 +95,21 @@ func ListVariables(ctx context.Context) ([]VariableDescriptor, error) {
 	return getVarsBackend(ctx).List()
 }
 
-// DefaultVarContext should be passed to functions that interact with EFI
-// variables in order to use the default system backend for accessing
-// EFI variables.
+func withVarsBackend(ctx context.Context, backend VarsBackend) context.Context {
+	return context.WithValue(ctx, varsBackendKey{}, backend)
+}
+
+func newDefaultVarContext() context.Context {
+	return addDefaultVarsBackend(context.Background())
+}
+
+// DefaultVarContext should generally be passed to functions that interact with
+// EFI variables in order to use the default system backend for accessing EFI
+// variables. It is based on a background context.
 var DefaultVarContext = newDefaultVarContext()
+
+// WithDefaultVarsBackend adds the default system backend for accesssing EFI
+// variables to an existing context.
+func WithDefaultVarsBackend(ctx context.Context) context.Context {
+	return addDefaultVarsBackend(ctx)
+}

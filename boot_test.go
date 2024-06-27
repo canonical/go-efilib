@@ -20,7 +20,7 @@ type bootSuite struct {
 
 func (s *bootSuite) SetUpTest(c *C) {
 	s.mockVars = make(mockBootVars)
-	s.mockCtx = context.WithValue(context.Background(), VarsBackendKey{}, s.mockVars)
+	s.mockCtx = WithVarsBackend(context.Background(), s.mockVars)
 }
 
 func (s *bootSuite) TearDownTest(c *C) {

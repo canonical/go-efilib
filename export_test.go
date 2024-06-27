@@ -4,6 +4,10 @@
 
 package efi
 
+type (
+	NullVarsBackend = nullVarsBackend
+)
+
 var (
-	NullContext = nullContext
+	WithVarsBackend = withVarsBackend
 )

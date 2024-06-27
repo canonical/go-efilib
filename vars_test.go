@@ -5,6 +5,7 @@
 package efi_test
 
 import (
+	"context"
 	"errors"
 
 	. "gopkg.in/check.v1"
@@ -62,22 +63,24 @@ func (v mockBootVars) add(name string, guid GUID, attrs VariableAttributes, data
 	v[VariableDescriptor{Name: name, GUID: guid}] = &mockBootVarData{attrs: attrs, data: data}
 }
 
+var nullContext = WithVarsBackend(context.Background(), NullVarsBackend{})
+
 type varsSuite struct{}
 
 var _ = Suite(&varsSuite{})
 
 func (s *varsSuite) TestNullReadVariable(c *C) {
-	_, _, err := ReadVariable(NullContext, "BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}))
+	_, _, err := ReadVariable(nullContext, "BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}))
 	c.Check(err, Equals, ErrVarsUnavailable)
 }
 
 func (s *varsSuite) TestNullWriteVariable(c *C) {
-	err := WriteVariable(NullContext, "BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}),
+	err := WriteVariable(nullContext, "BootOrder", MakeGUID(0x8be4df61, 0x93ca, 0x11d2, 0xaa0d, [...]uint8{0x00, 0xe0, 0x98, 0x03, 0x2b, 0x8c}),
 		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, DecodeHexString(c, "0001"))
 	c.Check(err, Equals, ErrVarsUnavailable)
 }
 
 func (s *varsSuite) TestNullListVariables(c *C) {
-	_, err := ListVariables(NullContext)
+	_, err := ListVariables(nullContext)
 	c.Check(err, Equals, ErrVarsUnavailable)
 }

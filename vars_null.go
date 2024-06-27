@@ -7,6 +7,6 @@ package efi
 
 import "context"
 
-func newDefaultVarContext() context.Context {
-	return nullContext
+func addDefaultVarsBackend(ctx context.Context) context.Context {
+	return withVarsBackend(ctx, nullVarsBackend{})
 }

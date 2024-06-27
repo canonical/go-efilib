@@ -284,11 +284,9 @@ func (v efivarfsVarsBackend) List() ([]VariableDescriptor, error) {
 	return entries, nil
 }
 
-var efivarfsVarContext = context.WithValue(context.Background(), VarsBackendKey{}, efivarfsVarsBackend{})
-
-func newDefaultVarContext() context.Context {
+func addDefaultVarsBackend(ctx context.Context) context.Context {
 	if !probeEfivarfs() {
-		return nullContext
+		return withVarsBackend(ctx, nullVarsBackend{})
 	}
-	return efivarfsVarContext
+	return withVarsBackend(ctx, efivarfsVarsBackend{})
 }
