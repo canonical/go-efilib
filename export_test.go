@@ -6,6 +6,7 @@ package efi
 
 type (
 	NullVarsBackend               = nullVarsBackend
+	VariableDescriptorSlice       = variableDescriptorSlice
 	VarsBackendKey                = varsBackendKey
 	VarsBackend2ToVarsBackendShim = varsBackend2ToVarsBackendShim
 )

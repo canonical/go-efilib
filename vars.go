@@ -5,10 +5,12 @@
 package efi
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"reflect"
+	"sort"
 
 	"github.com/canonical/go-efilib/internal/uefi"
 )
@@ -134,10 +136,46 @@ func WriteVariable(ctx context.Context, name string, guid GUID, attrs VariableAt
 	return getVarsBackend(ctx).Set(name, guid, attrs, data)
 }
 
-// ListVariables returns a list of variables that can be accessed. In general,
-// [DefaultVarContext] should be supplied to this.
+// ListVariables returns a sorted list of variables that can be accessed. In
+// general, [DefaultVarContext] should be supplied to this.
 func ListVariables(ctx context.Context) ([]VariableDescriptor, error) {
-	return getVarsBackend(ctx).List()
+	names, err := getVarsBackend(ctx).List()
+	if err != nil {
+		return nil, err
+	}
+	sort.Stable(variableDescriptorSlice(names))
+	return names, nil
+}
+
+// variableDescriptorSlice is a slice of VariableDescriptor instances that implements
+// the sort.Interface interface, so that it can be sorted.
+type variableDescriptorSlice []VariableDescriptor
+
+func (l variableDescriptorSlice) Len() int {
+	return len(l)
+}
+
+func (l variableDescriptorSlice) Less(i, j int) bool {
+	entryI := l[i]
+	entryJ := l[j]
+	// Sort by GUID first
+	switch bytes.Compare(entryI.GUID[:], entryJ.GUID[:]) {
+	case -1:
+		// i always sorts before j
+		return true
+	case 0:
+		// The GUIDs are identical, so sort based on name
+		return entryI.Name < entryJ.Name
+	case 1:
+		// i always sorts after j
+		return false
+	default:
+		panic("unexpected bytes.Compare return value")
+	}
+}
+
+func (l variableDescriptorSlice) Swap(i, j int) {
+	l[i], l[j] = l[j], l[i]
 }
 
 func withVarsBackend(ctx context.Context, backend VarsBackend) context.Context {

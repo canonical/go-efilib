@@ -13,7 +13,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
 	"syscall"
 
 	"golang.org/x/sys/unix"
@@ -278,9 +277,6 @@ func (v efivarfsVarsBackend) List() ([]VariableDescriptor, error) {
 		entries = append(entries, VariableDescriptor{Name: name, GUID: guid})
 	}
 
-	sort.Slice(entries, func(i, j int) bool {
-		return fmt.Sprintf("%s-%v", entries[i].Name, entries[i].GUID) < fmt.Sprintf("%s-%v", entries[j].Name, entries[j].GUID)
-	})
 	return entries, nil
 }
 

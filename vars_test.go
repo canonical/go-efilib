@@ -7,7 +7,6 @@ package efi_test
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sort"
 
 	. "gopkg.in/check.v1"
@@ -228,17 +227,14 @@ func (s *varsSuite) TestListVariables(c *C) {
 	ctx := WithVarsBackend(context.Background(), vars)
 	names, err := ListVariables(ctx)
 	c.Check(err, IsNil)
-	sort.Slice(names, func(i, j int) bool {
-		return fmt.Sprintf("%s-%v", names[i].Name, names[i].GUID) < fmt.Sprintf("%s-%v", names[j].Name, names[j].GUID)
-	})
 	c.Check(names, DeepEquals, []VariableDescriptor{
-		{
-			Name: "Bar",
-			GUID: MakeGUID(0x811539c4, 0x812d, 0x4ad6, 0x8c7e, [...]uint8{0xf8, 0xc9, 0xc5, 0x09, 0x53, 0x45}),
-		},
 		{
 			Name: "Foo",
 			GUID: MakeGUID(0x1cbf52c3, 0xdeee, 0x45ac, 0xb227, [...]uint8{0xeb, 0xe6, 0xa0, 0xe5, 0x8a, 0x5c}),
+		},
+		{
+			Name: "Bar",
+			GUID: MakeGUID(0x811539c4, 0x812d, 0x4ad6, 0x8c7e, [...]uint8{0xf8, 0xc9, 0xc5, 0x09, 0x53, 0x45}),
 		},
 	})
 }
@@ -305,17 +301,15 @@ func (s *varsSuite) TestVarsBackend2ToVarsBackendShimList(c *C) {
 
 	names, err := vars.List()
 	c.Check(err, IsNil)
-	sort.Slice(names, func(i, j int) bool {
-		return fmt.Sprintf("%s-%v", names[i].Name, names[i].GUID) < fmt.Sprintf("%s-%v", names[j].Name, names[j].GUID)
-	})
+	sort.Stable(VariableDescriptorSlice(names))
 	c.Check(names, DeepEquals, []VariableDescriptor{
-		{
-			Name: "Bar",
-			GUID: MakeGUID(0x811539c4, 0x812d, 0x4ad6, 0x8c7e, [...]uint8{0xf8, 0xc9, 0xc5, 0x09, 0x53, 0x45}),
-		},
 		{
 			Name: "Foo",
 			GUID: MakeGUID(0x1cbf52c3, 0xdeee, 0x45ac, 0xb227, [...]uint8{0xeb, 0xe6, 0xa0, 0xe5, 0x8a, 0x5c}),
+		},
+		{
+			Name: "Bar",
+			GUID: MakeGUID(0x811539c4, 0x812d, 0x4ad6, 0x8c7e, [...]uint8{0xf8, 0xc9, 0xc5, 0x09, 0x53, 0x45}),
 		},
 	})
 }
