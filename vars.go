@@ -62,41 +62,30 @@ type VarsBackend2 interface {
 	List(ctx context.Context) ([]VariableDescriptor, error)
 }
 
-// varsBackend2ToVarsBackendShim makes a VarsBackend2 look like a VarsBackend.
-// It should only exist for the lifetime of a function call with the associated
-// context.
-type varsBackend2ToVarsBackendShim struct {
-	Context context.Context
-	Backend VarsBackend2
+type varsBackendWrapper struct {
+	Backend VarsBackend
 }
 
-func (v *varsBackend2ToVarsBackendShim) Get(name string, guid GUID) (VariableAttributes, []byte, error) {
-	return v.Backend.Get(v.Context, name, guid)
+func (v *varsBackendWrapper) Get(ctx context.Context, name string, guid GUID) (VariableAttributes, []byte, error) {
+	return v.Backend.Get(name, guid)
 }
 
-func (v *varsBackend2ToVarsBackendShim) Set(name string, guid GUID, attrs VariableAttributes, data []byte) error {
-	return v.Backend.Set(v.Context, name, guid, attrs, data)
+func (v *varsBackendWrapper) Set(ctx context.Context, name string, guid GUID, attrs VariableAttributes, data []byte) error {
+	return v.Backend.Set(name, guid, attrs, data)
 }
 
-func (v *varsBackend2ToVarsBackendShim) List() ([]VariableDescriptor, error) {
-	return v.Backend.List(v.Context)
+func (v *varsBackendWrapper) List(ctx context.Context) ([]VariableDescriptor, error) {
+	return v.Backend.List()
 }
 
-func varsBackend2ToVarsBackend(ctx context.Context, backend VarsBackend2) VarsBackend {
-	return &varsBackend2ToVarsBackendShim{
-		Context: ctx,
-		Backend: backend,
-	}
-}
-
-func getVarsBackend(ctx context.Context) VarsBackend {
+func getVarsBackend(ctx context.Context) VarsBackend2 {
 	switch v := ctx.Value(varsBackendKey{}).(type) {
 	case VarsBackend2:
-		return varsBackend2ToVarsBackend(ctx, v)
-	case VarsBackend:
 		return v
+	case VarsBackend:
+		return &varsBackendWrapper{Backend: v}
 	case nil:
-		return nullVarsBackend{}
+		return &varsBackendWrapper{Backend: nullVarsBackend{}}
 	default:
 		val := ctx.Value(varsBackendKey{})
 		panic(fmt.Sprintf("invalid variable backend type %q: %#v", reflect.TypeOf(val), val))
@@ -120,7 +109,7 @@ func (v nullVarsBackend) List() ([]VariableDescriptor, error) {
 // ReadVariable returns the value and attributes of the EFI variable with the specified
 // name and GUID. In general, [DefaultVarContext] should be supplied to this.
 func ReadVariable(ctx context.Context, name string, guid GUID) ([]byte, VariableAttributes, error) {
-	attrs, data, err := getVarsBackend(ctx).Get(name, guid)
+	attrs, data, err := getVarsBackend(ctx).Get(ctx, name, guid)
 	return data, attrs, err
 }
 
@@ -133,13 +122,13 @@ func ReadVariable(ctx context.Context, name string, guid GUID) ([]byte, Variable
 //
 // If the variable does not exist, it will be created.
 func WriteVariable(ctx context.Context, name string, guid GUID, attrs VariableAttributes, data []byte) error {
-	return getVarsBackend(ctx).Set(name, guid, attrs, data)
+	return getVarsBackend(ctx).Set(ctx, name, guid, attrs, data)
 }
 
 // ListVariables returns a sorted list of variables that can be accessed. In
 // general, [DefaultVarContext] should be supplied to this.
 func ListVariables(ctx context.Context) ([]VariableDescriptor, error) {
-	names, err := getVarsBackend(ctx).List()
+	names, err := getVarsBackend(ctx).List(ctx)
 	if err != nil {
 		return nil, err
 	}
