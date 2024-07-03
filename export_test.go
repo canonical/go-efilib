@@ -5,9 +5,14 @@
 package efi
 
 type (
-	NullVarsBackend = nullVarsBackend
+	NullVarsBackend               = nullVarsBackend
+	VarsBackendKey                = varsBackendKey
+	VarsBackend2ToVarsBackendShim = varsBackend2ToVarsBackendShim
 )
 
 var (
-	WithVarsBackend = withVarsBackend
+	GetVarsBackend            = getVarsBackend
+	VarsBackend2ToVarsBackend = varsBackend2ToVarsBackend
+	WithVarsBackend           = withVarsBackend
+	WithVarsBackend2          = withVarsBackend2
 )

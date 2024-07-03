@@ -7,6 +7,8 @@ package efi
 import (
 	"context"
 	"errors"
+	"fmt"
+	"reflect"
 
 	"github.com/canonical/go-efilib/internal/uefi"
 )
@@ -48,12 +50,55 @@ type VarsBackend interface {
 	List() ([]VariableDescriptor, error)
 }
 
-func getVarsBackend(ctx context.Context) VarsBackend {
-	value := ctx.Value(varsBackendKey{})
-	if value == nil {
-		return nullVarsBackend{}
+// VarsBackend2 is like [VarsBackend] only it takes a context that the backend can use
+// for deadlines or cancellation - this is paricularly applicable on systems where there
+// may be multiple writers and writes have to be serialized by the operating system to
+// some degree.
+type VarsBackend2 interface {
+	Get(ctx context.Context, name string, guid GUID) (VariableAttributes, []byte, error)
+	Set(ctx context.Context, name string, guid GUID, attrs VariableAttributes, data []byte) error
+	List(ctx context.Context) ([]VariableDescriptor, error)
+}
+
+// varsBackend2ToVarsBackendShim makes a VarsBackend2 look like a VarsBackend.
+// It should only exist for the lifetime of a function call with the associated
+// context.
+type varsBackend2ToVarsBackendShim struct {
+	Context context.Context
+	Backend VarsBackend2
+}
+
+func (v *varsBackend2ToVarsBackendShim) Get(name string, guid GUID) (VariableAttributes, []byte, error) {
+	return v.Backend.Get(v.Context, name, guid)
+}
+
+func (v *varsBackend2ToVarsBackendShim) Set(name string, guid GUID, attrs VariableAttributes, data []byte) error {
+	return v.Backend.Set(v.Context, name, guid, attrs, data)
+}
+
+func (v *varsBackend2ToVarsBackendShim) List() ([]VariableDescriptor, error) {
+	return v.Backend.List(v.Context)
+}
+
+func varsBackend2ToVarsBackend(ctx context.Context, backend VarsBackend2) VarsBackend {
+	return &varsBackend2ToVarsBackendShim{
+		Context: ctx,
+		Backend: backend,
 	}
-	return value.(VarsBackend)
+}
+
+func getVarsBackend(ctx context.Context) VarsBackend {
+	switch v := ctx.Value(varsBackendKey{}).(type) {
+	case VarsBackend2:
+		return varsBackend2ToVarsBackend(ctx, v)
+	case VarsBackend:
+		return v
+	case nil:
+		return nullVarsBackend{}
+	default:
+		val := ctx.Value(varsBackendKey{})
+		panic(fmt.Sprintf("invalid variable backend type %q: %#v", reflect.TypeOf(val), val))
+	}
 }
 
 type nullVarsBackend struct{}
@@ -96,6 +141,10 @@ func ListVariables(ctx context.Context) ([]VariableDescriptor, error) {
 }
 
 func withVarsBackend(ctx context.Context, backend VarsBackend) context.Context {
+	return context.WithValue(ctx, varsBackendKey{}, backend)
+}
+
+func withVarsBackend2(ctx context.Context, backend VarsBackend2) context.Context {
 	return context.WithValue(ctx, varsBackendKey{}, backend)
 }
 

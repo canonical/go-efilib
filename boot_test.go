@@ -14,12 +14,12 @@ import (
 )
 
 type bootSuite struct {
-	mockVars mockBootVars
+	mockVars mockVars
 	mockCtx  context.Context
 }
 
 func (s *bootSuite) SetUpTest(c *C) {
-	s.mockVars = make(mockBootVars)
+	s.mockVars = make(mockVars)
 	s.mockCtx = WithVarsBackend(context.Background(), s.mockVars)
 }
 
