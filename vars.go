@@ -182,11 +182,12 @@ func newDefaultVarContext() context.Context {
 
 // DefaultVarContext should generally be passed to functions that interact with
 // EFI variables in order to use the default system backend for accessing EFI
-// variables. It is based on a background context.
+// variables. It is based on a new background context.
 var DefaultVarContext = newDefaultVarContext()
 
 // WithDefaultVarsBackend adds the default system backend for accesssing EFI
-// variables to an existing context.
+// variables to an existing context. It allows for usage of any context other
+// than the internally created background one.
 func WithDefaultVarsBackend(ctx context.Context) context.Context {
 	return addDefaultVarsBackend(ctx)
 }
