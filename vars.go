@@ -40,7 +40,8 @@ type VariableDescriptor struct {
 	GUID GUID
 }
 
-type varsBackendKey struct{}
+// VarsBackendKey is used to key a [VarsBackend] or [VarsBackend2] on a [context.Context].
+type VarsBackendKey struct{}
 
 // VarsBackend is used by the [ReadVariable], [WriteVariable] and [ListVariables]
 // functions, and indirectly by other functions in this package to abstract access
@@ -79,7 +80,7 @@ func (v *varsBackendWrapper) List(ctx context.Context) ([]VariableDescriptor, er
 }
 
 func getVarsBackend(ctx context.Context) VarsBackend2 {
-	switch v := ctx.Value(varsBackendKey{}).(type) {
+	switch v := ctx.Value(VarsBackendKey{}).(type) {
 	case VarsBackend2:
 		return v
 	case VarsBackend:
@@ -87,7 +88,7 @@ func getVarsBackend(ctx context.Context) VarsBackend2 {
 	case nil:
 		return &varsBackendWrapper{Backend: nullVarsBackend{}}
 	default:
-		val := ctx.Value(varsBackendKey{})
+		val := ctx.Value(VarsBackendKey{})
 		panic(fmt.Sprintf("invalid variable backend type %q: %#v", reflect.TypeOf(val), val))
 	}
 }
@@ -168,11 +169,11 @@ func (l variableDescriptorSlice) Swap(i, j int) {
 }
 
 func withVarsBackend(ctx context.Context, backend VarsBackend) context.Context {
-	return context.WithValue(ctx, varsBackendKey{}, backend)
+	return context.WithValue(ctx, VarsBackendKey{}, backend)
 }
 
 func withVarsBackend2(ctx context.Context, backend VarsBackend2) context.Context {
-	return context.WithValue(ctx, varsBackendKey{}, backend)
+	return context.WithValue(ctx, VarsBackendKey{}, backend)
 }
 
 func newDefaultVarContext() context.Context {
