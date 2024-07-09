@@ -107,10 +107,23 @@ func (v nullVarsBackend) List() ([]VariableDescriptor, error) {
 	return nil, ErrVarsUnavailable
 }
 
+func isContextDone(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+		return nil
+	}
+}
+
 // ReadVariable returns the value and attributes of the EFI variable with the specified
 // name and GUID. In general, [DefaultVarContext] should be supplied to this.
 func ReadVariable(ctx context.Context, name string, guid GUID) ([]byte, VariableAttributes, error) {
-	attrs, data, err := getVarsBackend(ctx).Get(ctx, name, guid)
+	backend := getVarsBackend(ctx)
+	if err := isContextDone(ctx); err != nil {
+		return nil, 0, err
+	}
+	attrs, data, err := backend.Get(ctx, name, guid)
 	return data, attrs, err
 }
 
@@ -123,14 +136,25 @@ func ReadVariable(ctx context.Context, name string, guid GUID) ([]byte, Variable
 //
 // If the variable does not exist, it will be created.
 func WriteVariable(ctx context.Context, name string, guid GUID, attrs VariableAttributes, data []byte) error {
-	return getVarsBackend(ctx).Set(ctx, name, guid, attrs, data)
+	backend := getVarsBackend(ctx)
+	if err := isContextDone(ctx); err != nil {
+		return err
+	}
+	return backend.Set(ctx, name, guid, attrs, data)
 }
 
 // ListVariables returns a sorted list of variables that can be accessed. In
 // general, [DefaultVarContext] should be supplied to this.
 func ListVariables(ctx context.Context) ([]VariableDescriptor, error) {
-	names, err := getVarsBackend(ctx).List(ctx)
+	backend := getVarsBackend(ctx)
+	if err := isContextDone(ctx); err != nil {
+		return nil, err
+	}
+	names, err := backend.List(ctx)
 	if err != nil {
+		return nil, err
+	}
+	if err := isContextDone(ctx); err != nil {
 		return nil, err
 	}
 	sort.Stable(variableDescriptorSlice(names))
