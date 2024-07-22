@@ -117,7 +117,8 @@ func isContextDone(ctx context.Context) error {
 }
 
 // ReadVariable returns the value and attributes of the EFI variable with the specified
-// name and GUID. In general, [DefaultVarContext] should be supplied to this.
+// name and GUID. In general, [DefaultVarContext] or the result of [WithDefaultVarsBackend]
+// should be supplied to this. This will return an error if the context is done.
 func ReadVariable(ctx context.Context, name string, guid GUID) ([]byte, VariableAttributes, error) {
 	backend := getVarsBackend(ctx)
 	if err := isContextDone(ctx); err != nil {
@@ -128,8 +129,9 @@ func ReadVariable(ctx context.Context, name string, guid GUID) ([]byte, Variable
 }
 
 // WriteVariable writes the supplied data value with the specified attributes to the
-// EFI variable with the specified name and GUID. In general, [DefaultVarContext] should
-// be supplied to this.
+// EFI variable with the specified name and GUID. In general, [DefaultVarContext] or the
+// result of [WithDefaultVarsBackend] should be supplied to this. This will return an error
+// if the context is done.
 //
 // If the variable already exists, the specified attributes must match the existing
 // attributes with the exception of AttributeAppendWrite.
@@ -144,7 +146,8 @@ func WriteVariable(ctx context.Context, name string, guid GUID, attrs VariableAt
 }
 
 // ListVariables returns a sorted list of variables that can be accessed. In
-// general, [DefaultVarContext] should be supplied to this.
+// general, [DefaultVarContext] or the result of [WithDefaultVarsBackend] should
+// be supplied to this. This will return an error if the context is done.
 func ListVariables(ctx context.Context) ([]VariableDescriptor, error) {
 	backend := getVarsBackend(ctx)
 	if err := isContextDone(ctx); err != nil {
@@ -207,11 +210,27 @@ func newDefaultVarContext() context.Context {
 // DefaultVarContext should generally be passed to functions that interact with
 // EFI variables in order to use the default system backend for accessing EFI
 // variables. It is based on a new background context.
+//
+// On Linux, this uses efivarfs. The kernel rate limits unprivileged users' read
+// accesses to the EFI variable runtime service to 100 accesses per second, after
+// which any thread that attempts to perform a read access will sleep in an
+// uninterruptible state. This makes adding a deadline to the context for sections
+// of code that perform multiple variable reads worthwhile in some cases.
+// Unfortunately, there is no way to determine whether an access will be ratelimited
+// before performing it.
 var DefaultVarContext = newDefaultVarContext()
 
 // WithDefaultVarsBackend adds the default system backend for accesssing EFI
 // variables to an existing context. It allows for usage of any context other
 // than the internally created background one.
+//
+// On Linux, this uses efivarfs. The kernel rate limits unprivileged users' read
+// accesses to the EFI variable runtime service to 100 accesses per second, after
+// which any thread that attempts to perform a read access will sleep in an
+// uninterruptible state. This makes adding a deadline to the context for sections
+// of code that perform multiple variable reads worthwhile in some cases.
+// Unfortunately, there is no way to determine whether an access will be ratelimited
+// before performing it.
 func WithDefaultVarsBackend(ctx context.Context) context.Context {
 	return addDefaultVarsBackend(ctx)
 }
