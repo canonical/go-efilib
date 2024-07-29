@@ -22,7 +22,16 @@ import (
 // firmware volumes (see [efi.MediaFvDevicePathNode] and
 // [efi.MediaFvFileDevicePathNode]). If it is not known by this package,
 // then ("", false) will be returned.
+//
+// Deprecated: use [IndustryStandardString].
 func FileOrVolumeNameString(guid efi.GUID) (name string, wellKnown bool) {
+	return IndustryStandardString(guid)
+}
+
+// IndustryStandardString returns the semi-readable name for the supplied
+// GUID if it corresponds to a well known industry standard name. If it is
+// not known by this package, then ("", false) will be returned.
+func IndustryStandardString(guid efi.GUID) (name string, wellKnown bool) {
 	name, wellKnown = guidToNameMap[guid]
 	return name, wellKnown
 }
@@ -40,6 +49,6 @@ func ListAllKnown() []efi.GUID {
 }
 
 func init() {
-	efi.RegisterMediaFvFileNameLookup(FileOrVolumeNameString)
-	efi.RegisterMediaFvNameLookup(FileOrVolumeNameString)
+	efi.RegisterMediaFvFileNameLookup(IndustryStandardString)
+	efi.RegisterMediaFvNameLookup(IndustryStandardString)
 }
