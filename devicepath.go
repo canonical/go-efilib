@@ -36,6 +36,14 @@ const (
 	// *[HardDriveDevicePathNode] and matches the end of the longer device path.
 	DevicePathShortFormHDMatch
 
+	// DevicePathShortFormUSBWWIDMatch indicates that one device path begins with
+	// a *[USBWWIDDevicePathNode] and matches the end of the longer device path.
+	DevicePathShortFormUSBWWIDMatch
+
+	// DevicePathShortFormUSBClassMatch indicates that one device path begins with
+	// a *[USBClassDevicePathNode] and matches the end of the longer device path.
+	DevicePathShortFormUSBClassMatch
+
 	// DevicePathShortFormFileMatch indicates that one device path begins with a
 	// [FilePathDevicePathNode] and matches the end of the longer device path.
 	DevicePathShortFormFileMatch
@@ -136,7 +144,10 @@ func (p DevicePath) Write(w io.Writer) error {
 	return binary.Write(w, binary.LittleEndian, &end)
 }
 
-func devicePathFindFirst[T DevicePathNode](p DevicePath) DevicePath {
+// DevicePathFindFirstOccurrence finds the first occurrence of the device path
+// node with the specified type and returns it and the remaining components of
+// the device path.
+func DevicePathFindFirstOccurrence[T DevicePathNode](p DevicePath) DevicePath {
 	for i, n := range p {
 		if _, ok := n.(T); ok {
 			return p[i:]
@@ -168,18 +179,30 @@ func (p DevicePath) matchesInternal(other DevicePath, onlyFull bool) DevicePathM
 	switch n := other[0].(type) {
 	case *HardDriveDevicePathNode:
 		_ = n
-		p = devicePathFindFirst[*HardDriveDevicePathNode](p)
-		if res := p.matchesInternal(other, true); res == DevicePathFullMatch && len(p) == 2 {
+		p = DevicePathFindFirstOccurrence[*HardDriveDevicePathNode](p)
+		if res := p.matchesInternal(other, true); res == DevicePathFullMatch {
 			return DevicePathShortFormHDMatch
+		}
+	case *USBWWIDDevicePathNode:
+		_ = n
+		p = DevicePathFindFirstOccurrence[*USBWWIDDevicePathNode](p)
+		if res := p.matchesInternal(other, true); res == DevicePathFullMatch {
+			return DevicePathShortFormUSBWWIDMatch
+		}
+	case *USBClassDevicePathNode:
+		_ = n
+		p = DevicePathFindFirstOccurrence[*USBClassDevicePathNode](p)
+		if res := p.matchesInternal(other, true); res == DevicePathFullMatch {
+			return DevicePathShortFormUSBClassMatch
 		}
 	case FilePathDevicePathNode:
 		_ = n
-		p = devicePathFindFirst[FilePathDevicePathNode](p)
-		if res := p.matchesInternal(other, true); res == DevicePathFullMatch && len(p) == 1 {
+		p = DevicePathFindFirstOccurrence[FilePathDevicePathNode](p)
+		if res := p.matchesInternal(other, true); res == DevicePathFullMatch {
 			return DevicePathShortFormFileMatch
 		}
 	default:
-		// TODO: handle short form USB WWID, USB Class and URI device paths
+		// TODO: handle short form URI device paths
 	}
 
 	return DevicePathNoMatch
