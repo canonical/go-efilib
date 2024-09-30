@@ -22,6 +22,35 @@ import (
 	"github.com/canonical/go-efilib/mbr"
 )
 
+// DevicePathShortFormType describes whether a path is a recognized short-form
+// path, and what type it is.
+type DevicePathShortFormType int
+
+const (
+	// DevicePathNotShortForm indicates that a path is not a recognized short-form path
+	DevicePathNotShortForm DevicePathShortFormType = iota
+
+	// DevicePathShortFormHD indicates that a path is a HD() short-form path
+	DevicePathShortFormHD
+
+	// DevicePathShortFormUSBWWID indicates that a path is a UsbWwid() short-form path
+	DevicePathShortFormUSBWWID
+
+	// DevicePathShortFormUSBClass indicates that a path is a UsbClass() short-form path
+	DevicePathShortFormUSBClass
+
+	// DevicePathShortFormURI indicates that a path is a Uri() short-form path. Note that
+	// this package does not currently directly support device paths containing URIs.
+	DevicePathShortFormURI
+
+	// DevicePathShortFormFilePath indicates that a path is a file path short-form path
+	DevicePathShortFormFilePath
+)
+
+func (t DevicePathShortFormType) IsShortForm() bool {
+	return t > DevicePathNotShortForm
+}
+
 // DevicePathMatch indicates how a device path matched
 type DevicePathMatch int
 
@@ -166,56 +195,82 @@ func (p DevicePath) matchesInternal(other DevicePath, onlyFull bool) DevicePathM
 		return DevicePathNoMatch
 	}
 	if bytes.Equal(pBytes.Bytes(), otherBytes.Bytes()) {
+		// We have a full, exact match
 		return DevicePathFullMatch
 	}
 
 	if onlyFull {
-		return DevicePathNoMatch
-	}
-	if len(other) == 0 {
+		// If we're only permitted to find a full match, return no match now.
 		return DevicePathNoMatch
 	}
 
-	switch n := other[0].(type) {
-	case *HardDriveDevicePathNode:
-		_ = n
+	// Check if other is a short-form path. If so, convert p to the same type of
+	// short-form path and test if there is a short-form match.
+	switch other.ShortFormType() {
+	case DevicePathShortFormHD:
 		p = DevicePathFindFirstOccurrence[*HardDriveDevicePathNode](p)
 		if res := p.matchesInternal(other, true); res == DevicePathFullMatch {
 			return DevicePathShortFormHDMatch
 		}
-	case *USBWWIDDevicePathNode:
-		_ = n
+	case DevicePathShortFormUSBWWID:
 		p = DevicePathFindFirstOccurrence[*USBWWIDDevicePathNode](p)
 		if res := p.matchesInternal(other, true); res == DevicePathFullMatch {
 			return DevicePathShortFormUSBWWIDMatch
 		}
-	case *USBClassDevicePathNode:
-		_ = n
+	case DevicePathShortFormUSBClass:
 		p = DevicePathFindFirstOccurrence[*USBClassDevicePathNode](p)
 		if res := p.matchesInternal(other, true); res == DevicePathFullMatch {
 			return DevicePathShortFormUSBClassMatch
 		}
-	case FilePathDevicePathNode:
-		_ = n
+	case DevicePathShortFormFilePath:
 		p = DevicePathFindFirstOccurrence[FilePathDevicePathNode](p)
 		if res := p.matchesInternal(other, true); res == DevicePathFullMatch {
 			return DevicePathShortFormFileMatch
 		}
-	default:
-		// TODO: handle short form URI device paths
 	}
 
 	return DevicePathNoMatch
 }
 
 // Matches indicates whether other matches this path in some way, and returns
-// the type of match. If other begins with *[HardDriveDevicePathNode] and is 2
-// nodes long, this may return DevicePathShortFormHDMatch. If other begins with
-// [FilePathDevicePathNode] and is a single node long, this may return
-// DevicePathShortFormFileMatch. This returns DevicePathFullMatch if the supplied
-// path fully matches, and DevicePathNoMatch if there is no match.
+// the type of match. If other is a HD() short-form path, this may return
+// DevicePathShortFormHDMatch. If other is a UsbWwid() short-form path, this may
+// return DevicePathShortFormUSBWWIDMatch. If other is a UsbClass() short-form path,
+// this may return DevicePathShortFormUSBClassMatch. If other is a file path short-form
+// path, this may return DevicePathShortFormFileMatch. This returns DevicePathFullMatch
+// if the supplied path fully matches, and DevicePathNoMatch if there is no match.
 func (p DevicePath) Matches(other DevicePath) DevicePathMatch {
 	return p.matchesInternal(other, false)
+}
+
+// ShortFormType returns whether this is a short-form type of path, and if so,
+// what type of short-form path. The UEFI boot manager is required to handle a
+// certain set of well defined short-form paths that begin with a specific
+// component.
+func (p DevicePath) ShortFormType() DevicePathShortFormType {
+	if len(p) == 0 {
+		return DevicePathNotShortForm
+	}
+
+	switch n := p[0].(type) {
+	case *HardDriveDevicePathNode:
+		_ = n
+		return DevicePathShortFormHD
+	case *USBWWIDDevicePathNode:
+		_ = n
+		return DevicePathShortFormUSBWWID
+	case *USBClassDevicePathNode:
+		_ = n
+		return DevicePathShortFormUSBClass
+	case *GenericDevicePathNode:
+		if n.Type == MessagingDevicePath && n.SubType == uefi.MSG_URI_DP {
+			return DevicePathShortFormURI
+		}
+	case FilePathDevicePathNode:
+		return DevicePathShortFormFilePath
+	}
+
+	return DevicePathNotShortForm
 }
 
 // GenericDevicePathNode corresponds to a device path nodes with a type that is
