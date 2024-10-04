@@ -38,6 +38,12 @@ const (
 	LoadOptionClassPlatformRecovery LoadOptionClass = "PlatformRecovery"
 )
 
+// VariableName returns the formatted entry name of the Class and provided index n
+// https://uefi.org/specs/UEFI/2.10_A/03_Boot_Manager.html#boot-manager-programming
+func (l LoadOptionClass) VariableName(n uint16) string {
+	return fmt.Sprintf("%s%04X", l, n)
+}
+
 // OSIndications provides a way for the firmware to advertise features to the OS
 // and a way to request the firmware perform a specific action on the next boot.
 type OSIndications uint64
@@ -181,7 +187,7 @@ func ReadLoadOptionVariable(ctx context.Context, class LoadOptionClass, n uint16
 		return nil, fmt.Errorf("invalid class %q: only suitable for Driver, SysPrep, Boot, or PlatformRecovery", class)
 	}
 
-	data, _, err := ReadVariable(ctx, fmt.Sprintf("%s%04x", class, n), GlobalVariable)
+	data, _, err := ReadVariable(ctx, class.VariableName(n), GlobalVariable)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +220,7 @@ func WriteLoadOptionVariable(ctx context.Context, class LoadOptionClass, n uint1
 		return fmt.Errorf("cannot serialize load option: %w", err)
 	}
 
-	return WriteVariable(ctx, fmt.Sprintf("%s%04x", class, n), GlobalVariable, AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, w.Bytes())
+	return WriteVariable(ctx, class.VariableName(n), GlobalVariable, AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, w.Bytes())
 }
 
 // DeleteLoadOptionVariable deletes the load option variable for the specified
@@ -230,7 +236,7 @@ func DeleteLoadOptionVariable(ctx context.Context, class LoadOptionClass, n uint
 		return fmt.Errorf("invalid class %q: only suitable for Driver, SysPrep or Boot", class)
 	}
 
-	return WriteVariable(ctx, fmt.Sprintf("%s%04x", class, n), GlobalVariable, AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, nil)
+	return WriteVariable(ctx, class.VariableName(n), GlobalVariable, AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, nil)
 }
 
 // ListLoadOptionNumbers lists the numbers of all of the load option variables
