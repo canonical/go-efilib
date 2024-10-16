@@ -208,11 +208,11 @@ func unmarshalAuthenticodeContent(data []byte) (*authenticodeContent, error) {
 
 // type X509CertID represents the identity of a X.509 certificate.
 type X509CertID interface {
-	Subject() []byte                             // The encoded subject
+	RawSubject() []byte                          // The encoded subject
 	SubjectKeyId() []byte                        // The subject key ID
 	PublicKeyAlgorithm() x509.PublicKeyAlgorithm // The certificate's public key algorithm
 
-	Issuer() []byte                              // The encoded issuer
+	RawIssuer() []byte                           // The encoded issuer
 	AuthorityKeyId() []byte                      // The authority key ID
 	SignatureAlgorithm() x509.SignatureAlgorithm // The algorithm the issuer used to sign the certificate
 }
@@ -227,7 +227,7 @@ func NewX509CertIDFromCertificate(cert *x509.Certificate) X509CertID {
 	return &x509CertId{cert: cert}
 }
 
-func (id *x509CertId) Subject() []byte {
+func (id *x509CertId) RawSubject() []byte {
 	return id.cert.RawSubject
 }
 
@@ -239,7 +239,7 @@ func (id *x509CertId) PublicKeyAlgorithm() x509.PublicKeyAlgorithm {
 	return id.cert.PublicKeyAlgorithm
 }
 
-func (id *x509CertId) Issuer() []byte {
+func (id *x509CertId) RawIssuer() []byte {
 	return id.cert.RawIssuer
 }
 
@@ -252,7 +252,7 @@ func (id *x509CertId) SignatureAlgorithm() x509.SignatureAlgorithm {
 }
 
 func certLikelyIssued(issuer, subject X509CertID) bool {
-	if !bytes.Equal(issuer.Subject(), subject.Issuer()) {
+	if !bytes.Equal(issuer.RawSubject(), subject.RawIssuer()) {
 		return false
 	}
 
@@ -297,10 +297,10 @@ func isSelfSignedCert(cert X509CertID) bool {
 }
 
 func certsMatch(x, y X509CertID) bool {
-	return bytes.Equal(x.Subject(), y.Subject()) &&
+	return bytes.Equal(x.RawSubject(), y.RawSubject()) &&
 		bytes.Equal(x.SubjectKeyId(), y.SubjectKeyId()) &&
 		x.SignatureAlgorithm() == y.SignatureAlgorithm() &&
-		bytes.Equal(x.Issuer(), y.Issuer()) &&
+		bytes.Equal(x.RawIssuer(), y.RawIssuer()) &&
 		bytes.Equal(x.AuthorityKeyId(), y.AuthorityKeyId()) &&
 		x.PublicKeyAlgorithm() == y.PublicKeyAlgorithm()
 }
