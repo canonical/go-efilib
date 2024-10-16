@@ -46,6 +46,7 @@ func (s *wincertSuite) TestReadWinCertificateGUID(c *C) {
 	c.Assert(err, IsNil)
 
 	c.Check(p7cert.CertLikelyTrustAnchor(ca), Equals, true)
+	c.Check(p7cert.CertWithIDLikelyTrustAnchor(NewX509CertIDFromCertificate(ca)), Equals, true)
 
 	caBytes, err = os.ReadFile("testdata/certs/canonical-uefi-ca.der")
 	c.Check(err, IsNil)
@@ -53,6 +54,7 @@ func (s *wincertSuite) TestReadWinCertificateGUID(c *C) {
 	c.Assert(err, IsNil)
 
 	c.Check(p7cert.CertLikelyTrustAnchor(ca), Equals, false)
+	c.Check(p7cert.CertWithIDLikelyTrustAnchor(NewX509CertIDFromCertificate(ca)), Equals, false)
 }
 
 func (s *wincertSuite) TestReadWinCertificateAuthenticode(c *C) {
@@ -75,6 +77,7 @@ func (s *wincertSuite) TestReadWinCertificateAuthenticode(c *C) {
 	c.Assert(err, IsNil)
 
 	c.Check(authenticodeCert.CertLikelyTrustAnchor(ca), Equals, true)
+	c.Check(authenticodeCert.CertWithIDLikelyTrustAnchor(NewX509CertIDFromCertificate(ca)), Equals, true)
 
 	caBytes, err = os.ReadFile("testdata/certs/MicCorKEKCA2011_2011-06-24.crt")
 	c.Check(err, IsNil)
@@ -82,50 +85,10 @@ func (s *wincertSuite) TestReadWinCertificateAuthenticode(c *C) {
 	c.Assert(err, IsNil)
 
 	c.Check(authenticodeCert.CertLikelyTrustAnchor(ca), Equals, false)
+	c.Check(authenticodeCert.CertWithIDLikelyTrustAnchor(NewX509CertIDFromCertificate(ca)), Equals, false)
 
 	c.Check(authenticodeCert.DigestAlgorithm(), Equals, crypto.SHA256)
 	c.Check(authenticodeCert.Digest(), DeepEquals, DecodeHexString(c, "b886cc19bdfff84a4e7b9fc2375309ec857bae5deb01635f6a73d9ed73304e50"))
-}
-
-func (s *wincertSuite) TestWinCertificationAuthenticodeCertLikelyTrustAnchorWithPartialCert(c *C) {
-	f, err := os.Open("testdata/sigs/cert-type-authenticode.sig")
-	c.Assert(err, IsNil)
-	defer f.Close()
-
-	cert, err := ReadWinCertificate(f)
-	c.Assert(err, IsNil)
-	authenticodeCert, ok := cert.(*WinCertificateAuthenticode)
-	c.Check(ok, Equals, true)
-
-	caBytes, err := os.ReadFile("testdata/certs/canonical-uefi-ca.der")
-	c.Check(err, IsNil)
-	ca, err := x509.ParseCertificate(caBytes)
-	c.Assert(err, IsNil)
-
-	ca = &x509.Certificate{
-		RawSubject:         ca.RawSubject,
-		SubjectKeyId:       ca.SubjectKeyId,
-		SignatureAlgorithm: ca.SignatureAlgorithm,
-		RawIssuer:          ca.RawIssuer,
-		AuthorityKeyId:     ca.AuthorityKeyId,
-		PublicKeyAlgorithm: ca.PublicKeyAlgorithm,
-	}
-	c.Check(authenticodeCert.CertLikelyTrustAnchor(ca), Equals, true)
-
-	caBytes, err = os.ReadFile("testdata/certs/MicCorKEKCA2011_2011-06-24.crt")
-	c.Check(err, IsNil)
-	ca, err = x509.ParseCertificate(caBytes)
-	c.Assert(err, IsNil)
-
-	ca = &x509.Certificate{
-		RawSubject:         ca.RawSubject,
-		SubjectKeyId:       ca.SubjectKeyId,
-		SignatureAlgorithm: ca.SignatureAlgorithm,
-		RawIssuer:          ca.RawIssuer,
-		AuthorityKeyId:     ca.AuthorityKeyId,
-		PublicKeyAlgorithm: ca.PublicKeyAlgorithm,
-	}
-	c.Check(authenticodeCert.CertLikelyTrustAnchor(ca), Equals, false)
 }
 
 func (s *wincertSuite) TestWinCertificationAuthenticodeSelfSigned(c *C) {
@@ -148,6 +111,7 @@ func (s *wincertSuite) TestWinCertificationAuthenticodeSelfSigned(c *C) {
 	c.Assert(err, IsNil)
 
 	c.Check(authenticodeCert.CertLikelyTrustAnchor(ca), Equals, true)
+	c.Check(authenticodeCert.CertWithIDLikelyTrustAnchor(NewX509CertIDFromCertificate(ca)), Equals, true)
 
 	caBytes, err = os.ReadFile("testdata/certs/MicCorKEKCA2011_2011-06-24.crt")
 	c.Check(err, IsNil)
@@ -155,50 +119,10 @@ func (s *wincertSuite) TestWinCertificationAuthenticodeSelfSigned(c *C) {
 	c.Assert(err, IsNil)
 
 	c.Check(authenticodeCert.CertLikelyTrustAnchor(ca), Equals, false)
+	c.Check(authenticodeCert.CertWithIDLikelyTrustAnchor(NewX509CertIDFromCertificate(ca)), Equals, false)
 
 	c.Check(authenticodeCert.DigestAlgorithm(), Equals, crypto.SHA256)
 	c.Check(authenticodeCert.Digest(), DeepEquals, DecodeHexString(c, "bf6b6dfdb1f6435a81e4808db7f846d86d170566e4753d4384fdab6504be4fb9"))
-}
-
-func (s *wincertSuite) TestWinCertificationAuthenticodeCertLikelyTrustAnchorWithPartialCertSelfSigned(c *C) {
-	f, err := os.Open("testdata/sigs/cert-type-authenticode-self-signed.sig")
-	c.Assert(err, IsNil)
-	defer f.Close()
-
-	cert, err := ReadWinCertificate(f)
-	c.Assert(err, IsNil)
-	authenticodeCert, ok := cert.(*WinCertificateAuthenticode)
-	c.Check(ok, Equals, true)
-
-	caBytes, err := os.ReadFile("testdata/certs/PkKek-1-snakeoil.der")
-	c.Check(err, IsNil)
-	ca, err := x509.ParseCertificate(caBytes)
-	c.Assert(err, IsNil)
-
-	ca = &x509.Certificate{
-		RawSubject:         ca.RawSubject,
-		SubjectKeyId:       ca.SubjectKeyId,
-		SignatureAlgorithm: ca.SignatureAlgorithm,
-		RawIssuer:          ca.RawIssuer,
-		AuthorityKeyId:     ca.AuthorityKeyId,
-		PublicKeyAlgorithm: ca.PublicKeyAlgorithm,
-	}
-	c.Check(authenticodeCert.CertLikelyTrustAnchor(ca), Equals, true)
-
-	caBytes, err = os.ReadFile("testdata/certs/MicCorKEKCA2011_2011-06-24.crt")
-	c.Check(err, IsNil)
-	ca, err = x509.ParseCertificate(caBytes)
-	c.Assert(err, IsNil)
-
-	ca = &x509.Certificate{
-		RawSubject:         ca.RawSubject,
-		SubjectKeyId:       ca.SubjectKeyId,
-		SignatureAlgorithm: ca.SignatureAlgorithm,
-		RawIssuer:          ca.RawIssuer,
-		AuthorityKeyId:     ca.AuthorityKeyId,
-		PublicKeyAlgorithm: ca.PublicKeyAlgorithm,
-	}
-	c.Check(authenticodeCert.CertLikelyTrustAnchor(ca), Equals, false)
 }
 
 func (s *wincertSuite) TestReadWinCertificateInvalidRevision(c *C) {
