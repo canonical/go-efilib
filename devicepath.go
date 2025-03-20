@@ -895,14 +895,11 @@ func (d *SATADevicePathNode) Write(w io.Writer) error {
 // NVMENamespaceDevicePathNode corresponds to a NVME namespace device path node.
 type NVMENamespaceDevicePathNode struct {
 	NamespaceID   uint32 // Namespace identifier
-	NamespaceUUID uint64 // EUI-64 (extended unique identifier). This is set to 0 where not supported
+	NamespaceUUID EUI64  // EUI-64 unique identifier. This is set to 0 where not supported
 }
 
 func (d *NVMENamespaceDevicePathNode) ToString(_ DevicePathToStringFlags) string {
-	var uuid [8]uint8
-	binary.BigEndian.PutUint64(uuid[:], d.NamespaceUUID)
-	return fmt.Sprintf("NVMe(0x%x,%02x-%02x-%02x-%02x-%02x-%02x-%02x-%02x)", d.NamespaceID,
-		uuid[0], uuid[1], uuid[2], uuid[3], uuid[4], uuid[5], uuid[6], uuid[7])
+	return fmt.Sprintf("NVMe(0x%x,%s)", d.NamespaceID, d.NamespaceUUID)
 }
 
 func (d *NVMENamespaceDevicePathNode) String() string {
@@ -910,12 +907,14 @@ func (d *NVMENamespaceDevicePathNode) String() string {
 }
 
 func (d *NVMENamespaceDevicePathNode) Write(w io.Writer) error {
+	// Convert the UUID back from EUI64 to uint64, big-endian.
+	uuid := binary.BigEndian.Uint64(d.NamespaceUUID[:])
 	data := uefi.NVME_NAMESPACE_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MESSAGING_DEVICE_PATH),
 			SubType: uint8(uefi.MSG_NVME_NAMESPACE_DP)},
 		NamespaceId:   d.NamespaceID,
-		NamespaceUuid: d.NamespaceUUID}
+		NamespaceUuid: uuid}
 	data.Header.Length = uint16(binary.Size(data))
 
 	return binary.Write(w, binary.LittleEndian, &data)
@@ -1455,9 +1454,17 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
+
+			// Convert to the UUID to the EUI64 type, which is an 8-byte
+			// array. It goes big-endian into the array - the MSB is the
+			// first byte of the UUID. At least that's the way that EDK2
+			// prints it. The UEFI spec is a bit vague here.
+			var uuid EUI64
+			binary.BigEndian.PutUint64(uuid[:], n.NamespaceUuid)
+
 			return &NVMENamespaceDevicePathNode{
 				NamespaceID:   n.NamespaceId,
-				NamespaceUUID: n.NamespaceUuid}, nil
+				NamespaceUUID: uuid}, nil
 		}
 	case uefi.MEDIA_DEVICE_PATH:
 		switch h.SubType {

@@ -13,6 +13,8 @@ import (
 	. "gopkg.in/check.v1"
 )
 
+var zeroEUI64 EUI64
+
 type dpSuite struct{}
 
 var _ = Suite(&dpSuite{})
@@ -38,7 +40,7 @@ func (s *dpSuite) TestReadDevicePath(c *C) {
 			Device:   0x0},
 		&NVMENamespaceDevicePathNode{
 			NamespaceID:   0x1,
-			NamespaceUUID: 0x0},
+			NamespaceUUID: zeroEUI64},
 		&HardDriveDevicePathNode{
 			PartitionNumber: 1,
 			PartitionStart:  0x800,
@@ -270,7 +272,7 @@ func (d *dpSuite) TestDevicePathMatchesFull(c *C) {
 			Device:   0x0},
 		&NVMENamespaceDevicePathNode{
 			NamespaceID:   0x1,
-			NamespaceUUID: 0x0},
+			NamespaceUUID: zeroEUI64},
 		&HardDriveDevicePathNode{
 			PartitionNumber: 1,
 			PartitionStart:  0x800,
@@ -294,7 +296,7 @@ func (d *dpSuite) TestDevicePathMatchesShortHD(c *C) {
 			Device:   0x0},
 		&NVMENamespaceDevicePathNode{
 			NamespaceID:   0x1,
-			NamespaceUUID: 0x0},
+			NamespaceUUID: zeroEUI64},
 		&HardDriveDevicePathNode{
 			PartitionNumber: 1,
 			PartitionStart:  0x800,
@@ -327,7 +329,7 @@ func (d *dpSuite) TestDevicePathMatchesShortFile(c *C) {
 			Device:   0x0},
 		&NVMENamespaceDevicePathNode{
 			NamespaceID:   0x1,
-			NamespaceUUID: 0x0},
+			NamespaceUUID: zeroEUI64},
 		&HardDriveDevicePathNode{
 			PartitionNumber: 1,
 			PartitionStart:  0x800,
@@ -359,7 +361,7 @@ func (d *dpSuite) TestDevicePathMatchesEmptyOtherNoMatch(c *C) {
 			Device:   0x0},
 		&NVMENamespaceDevicePathNode{
 			NamespaceID:   0x1,
-			NamespaceUUID: 0x0},
+			NamespaceUUID: zeroEUI64},
 		&HardDriveDevicePathNode{
 			PartitionNumber: 1,
 			PartitionStart:  0x800,
@@ -383,7 +385,7 @@ func (d *dpSuite) TestDevicePathMatchesFullNoMatch(c *C) {
 			Device:   0x0},
 		&NVMENamespaceDevicePathNode{
 			NamespaceID:   0x1,
-			NamespaceUUID: 0x0},
+			NamespaceUUID: zeroEUI64},
 		&HardDriveDevicePathNode{
 			PartitionNumber: 1,
 			PartitionStart:  0x800,
@@ -404,7 +406,7 @@ func (d *dpSuite) TestDevicePathMatchesFullNoMatch(c *C) {
 			Device:   0x2},
 		&NVMENamespaceDevicePathNode{
 			NamespaceID:   0x1,
-			NamespaceUUID: 0x0},
+			NamespaceUUID: zeroEUI64},
 		&HardDriveDevicePathNode{
 			PartitionNumber: 1,
 			PartitionStart:  0x800,
@@ -428,7 +430,7 @@ func (d *dpSuite) TestDevicePathMatchesShortHDNoMatch(c *C) {
 			Device:   0x0},
 		&NVMENamespaceDevicePathNode{
 			NamespaceID:   0x1,
-			NamespaceUUID: 0x0},
+			NamespaceUUID: zeroEUI64},
 		&HardDriveDevicePathNode{
 			PartitionNumber: 1,
 			PartitionStart:  0x800,
@@ -461,7 +463,7 @@ func (d *dpSuite) TestDevicePathMatchesShortFileNoMatch(c *C) {
 			Device:   0x0},
 		&NVMENamespaceDevicePathNode{
 			NamespaceID:   0x1,
-			NamespaceUUID: 0x0},
+			NamespaceUUID: zeroEUI64},
 		&HardDriveDevicePathNode{
 			PartitionNumber: 1,
 			PartitionStart:  0x800,
