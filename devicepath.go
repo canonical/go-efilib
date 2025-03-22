@@ -923,6 +923,7 @@ func (d *NVMENamespaceDevicePathNode) Write(w io.Writer) error {
 // MBRType describes a disk header type
 type MBRType uint8
 
+// String implements [fmt.Stringer].
 func (t MBRType) String() string {
 	switch t {
 	case LegacyMBR:
@@ -935,33 +936,72 @@ func (t MBRType) String() string {
 }
 
 const (
-	LegacyMBR MBRType = 1
-	GPT               = 2
+	// LegacyMBR indicates that a disk has a MBR header.
+	LegacyMBR MBRType = uefi.MBR_TYPE_PCAT
+
+	// GPT indicates that a disk has a GPT header.
+	GPT MBRType = uefi.MBR_TYPE_EFI_PARTITION_TABLE_HEADER
 )
 
+// HardDriveSignatureType describes the type of unique identifier associated
+// with a hard drive.
 type HardDriveSignatureType uint8
 
+const (
+	// NoHardDriveSignature indicates there is no signature.
+	NoHardDriveSignature HardDriveSignatureType = uefi.NO_DISK_SIGNATURE
+
+	// HardDriveSignatureTypeMBR indicates that the unique identifier
+	// is a MBR unique signature. This is represented by the
+	// MBRHardDriveSignature type.
+	HardDriveSignatureTypeMBR HardDriveSignatureType = uefi.SIGNATURE_TYPE_MBR
+
+	// HardDriveSignatureTypeGUID indicates that the unique identifier
+	// is a GUID. This is represented by the GUIDHardDriveSignature type.
+	HardDriveSignatureTypeGUID HardDriveSignatureType = uefi.SIGNATURE_TYPE_GUID
+)
+
+// String implements [fmt.Stringer].
 func (t HardDriveSignatureType) String() string {
 	switch t {
-	case uefi.SIGNATURE_TYPE_MBR:
+	case HardDriveSignatureTypeMBR:
 		return "MBR"
-	case uefi.SIGNATURE_TYPE_GUID:
+	case HardDriveSignatureTypeGUID:
 		return "GPT"
 	default:
 		return strconv.FormatUint(uint64(t), 10)
 	}
 }
 
-// HardDriveSignature is an abstraction for a unique hard drive identifier
+// HardDriveSignature is an abstraction for a unique hard drive identifier.
 type HardDriveSignature interface {
 	fmt.Stringer
 	Data() [16]uint8              // the raw signature data
 	Type() HardDriveSignatureType // Signature type
 }
 
+type emptyHardDriveSignatureType struct{}
+
+func (emptyHardDriveSignatureType) String() string {
+	return ""
+}
+
+func (emptyHardDriveSignatureType) Data() [16]uint8 {
+	var emptySignature [16]uint8
+	return emptySignature
+}
+
+func (emptyHardDriveSignatureType) Type() HardDriveSignatureType {
+	return NoHardDriveSignature
+}
+
+// EmptyHardDriveSignature is an empty [HardDriveSignature].
+var EmptyHardDriveSignature = emptyHardDriveSignatureType{}
+
 // GUIDHardDriveSignature is a [HardDriveSignature] for GPT drives.
 type GUIDHardDriveSignature GUID
 
+// String implements [fmt.Stringer].
 func (s GUIDHardDriveSignature) String() string {
 	return GUID(s).String()
 }
@@ -974,12 +1014,13 @@ func (s GUIDHardDriveSignature) Data() (out [16]uint8) {
 
 // Type implements [HardDriveSignature.Type].
 func (GUIDHardDriveSignature) Type() HardDriveSignatureType {
-	return HardDriveSignatureType(uefi.SIGNATURE_TYPE_GUID)
+	return HardDriveSignatureTypeGUID
 }
 
 // MBRHardDriveSignature is a [HardDriveSignature] for legacy MBR drives.
 type MBRHardDriveSignature uint32
 
+// String implements [fmt.Stringer].
 func (s MBRHardDriveSignature) String() string {
 	return fmt.Sprintf("0x%08x", uint32(s))
 }
@@ -992,7 +1033,7 @@ func (s MBRHardDriveSignature) Data() (out [16]uint8) {
 
 // Type implements [HardDriveSignature.Type].
 func (s MBRHardDriveSignature) Type() HardDriveSignatureType {
-	return HardDriveSignatureType(uefi.SIGNATURE_TYPE_MBR)
+	return HardDriveSignatureTypeMBR
 }
 
 type genericHardDriveSignature struct {
@@ -1017,18 +1058,19 @@ type HardDriveDevicePathNode struct {
 	PartitionNumber uint32             // 1-indexed partition number
 	PartitionStart  uint64             // Starting LBA
 	PartitionSize   uint64             // Size in number of LBAs
-	Signature       HardDriveSignature // Signature,the type of which is implementation specific (GPT vs MBR)
+	Signature       HardDriveSignature // Signature, the type of which is implementation specific (GPT vs MBR)
 	MBRType         MBRType            // Legacy MBR or GPT
 }
 
 func (d *HardDriveDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	var builder bytes.Buffer
 
+	fmt.Fprintf(&builder, "HD(%d,%s,", d.PartitionNumber, d.Signature.Type())
 	switch d.Signature.Type() {
 	default:
-		fmt.Fprintf(&builder, "HD(%d,%d,0", d.PartitionNumber, d.MBRType)
-	case uefi.SIGNATURE_TYPE_MBR, uefi.SIGNATURE_TYPE_GUID:
-		fmt.Fprintf(&builder, "HD(%d,%s,%s", d.PartitionNumber, d.Signature.Type(), d.Signature)
+		fmt.Fprintf(&builder, "0")
+	case HardDriveSignatureTypeMBR, HardDriveSignatureTypeGUID:
+		fmt.Fprintf(&builder, "%s", d.Signature)
 	}
 
 	if !flags.DisplayOnly() {
@@ -1057,9 +1099,10 @@ func (d *HardDriveDevicePathNode) Write(w io.Writer) error {
 		data.SignatureType = uint8(d.Signature.Type())
 
 		switch d.Signature.Type() {
-		case uefi.NO_DISK_SIGNATURE:
-			if d.Signature.Data() != data.Signature {
-				return errors.New("inconsistent signature and signature type")
+		case NoHardDriveSignature:
+			// There should be an empty signature.
+			if d.Signature.Data() != EmptyHardDriveSignature.Data() {
+				return errors.New("inconsistent signature and signature type: expected empty signature for NoHardDriveSignature signature type")
 			}
 		default:
 			data.Signature = d.Signature.Data()
@@ -1477,6 +1520,10 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 			var signature HardDriveSignature
 			switch n.SignatureType {
 			case uefi.NO_DISK_SIGNATURE:
+				if n.Signature != EmptyHardDriveSignature.Data() {
+					return nil, errors.New("inconsistent signature and signature type: expected empty signature for NO_DISK_SIGNATURE")
+				}
+				signature = EmptyHardDriveSignature
 			case uefi.SIGNATURE_TYPE_MBR:
 				signature = MBRHardDriveSignature(binary.LittleEndian.Uint32(n.Signature[:]))
 			case uefi.SIGNATURE_TYPE_GUID:

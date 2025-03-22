@@ -12,6 +12,9 @@ import (
 )
 
 const (
+	MBR_TYPE_PCAT                       = 0x01
+	MBR_TYPE_EFI_PARTITION_TABLE_HEADER = 0x02
+
 	NO_DISK_SIGNATURE   = 0x00
 	SIGNATURE_TYPE_MBR  = 0x01
 	SIGNATURE_TYPE_GUID = 0x02
