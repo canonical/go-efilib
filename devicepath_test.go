@@ -84,7 +84,7 @@ func (s *dpSuite) TestReadDevicePathUnrecognizedType(c *C) {
 	c.Check(path, DeepEquals, expected)
 }
 
-func (s *dpSuite) TestReadDevicePath2(c *C) {
+func (s *dpSuite) TestReadDevicePathHyperV(c *C) {
 	r := bytes.NewReader(DecodeHexString(c, "02021800000000000000000000000000564d42757300000001043400a2e5179b9108dd42b65380"+
 		"b5c22809bad96361baa104294db60572e2ffb1dc7f5a80e5d23e369c4494ed50c0a0cd8656030208000000000004012a000f0000000028000000"+
 		"0000000050030000000000dbfe3389532f0b49a2455c7fa1f986320202040434005c004500460049005c007500620075006e00740075005c0073"+
@@ -111,6 +111,39 @@ func (s *dpSuite) TestReadDevicePath2(c *C) {
 			Signature:       GUIDHardDriveSignature(MakeGUID(0x8933fedb, 0x2f53, 0x490b, 0xa245, [...]uint8{0x5c, 0x7f, 0xa1, 0xf9, 0x86, 0x32})),
 			MBRType:         GPT},
 		FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}
+	c.Check(path, DeepEquals, expected)
+}
+
+func (s *dpSuite) TestReadDevicePathPXE(c *C) {
+	r := bytes.NewReader(DecodeHexString(c, "02010c00d041030a01000000010106000000010106000000030b2500a0369ff5a7a80000000000"+
+		"00000000000000000000000000000000000000000001030c1b0000000000000000000000000000000000000000000000007fff0400"))
+	path, err := ReadDevicePath(r)
+	c.Assert(err, IsNil)
+	c.Check(path.String(), Equals, "\\PciRoot(0x1)\\Pci(0x0,0x0)\\Pci(0x0,0x0)\\MacAddr(a0369ff5a7a8,0x1)\\Msg(12,0000000000000000000000000000000000000000000000)")
+
+	expected := DevicePath{
+		&ACPIDevicePathNode{
+			HID: 0x0a0341d0,
+			UID: 0x1,
+		},
+		&PCIDevicePathNode{
+			Function: 0x0,
+			Device:   0x0,
+		},
+		&PCIDevicePathNode{
+			Function: 0x0,
+			Device:   0x0,
+		},
+		&MACAddrDevicePathNode{
+			MACAddress: EUI48{0xa0, 0x36, 0x9f, 0xf5, 0xa7, 0xa8},
+			IfType:     NetworkInterfaceTypeEthernet,
+		},
+		&GenericDevicePathNode{
+			Type:    MessagingDevicePath,
+			SubType: 12,
+			Data:    DecodeHexString(c, "0000000000000000000000000000000000000000000000"),
+		},
+	}
 	c.Check(path, DeepEquals, expected)
 }
 
@@ -473,6 +506,6 @@ func (d *dpSuite) TestDevicePathMatchesShortFileNoMatch(c *C) {
 		FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}
 
 	filePath := DevicePath{
-		FilePathDevicePathNode("\\EFI\\ubuntu\\sgrubx64.efi")}
+		FilePathDevicePathNode("\\EFI\\ubuntu\\grubx64.efi")}
 	c.Check(path.Matches(filePath), Equals, DevicePathNoMatch)
 }

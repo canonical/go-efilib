@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"unsafe"
 
 	"github.com/canonical/go-efilib/internal/ioerr"
 	"github.com/canonical/go-efilib/internal/uefi"
@@ -806,6 +807,51 @@ func (d *USBClassDevicePathNode) Write(w io.Writer) error {
 	return binary.Write(w, binary.LittleEndian, &data)
 }
 
+// MACAddrDevicePathNode corresponds to a MAC address device path node.
+type MACAddrDevicePathNode struct {
+	MACAddress MACAddress
+	IfType     NetworkInterfaceType
+}
+
+// ToString implements [DevicePathNode.ToString].
+func (d *MACAddrDevicePathNode) ToString(_ DevicePathToStringFlags) string {
+	var addr [32]uint8
+	if d.MACAddress != nil {
+		addr = d.MACAddress.Bytes32()
+	}
+
+	sz := unsafe.Sizeof(addr)
+	if d.IfType == NetworkInterfaceTypeReserved || d.IfType == NetworkInterfaceTypeEthernet {
+		sz = 6
+	}
+
+	return fmt.Sprintf("MacAddr(%02x,%#x)", addr[:sz], d.IfType)
+}
+
+// String implements [fmt.Stringer].
+func (d *MACAddrDevicePathNode) String() string {
+	return d.ToString(DevicePathDisplayOnly)
+}
+
+// Write implements [DevicePathNode.Write].
+func (d *MACAddrDevicePathNode) Write(w io.Writer) error {
+	data := uefi.MAC_ADDR_DEVICE_PATH{
+		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
+			Type:    uint8(uefi.MESSAGING_DEVICE_PATH),
+			SubType: uint8(uefi.MSG_MAC_ADDR_DP),
+		},
+		IfType: uint8(d.IfType),
+	}
+	data.Header.Length = uint16(unsafe.Sizeof(data))
+	if d.MACAddress != nil {
+		data.MacAddress = uefi.EFI_MAC_ADDRESS{
+			Addr: d.MACAddress.Bytes32(),
+		}
+	}
+
+	return binary.Write(w, binary.LittleEndian, &data)
+}
+
 // USBWWIDDevicePathNode corresponds to a USB WWID device path node.
 type USBWWIDDevicePathNode struct {
 	InterfaceNumber uint16
@@ -948,7 +994,8 @@ const (
 type HardDriveSignatureType uint8
 
 const (
-	// NoHardDriveSignature indicates there is no signature.
+	// NoHardDriveSignature indicates there is no signature. This can
+	// be represented by the value EmptyHardDriveSignature.
 	NoHardDriveSignature HardDriveSignatureType = uefi.NO_DISK_SIGNATURE
 
 	// HardDriveSignatureTypeMBR indicates that the unique identifier
@@ -1453,7 +1500,8 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
-			return &USBDevicePathNode{ParentPortNumber: n.ParentPortNumber, InterfaceNumber: n.InterfaceNumber}, nil
+			return &USBDevicePathNode{ParentPortNumber: n.ParentPortNumber,
+				InterfaceNumber: n.InterfaceNumber}, nil
 		case uefi.MSG_USB_CLASS_DP:
 			var n uefi.USB_CLASS_DEVICE_PATH
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
@@ -1465,6 +1513,25 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 				DeviceClass:    USBClass(n.DeviceClass),
 				DeviceSubClass: n.DeviceSubClass,
 				DeviceProtocol: n.DeviceProtocol}, nil
+		case uefi.MSG_MAC_ADDR_DP:
+			var n uefi.MAC_ADDR_DEVICE_PATH
+			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
+				return nil, err
+			}
+
+			node := &MACAddrDevicePathNode{
+				IfType: NetworkInterfaceType(n.IfType),
+			}
+			switch node.IfType {
+			case NetworkInterfaceTypeReserved, NetworkInterfaceTypeEthernet:
+				var addr EUI48
+				copy(addr[:], n.MacAddress.Addr[:])
+				node.MACAddress = addr
+			default:
+				node.MACAddress = unknownMACAddress(n.MacAddress.Addr)
+			}
+
+			return node, nil
 		case uefi.MSG_VENDOR_DP:
 			return readVendorDevicePathNode(buf)
 		case uefi.MSG_USB_WWID_DP:

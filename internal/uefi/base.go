@@ -28,3 +28,7 @@ type EFI_TABLE_HEADER struct {
 	CRC        uint32
 	Reserved   uint32
 }
+
+type EFI_MAC_ADDRESS struct {
+	Addr [32]uint8
+}

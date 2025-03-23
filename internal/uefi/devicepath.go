@@ -14,35 +14,48 @@ import (
 const (
 	MBR_TYPE_PCAT                       = 0x01
 	MBR_TYPE_EFI_PARTITION_TABLE_HEADER = 0x02
+)
 
+const (
 	NO_DISK_SIGNATURE   = 0x00
 	SIGNATURE_TYPE_MBR  = 0x01
 	SIGNATURE_TYPE_GUID = 0x02
+)
 
+const (
 	HARDWARE_DEVICE_PATH  = 0x01
 	ACPI_DEVICE_PATH      = 0x02
 	MESSAGING_DEVICE_PATH = 0x03
 	MEDIA_DEVICE_PATH     = 0x04
 	BBS_DEVICE_PATH       = 0x05
 	END_DEVICE_PATH_TYPE  = 0x7f
+)
 
+const (
 	HW_PCI_DP    = 0x01
 	HW_VENDOR_DP = 0x04
+)
 
+const (
 	ACPI_DP          = 0x01
 	ACPI_EXTENDED_DP = 0x02
+)
 
+const (
 	MSG_ATAPI_DP               = 0x01
 	MSG_SCSI_DP                = 0x02
 	MSG_USB_DP                 = 0x05
 	MSG_USB_CLASS_DP           = 0x0f
 	MSG_VENDOR_DP              = 0x0a
+	MSG_MAC_ADDR_DP            = 0x0b
 	MSG_USB_WWID_DP            = 0x10
 	MSG_DEVICE_LOGICAL_UNIT_DP = 0x11
 	MSG_SATA_DP                = 0x12
 	MSG_NVME_NAMESPACE_DP      = 0x17
 	MSG_URI_DP                 = 0x18
+)
 
+const (
 	MEDIA_HARDDRIVE_DP             = 0x01
 	MEDIA_CDROM_DP                 = 0x02
 	MEDIA_VENDOR_DP                = 0x03
@@ -50,9 +63,9 @@ const (
 	MEDIA_PIWG_FW_FILE_DP          = 0x06
 	MEDIA_PIWG_FW_VOL_DP           = 0x07
 	MEDIA_RELATIVE_OFFSET_RANGE_DP = 0x08
-
-	END_ENTIRE_DEVICE_PATH_SUBTYPE = 0xff
 )
+
+const END_ENTIRE_DEVICE_PATH_SUBTYPE = 0xff
 
 type EFI_DEVICE_PATH_PROTOCOL struct {
 	Type    uint8
@@ -110,6 +123,12 @@ type USB_CLASS_DEVICE_PATH struct {
 	DeviceClass    uint8
 	DeviceSubClass uint8
 	DeviceProtocol uint8
+}
+
+type MAC_ADDR_DEVICE_PATH struct {
+	Header     EFI_DEVICE_PATH_PROTOCOL
+	MacAddress EFI_MAC_ADDRESS
+	IfType     uint8
 }
 
 type USB_WWID_DEVICE_PATH struct {
