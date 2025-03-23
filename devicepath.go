@@ -1088,20 +1088,20 @@ func (s MBRHardDriveSignature) Type() HardDriveSignatureType {
 	return HardDriveSignatureTypeMBR
 }
 
-type genericHardDriveSignature struct {
+type unknownHardDriveSignature struct {
 	typ  HardDriveSignatureType
 	data [16]uint8
 }
 
-func (s *genericHardDriveSignature) String() string {
+func (s *unknownHardDriveSignature) String() string {
 	return fmt.Sprintf("%x", s.data)
 }
 
-func (s *genericHardDriveSignature) Data() [16]uint8 {
+func (s *unknownHardDriveSignature) Data() [16]uint8 {
 	return s.data
 }
 
-func (s *genericHardDriveSignature) Type() HardDriveSignatureType {
+func (s *unknownHardDriveSignature) Type() HardDriveSignatureType {
 	return s.typ
 }
 
@@ -1510,8 +1510,9 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
-			return &USBDevicePathNode{ParentPortNumber: n.ParentPortNumber,
-				InterfaceNumber: n.InterfaceNumber}, nil
+			return &USBDevicePathNode{
+				ParentPortNumber: n.ParentPortNumber,
+				InterfaceNumber:  n.InterfaceNumber}, nil
 		case uefi.MSG_USB_CLASS_DP:
 			var n uefi.USB_CLASS_DEVICE_PATH
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
@@ -1606,7 +1607,7 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 			case uefi.SIGNATURE_TYPE_GUID:
 				signature = GUIDHardDriveSignature(n.Signature)
 			default:
-				signature = &genericHardDriveSignature{
+				signature = &unknownHardDriveSignature{
 					typ:  HardDriveSignatureType(n.SignatureType),
 					data: n.Signature}
 			}
