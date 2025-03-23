@@ -263,7 +263,7 @@ func (p DevicePath) ShortFormType() DevicePathShortFormType {
 	case *USBClassDevicePathNode:
 		_ = n
 		return DevicePathShortFormUSBClass
-	case *GenericDevicePathNode:
+	case *UnsupportedDevicePathNode:
 		if n.Type == MessagingDevicePath && n.SubType == uefi.MSG_URI_DP {
 			return DevicePathShortFormURI
 		}
@@ -275,14 +275,19 @@ func (p DevicePath) ShortFormType() DevicePathShortFormType {
 }
 
 // GenericDevicePathNode corresponds to a device path nodes with a type that is
+// not handled by this package.
+// Deprecated: use [UnsupportedDevicePathNode].
+type GenericDevicePathNode = UnsupportedDevicePathNode
+
+// UnsupportedDevicePathNode corresponds to a device path nodes with a type that is
 // not handled by this package
-type GenericDevicePathNode struct {
+type UnsupportedDevicePathNode struct {
 	Type    DevicePathType
 	SubType DevicePathSubType // the meaning of the sub-type depends on the Type field.
 	Data    []byte            // An opaque blob of data associated with this node
 }
 
-func (n *GenericDevicePathNode) ToString(_ DevicePathToStringFlags) string {
+func (n *UnsupportedDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	var builder bytes.Buffer
 
 	switch n.Type {
@@ -300,11 +305,11 @@ func (n *GenericDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	return builder.String()
 }
 
-func (n *GenericDevicePathNode) String() string {
+func (n *UnsupportedDevicePathNode) String() string {
 	return n.ToString(DevicePathDisplayOnly)
 }
 
-func (n *GenericDevicePathNode) Write(w io.Writer) error {
+func (n *UnsupportedDevicePathNode) Write(w io.Writer) error {
 	hdr := uefi.EFI_DEVICE_PATH_PROTOCOL{
 		Type:    uint8(n.Type),
 		SubType: uint8(n.SubType)}
@@ -1663,7 +1668,7 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 		return nil, err
 	}
 	data, _ := io.ReadAll(buf)
-	return &GenericDevicePathNode{Type: DevicePathType(n.Type), SubType: DevicePathSubType(n.SubType), Data: data}, nil
+	return &UnsupportedDevicePathNode{Type: DevicePathType(n.Type), SubType: DevicePathSubType(n.SubType), Data: data}, nil
 }
 
 // ReadDevicePath decodes a device path from the supplied io.Reader. It will read
