@@ -282,42 +282,44 @@ type GenericDevicePathNode struct {
 	Data    []byte            // An opaque blob of data associated with this node
 }
 
-func (d *GenericDevicePathNode) ToString(_ DevicePathToStringFlags) string {
+func (n *GenericDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	var builder bytes.Buffer
 
-	switch d.Type {
+	switch n.Type {
 	case HardwareDevicePath, ACPIDevicePath, MessagingDevicePath,
 		MediaDevicePath, BBSDevicePath:
-		fmt.Fprintf(&builder, "%s(", d.Type)
+		fmt.Fprintf(&builder, "%s(", n.Type)
 	default:
-		fmt.Fprintf(&builder, "Path(%d,", d.Type)
+		fmt.Fprintf(&builder, "Path(%d,", n.Type)
 	}
-	fmt.Fprintf(&builder, "%d", d.SubType)
-	if len(d.Data) > 0 {
-		fmt.Fprintf(&builder, ",%x", d.Data)
+	fmt.Fprintf(&builder, "%d", n.SubType)
+	if len(n.Data) > 0 {
+		fmt.Fprintf(&builder, ",%x", n.Data)
 	}
 	fmt.Fprintf(&builder, ")")
 	return builder.String()
 }
 
-func (d *GenericDevicePathNode) String() string {
-	return d.ToString(DevicePathDisplayOnly)
+func (n *GenericDevicePathNode) String() string {
+	return n.ToString(DevicePathDisplayOnly)
 }
 
-func (d *GenericDevicePathNode) Write(w io.Writer) error {
-	data := uefi.EFI_DEVICE_PATH_PROTOCOL{
-		Type:    uint8(d.Type),
-		SubType: uint8(d.SubType)}
+func (n *GenericDevicePathNode) Write(w io.Writer) error {
+	hdr := uefi.EFI_DEVICE_PATH_PROTOCOL{
+		Type:    uint8(n.Type),
+		SubType: uint8(n.SubType)}
+	hdrSz := binary.Size(hdr)
+	dataSz := len(n.Data)
 
-	if len(d.Data) > math.MaxUint16-binary.Size(data) {
+	if dataSz > math.MaxUint16-hdrSz {
 		return errors.New("Data too large")
 	}
-	data.Length = uint16(binary.Size(data) + len(d.Data))
+	hdr.Length = uint16(hdrSz + dataSz)
 
-	if err := binary.Write(w, binary.LittleEndian, &data); err != nil {
+	if err := binary.Write(w, binary.LittleEndian, &hdr); err != nil {
 		return err
 	}
-	_, err := w.Write(d.Data)
+	_, err := w.Write(n.Data)
 	return err
 }
 
@@ -327,24 +329,24 @@ type PCIDevicePathNode struct {
 	Device   uint8 // Device number of PCI bus
 }
 
-func (d *PCIDevicePathNode) ToString(_ DevicePathToStringFlags) string {
-	return fmt.Sprintf("Pci(0x%x,0x%x)", d.Device, d.Function)
+func (n *PCIDevicePathNode) ToString(_ DevicePathToStringFlags) string {
+	return fmt.Sprintf("Pci(0x%x,0x%x)", n.Device, n.Function)
 }
 
-func (d *PCIDevicePathNode) String() string {
-	return d.ToString(DevicePathDisplayOnly)
+func (n *PCIDevicePathNode) String() string {
+	return n.ToString(DevicePathDisplayOnly)
 }
 
-func (d *PCIDevicePathNode) Write(w io.Writer) error {
-	data := uefi.PCI_DEVICE_PATH{
+func (n *PCIDevicePathNode) Write(w io.Writer) error {
+	node := uefi.PCI_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.HARDWARE_DEVICE_PATH),
 			SubType: uint8(uefi.HW_PCI_DP)},
-		Function: d.Function,
-		Device:   d.Device}
-	data.Header.Length = uint16(binary.Size(data))
+		Function: n.Function,
+		Device:   n.Device}
+	node.Header.Length = uint16(binary.Size(node))
 
-	return binary.Write(w, binary.LittleEndian, &data)
+	return binary.Write(w, binary.LittleEndian, &node)
 }
 
 // VendorDevicePathNode corresponds to a vendor specific node.
@@ -354,9 +356,9 @@ type VendorDevicePathNode struct {
 	Data []byte         // Vendor specific data
 }
 
-func (d *VendorDevicePathNode) ToString(_ DevicePathToStringFlags) string {
+func (n *VendorDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	var t string
-	switch d.Type {
+	switch n.Type {
 	case HardwareDevicePath:
 		t = "Hw"
 	case MessagingDevicePath:
@@ -368,21 +370,21 @@ func (d *VendorDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	}
 
 	var s bytes.Buffer
-	fmt.Fprintf(&s, "Ven%s(%s", t, d.GUID)
-	if len(d.Data) > 0 {
-		fmt.Fprintf(&s, ",%x", d.Data)
+	fmt.Fprintf(&s, "Ven%s(%s", t, n.GUID)
+	if len(n.Data) > 0 {
+		fmt.Fprintf(&s, ",%x", n.Data)
 	}
 	fmt.Fprintf(&s, ")")
 	return s.String()
 }
 
-func (d *VendorDevicePathNode) String() string {
-	return d.ToString(DevicePathDisplayOnly)
+func (n *VendorDevicePathNode) String() string {
+	return n.ToString(DevicePathDisplayOnly)
 }
 
-func (d *VendorDevicePathNode) Write(w io.Writer) error {
+func (n *VendorDevicePathNode) Write(w io.Writer) error {
 	var subType uint8
-	switch d.Type {
+	switch n.Type {
 	case HardwareDevicePath:
 		subType = uefi.HW_VENDOR_DP
 	case MessagingDevicePath:
@@ -393,22 +395,23 @@ func (d *VendorDevicePathNode) Write(w io.Writer) error {
 		return errors.New("invalid device path type")
 	}
 
-	data := uefi.VENDOR_DEVICE_PATH{
+	node := uefi.VENDOR_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
-			Type:    uint8(d.Type),
+			Type:    uint8(n.Type),
 			SubType: subType},
-		Guid: uefi.EFI_GUID(d.GUID)}
+		Guid: uefi.EFI_GUID(n.GUID)}
+	nodeSz := binary.Size(node)
 
-	if len(d.Data) > math.MaxUint16-binary.Size(data) {
+	dataSz := len(n.Data)
+	if dataSz > math.MaxUint16-nodeSz {
 		return errors.New("Data too large")
 	}
-	data.Header.Length = uint16(binary.Size(data) + len(d.Data))
+	node.Header.Length = uint16(nodeSz + dataSz)
 
-	if err := binary.Write(w, binary.LittleEndian, &data); err != nil {
+	if err := binary.Write(w, binary.LittleEndian, &node); err != nil {
 		return err
 	}
-
-	_, err := w.Write(d.Data)
+	_, err := w.Write(n.Data)
 	return err
 }
 
@@ -420,9 +423,11 @@ func readVendorDevicePathNode(r io.Reader) (out *VendorDevicePathNode, err error
 
 	out = &VendorDevicePathNode{
 		Type: DevicePathType(n.Header.Type),
-		GUID: GUID(n.Guid)}
-	data, _ := io.ReadAll(r)
-	out.Data = data
+		GUID: GUID(n.Guid),
+	}
+
+	// The rest of the data from this io.Reader is for us.
+	out.Data, _ = io.ReadAll(r)
 
 	return out, nil
 }
@@ -470,40 +475,40 @@ type ACPIDevicePathNode struct {
 	UID uint32 // Unique ID
 }
 
-func (d *ACPIDevicePathNode) ToString(_ DevicePathToStringFlags) string {
-	if d.HID.Vendor() == "PNP" {
-		switch d.HID.Product() {
+func (n *ACPIDevicePathNode) ToString(_ DevicePathToStringFlags) string {
+	if n.HID.Vendor() == "PNP" {
+		switch n.HID.Product() {
 		case 0x0a03:
-			return fmt.Sprintf("PciRoot(0x%x)", d.UID)
+			return fmt.Sprintf("PciRoot(0x%x)", n.UID)
 		case 0x0a08:
-			return fmt.Sprintf("PcieRoot(0x%x)", d.UID)
+			return fmt.Sprintf("PcieRoot(0x%x)", n.UID)
 		case 0x0604:
-			return fmt.Sprintf("Floppy(0x%x)", d.UID)
+			return fmt.Sprintf("Floppy(0x%x)", n.UID)
 		case 0x0301:
-			return fmt.Sprintf("Keyboard(0x%x)", d.UID)
+			return fmt.Sprintf("Keyboard(0x%x)", n.UID)
 		case 0x0501:
-			return fmt.Sprintf("Serial(0x%x)", d.UID)
+			return fmt.Sprintf("Serial(0x%x)", n.UID)
 		case 0x0401:
-			return fmt.Sprintf("ParallelPort(0x%x)", d.UID)
+			return fmt.Sprintf("ParallelPort(0x%x)", n.UID)
 		}
 	}
-	return fmt.Sprintf("Acpi(%s,0x%x)", d.HID, d.UID)
+	return fmt.Sprintf("Acpi(%s,0x%x)", n.HID, n.UID)
 }
 
-func (d *ACPIDevicePathNode) String() string {
-	return d.ToString(DevicePathDisplayOnly)
+func (n *ACPIDevicePathNode) String() string {
+	return n.ToString(DevicePathDisplayOnly)
 }
 
-func (d *ACPIDevicePathNode) Write(w io.Writer) error {
-	data := uefi.ACPI_HID_DEVICE_PATH{
+func (n *ACPIDevicePathNode) Write(w io.Writer) error {
+	node := uefi.ACPI_HID_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.ACPI_DEVICE_PATH),
 			SubType: uint8(uefi.ACPI_DP)},
-		HID: uint32(d.HID),
-		UID: uint32(d.UID)}
-	data.Header.Length = uint16(binary.Size(data))
+		HID: uint32(n.HID),
+		UID: uint32(n.UID)}
+	node.Header.Length = uint16(binary.Size(node))
 
-	return binary.Write(w, binary.LittleEndian, &data)
+	return binary.Write(w, binary.LittleEndian, &node)
 }
 
 // ACPIExtendedDevicePathNode corresponds to an ACPI device path node
@@ -518,85 +523,83 @@ type ACPIExtendedDevicePathNode struct {
 	CIDStr string
 }
 
-func (d *ACPIExtendedDevicePathNode) ToString(flags DevicePathToStringFlags) string {
+func (n *ACPIExtendedDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	switch {
-	case d.HIDStr == "" && d.CIDStr == "" && d.UIDStr != "":
-		return fmt.Sprintf("AcpiExp(%s,%s,%s)", d.HID, d.CID, d.UIDStr)
-	case flags.DisplayOnly() && d.HID.Vendor() == "PNP" && (d.HID.Product() == 0x0a03 || (d.CID.Product() == 0x0a03 && d.HID.Product() != 0x0a08)):
-		if d.UIDStr != "" {
-			return fmt.Sprintf("PciRoot(%s)", d.UIDStr)
+	case n.HIDStr == "" && n.CIDStr == "" && n.UIDStr != "":
+		return fmt.Sprintf("AcpiExp(%s,%s,%s)", n.HID, n.CID, n.UIDStr)
+	case flags.DisplayOnly() && n.HID.Vendor() == "PNP" && (n.HID.Product() == 0x0a03 || (n.CID.Product() == 0x0a03 && n.HID.Product() != 0x0a08)):
+		if n.UIDStr != "" {
+			return fmt.Sprintf("PciRoot(%s)", n.UIDStr)
 		}
-		return fmt.Sprintf("PciRoot(0x%x)", d.UID)
-	case flags.DisplayOnly() && d.HID.Vendor() == "PNP" && (d.HID.Product() == 0x0a08 || d.CID.Product() == 0x0a08):
-		if d.UIDStr != "" {
-			return fmt.Sprintf("PcieRoot(%s)", d.UIDStr)
+		return fmt.Sprintf("PciRoot(0x%x)", n.UID)
+	case flags.DisplayOnly() && n.HID.Vendor() == "PNP" && (n.HID.Product() == 0x0a08 || n.CID.Product() == 0x0a08):
+		if n.UIDStr != "" {
+			return fmt.Sprintf("PcieRoot(%s)", n.UIDStr)
 		}
-		return fmt.Sprintf("PcieRoot(0x%x)", d.UID)
+		return fmt.Sprintf("PcieRoot(0x%x)", n.UID)
 	}
 
 	if !flags.DisplayOnly() {
-		hidStr := d.HIDStr
+		hidStr := n.HIDStr
 		if hidStr == "" {
 			hidStr = "<nil>"
 		}
-		cidStr := d.CIDStr
+		cidStr := n.CIDStr
 		if cidStr == "" {
 			cidStr = "<nil>"
 		}
-		uidStr := d.UIDStr
+		uidStr := n.UIDStr
 		if uidStr == "" {
 			uidStr = "<nil>"
 		}
 
-		return fmt.Sprintf("AcpiEx(%s,%s,0x%x,%s,%s,%s)", d.HID, d.CID, d.UID, hidStr, cidStr, uidStr)
+		return fmt.Sprintf("AcpiEx(%s,%s,0x%x,%s,%s,%s)", n.HID, n.CID, n.UID, hidStr, cidStr, uidStr)
 	}
 
-	hidText := d.HID.String()
-	if d.HIDStr != "" {
-		hidText = d.HIDStr
+	hidText := n.HID.String()
+	if n.HIDStr != "" {
+		hidText = n.HIDStr
 	}
-	cidText := d.CID.String()
-	if d.CIDStr != "" {
-		cidText = d.CIDStr
+	cidText := n.CID.String()
+	if n.CIDStr != "" {
+		cidText = n.CIDStr
 	}
 
-	if d.UIDStr != "" {
-		return fmt.Sprintf("AcpiEx(%s,%s,%s)", hidText, cidText, d.UIDStr)
+	if n.UIDStr != "" {
+		return fmt.Sprintf("AcpiEx(%s,%s,%s)", hidText, cidText, n.UIDStr)
 	}
-	return fmt.Sprintf("AcpiEx(%s,%s,0x%x)", hidText, cidText, d.UID)
+	return fmt.Sprintf("AcpiEx(%s,%s,0x%x)", hidText, cidText, n.UID)
 }
 
-func (d *ACPIExtendedDevicePathNode) String() string {
-	return d.ToString(DevicePathDisplayOnly)
+func (n *ACPIExtendedDevicePathNode) String() string {
+	return n.ToString(DevicePathDisplayOnly)
 }
 
-func (d *ACPIExtendedDevicePathNode) Write(w io.Writer) error {
-	data := uefi.ACPI_EXTENDED_HID_DEVICE_PATH{
+func (n *ACPIExtendedDevicePathNode) Write(w io.Writer) error {
+	node := uefi.ACPI_EXTENDED_HID_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.ACPI_DEVICE_PATH),
 			SubType: uint8(uefi.ACPI_EXTENDED_DP)},
-		HID: uint32(d.HID),
-		UID: d.UID,
-		CID: uint32(d.CID)}
+		HID: uint32(n.HID),
+		UID: n.UID,
+		CID: uint32(n.CID)}
+
 	// Set a reasonable limit on each string field
-	for _, s := range []string{d.HIDStr, d.UIDStr, d.CIDStr} {
-		if len(s) > math.MaxUint16-(binary.Size(data)+3) {
-			return errors.New("string field too large")
+	length := binary.Size(node) + 3 // extra 3 bytes for NULL terminators
+
+	for _, s := range []string{n.HIDStr, n.UIDStr, n.CIDStr} {
+		sz := len(s)
+		if sz > math.MaxUint16-length {
+			return errors.New("string fields too large")
 		}
+		length += sz
 	}
+	node.Header.Length = uint16(length)
 
-	// This can't overflow int
-	length := binary.Size(data) + len(d.HIDStr) + len(d.UIDStr) + len(d.CIDStr) + 3
-	if length > math.MaxUint16 {
-		return errors.New("too large")
-	}
-	data.Header.Length = uint16(length)
-
-	if err := binary.Write(w, binary.LittleEndian, &data); err != nil {
+	if err := binary.Write(w, binary.LittleEndian, &node); err != nil {
 		return err
 	}
-
-	for _, s := range []string{d.HIDStr, d.UIDStr, d.CIDStr} {
+	for _, s := range []string{n.HIDStr, n.UIDStr, n.CIDStr} {
 		if _, err := io.WriteString(w, s); err != nil {
 			return err
 		}
@@ -651,28 +654,28 @@ type ATAPIDevicePathNode struct {
 	LUN        uint16 // Logical unit number
 }
 
-func (d *ATAPIDevicePathNode) ToString(flags DevicePathToStringFlags) string {
+func (n *ATAPIDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	if flags.DisplayOnly() {
-		return fmt.Sprintf("Ata(0x%x)", d.LUN)
+		return fmt.Sprintf("Ata(0x%x)", n.LUN)
 	}
-	return fmt.Sprintf("Ata(%s,%s,0x%x)", d.Controller, d.Drive, d.LUN)
+	return fmt.Sprintf("Ata(%s,%s,0x%x)", n.Controller, n.Drive, n.LUN)
 }
 
-func (d *ATAPIDevicePathNode) String() string {
-	return d.ToString(DevicePathDisplayOnly)
+func (n *ATAPIDevicePathNode) String() string {
+	return n.ToString(DevicePathDisplayOnly)
 }
 
-func (d *ATAPIDevicePathNode) Write(w io.Writer) error {
-	data := uefi.ATAPI_DEVICE_PATH{
+func (n *ATAPIDevicePathNode) Write(w io.Writer) error {
+	node := uefi.ATAPI_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MESSAGING_DEVICE_PATH),
 			SubType: uint8(uefi.MSG_ATAPI_DP)},
-		PrimarySecondary: uint8(d.Controller),
-		SlaveMaster:      uint8(d.Drive),
-		Lun:              d.LUN}
-	data.Header.Length = uint16(binary.Size(data))
+		PrimarySecondary: uint8(n.Controller),
+		SlaveMaster:      uint8(n.Drive),
+		Lun:              n.LUN}
+	node.Header.Length = uint16(binary.Size(node))
 
-	return binary.Write(w, binary.LittleEndian, &data)
+	return binary.Write(w, binary.LittleEndian, &node)
 }
 
 // SCSIDevicePathNode corresponds to a SCSI device path node.
@@ -681,24 +684,24 @@ type SCSIDevicePathNode struct {
 	LUN uint16 // Logical unit number
 }
 
-func (d *SCSIDevicePathNode) ToString(_ DevicePathToStringFlags) string {
-	return fmt.Sprintf("Scsi(0x%x,0x%x)", d.PUN, d.LUN)
+func (n *SCSIDevicePathNode) ToString(_ DevicePathToStringFlags) string {
+	return fmt.Sprintf("Scsi(0x%x,0x%x)", n.PUN, n.LUN)
 }
 
-func (d *SCSIDevicePathNode) String() string {
-	return d.ToString(DevicePathDisplayOnly)
+func (n *SCSIDevicePathNode) String() string {
+	return n.ToString(DevicePathDisplayOnly)
 }
 
-func (d *SCSIDevicePathNode) Write(w io.Writer) error {
-	data := uefi.SCSI_DEVICE_PATH{
+func (n *SCSIDevicePathNode) Write(w io.Writer) error {
+	node := uefi.SCSI_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MESSAGING_DEVICE_PATH),
 			SubType: uint8(uefi.MSG_SCSI_DP)},
-		Pun: d.PUN,
-		Lun: d.LUN}
-	data.Header.Length = uint16(binary.Size(data))
+		Pun: n.PUN,
+		Lun: n.LUN}
+	node.Header.Length = uint16(binary.Size(node))
 
-	return binary.Write(w, binary.LittleEndian, &data)
+	return binary.Write(w, binary.LittleEndian, &node)
 }
 
 // USBDevicePathNode corresponds to a USB device path node.
@@ -707,24 +710,24 @@ type USBDevicePathNode struct {
 	InterfaceNumber  uint8
 }
 
-func (d *USBDevicePathNode) ToString(_ DevicePathToStringFlags) string {
-	return fmt.Sprintf("USB(0x%x,0x%x)", d.ParentPortNumber, d.InterfaceNumber)
+func (n *USBDevicePathNode) ToString(_ DevicePathToStringFlags) string {
+	return fmt.Sprintf("USB(0x%x,0x%x)", n.ParentPortNumber, n.InterfaceNumber)
 }
 
-func (d *USBDevicePathNode) String() string {
-	return d.ToString(DevicePathDisplayOnly)
+func (n *USBDevicePathNode) String() string {
+	return n.ToString(DevicePathDisplayOnly)
 }
 
-func (d *USBDevicePathNode) Write(w io.Writer) error {
-	data := uefi.USB_DEVICE_PATH{
+func (n *USBDevicePathNode) Write(w io.Writer) error {
+	node := uefi.USB_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MESSAGING_DEVICE_PATH),
 			SubType: uint8(uefi.MSG_USB_DP)},
-		ParentPortNumber: d.ParentPortNumber,
-		InterfaceNumber:  d.InterfaceNumber}
-	data.Header.Length = uint16(binary.Size(data))
+		ParentPortNumber: n.ParentPortNumber,
+		InterfaceNumber:  n.InterfaceNumber}
+	node.Header.Length = uint16(binary.Size(node))
 
-	return binary.Write(w, binary.LittleEndian, &data)
+	return binary.Write(w, binary.LittleEndian, &node)
 }
 
 type USBClass uint8
@@ -753,9 +756,9 @@ type USBClassDevicePathNode struct {
 	DeviceProtocol uint8
 }
 
-func (d *USBClassDevicePathNode) ToString(_ DevicePathToStringFlags) string {
+func (n *USBClassDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	var builder bytes.Buffer
-	switch d.DeviceClass {
+	switch n.DeviceClass {
 	case USBClassAudio:
 		fmt.Fprintf(&builder, "UsbAudio")
 	case USBClassCDCControl:
@@ -781,30 +784,30 @@ func (d *USBClassDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	case USBClassWireless:
 		fmt.Fprintf(&builder, "UsbWireless")
 	default:
-		return fmt.Sprintf("UsbClass(0x%x,0x%x,0x%x,0x%x,0x%x)", d.VendorId, d.ProductId, d.DeviceClass, d.DeviceSubClass, d.DeviceProtocol)
+		return fmt.Sprintf("UsbClass(0x%x,0x%x,0x%x,0x%x,0x%x)", n.VendorId, n.ProductId, n.DeviceClass, n.DeviceSubClass, n.DeviceProtocol)
 	}
 
-	fmt.Fprintf(&builder, "(0x%x,0x%x,0x%x,0x%x)", d.VendorId, d.ProductId, d.DeviceSubClass, d.DeviceProtocol)
+	fmt.Fprintf(&builder, "(0x%x,0x%x,0x%x,0x%x)", n.VendorId, n.ProductId, n.DeviceSubClass, n.DeviceProtocol)
 	return builder.String()
 }
 
-func (d *USBClassDevicePathNode) String() string {
-	return d.ToString(DevicePathDisplayOnly)
+func (n *USBClassDevicePathNode) String() string {
+	return n.ToString(DevicePathDisplayOnly)
 }
 
-func (d *USBClassDevicePathNode) Write(w io.Writer) error {
-	data := uefi.USB_CLASS_DEVICE_PATH{
+func (n *USBClassDevicePathNode) Write(w io.Writer) error {
+	node := uefi.USB_CLASS_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MESSAGING_DEVICE_PATH),
 			SubType: uint8(uefi.MSG_USB_CLASS_DP)},
-		VendorId:       d.VendorId,
-		ProductId:      d.ProductId,
-		DeviceClass:    uint8(d.DeviceClass),
-		DeviceSubClass: d.DeviceSubClass,
-		DeviceProtocol: d.DeviceProtocol}
-	data.Header.Length = uint16(binary.Size(data))
+		VendorId:       n.VendorId,
+		ProductId:      n.ProductId,
+		DeviceClass:    uint8(n.DeviceClass),
+		DeviceSubClass: n.DeviceSubClass,
+		DeviceProtocol: n.DeviceProtocol}
+	node.Header.Length = uint16(binary.Size(node))
 
-	return binary.Write(w, binary.LittleEndian, &data)
+	return binary.Write(w, binary.LittleEndian, &node)
 }
 
 // MACAddrDevicePathNode corresponds to a MAC address device path node.
@@ -814,42 +817,43 @@ type MACAddrDevicePathNode struct {
 }
 
 // ToString implements [DevicePathNode.ToString].
-func (d *MACAddrDevicePathNode) ToString(_ DevicePathToStringFlags) string {
+func (n *MACAddrDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	var addr [32]uint8
-	if d.MACAddress != nil {
-		addr = d.MACAddress.Bytes32()
+	if n.MACAddress != nil {
+		addr = n.MACAddress.Bytes32()
 	}
 
 	sz := unsafe.Sizeof(addr)
-	if d.IfType == NetworkInterfaceTypeReserved || d.IfType == NetworkInterfaceTypeEthernet {
+	if n.IfType == NetworkInterfaceTypeReserved || n.IfType == NetworkInterfaceTypeEthernet {
 		sz = 6
 	}
 
-	return fmt.Sprintf("MacAddr(%02x,%#x)", addr[:sz], d.IfType)
+	return fmt.Sprintf("MacAddr(%02x,%#x)", addr[:sz], n.IfType)
 }
 
 // String implements [fmt.Stringer].
-func (d *MACAddrDevicePathNode) String() string {
-	return d.ToString(DevicePathDisplayOnly)
+func (n *MACAddrDevicePathNode) String() string {
+	return n.ToString(DevicePathDisplayOnly)
 }
 
 // Write implements [DevicePathNode.Write].
-func (d *MACAddrDevicePathNode) Write(w io.Writer) error {
-	data := uefi.MAC_ADDR_DEVICE_PATH{
+func (n *MACAddrDevicePathNode) Write(w io.Writer) error {
+	node := uefi.MAC_ADDR_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MESSAGING_DEVICE_PATH),
 			SubType: uint8(uefi.MSG_MAC_ADDR_DP),
 		},
-		IfType: uint8(d.IfType),
+		IfType: uint8(n.IfType),
 	}
-	data.Header.Length = uint16(unsafe.Sizeof(data))
-	if d.MACAddress != nil {
-		data.MacAddress = uefi.EFI_MAC_ADDRESS{
-			Addr: d.MACAddress.Bytes32(),
+	node.Header.Length = uint16(binary.Size(node))
+
+	if n.MACAddress != nil {
+		node.MacAddress = uefi.EFI_MAC_ADDRESS{
+			Addr: n.MACAddress.Bytes32(),
 		}
 	}
 
-	return binary.Write(w, binary.LittleEndian, &data)
+	return binary.Write(w, binary.LittleEndian, &node)
 }
 
 // USBWWIDDevicePathNode corresponds to a USB WWID device path node.
@@ -860,54 +864,55 @@ type USBWWIDDevicePathNode struct {
 	SerialNumber    string
 }
 
-func (d *USBWWIDDevicePathNode) ToString(_ DevicePathToStringFlags) string {
-	return fmt.Sprintf("UsbWwid(0x%x,0x%x,0x%x,\"%s\"", d.VendorId, d.ProductId, d.InterfaceNumber, d.SerialNumber)
+func (n *USBWWIDDevicePathNode) ToString(_ DevicePathToStringFlags) string {
+	return fmt.Sprintf("UsbWwid(0x%x,0x%x,0x%x,\"%s\"", n.VendorId, n.ProductId, n.InterfaceNumber, n.SerialNumber)
 }
 
-func (d *USBWWIDDevicePathNode) String() string {
-	return d.ToString(DevicePathDisplayOnly)
+func (n *USBWWIDDevicePathNode) String() string {
+	return n.ToString(DevicePathDisplayOnly)
 }
 
-func (d *USBWWIDDevicePathNode) Write(w io.Writer) error {
-	data := uefi.USB_WWID_DEVICE_PATH{
+func (n *USBWWIDDevicePathNode) Write(w io.Writer) error {
+	node := uefi.USB_WWID_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MESSAGING_DEVICE_PATH),
 			SubType: uint8(uefi.MSG_USB_WWID_DP)},
-		InterfaceNumber: d.InterfaceNumber,
-		VendorId:        d.VendorId,
-		ProductId:       d.ProductId,
-		SerialNumber:    ConvertUTF8ToUTF16(d.SerialNumber)}
+		InterfaceNumber: n.InterfaceNumber,
+		VendorId:        n.VendorId,
+		ProductId:       n.ProductId,
+		SerialNumber:    ConvertUTF8ToUTF16(n.SerialNumber)}
 
-	l := binary.Size(data.Header) + binary.Size(data.InterfaceNumber) + binary.Size(data.VendorId) + binary.Size(data.ProductId)
-	if binary.Size(data.SerialNumber) > math.MaxUint16-l {
+	length := binary.Size(node.Header) + int(unsafe.Sizeof(node.InterfaceNumber)+unsafe.Sizeof(node.VendorId)+unsafe.Sizeof(node.ProductId))
+	serialNumSz := binary.Size(node.SerialNumber)
+	if serialNumSz > math.MaxUint16-length {
 		return errors.New("SerialNumber too long")
 	}
-	data.Header.Length = uint16(l + binary.Size(data.SerialNumber))
+	node.Header.Length = uint16(length + serialNumSz)
 
-	return binary.Write(w, binary.LittleEndian, &data)
+	return binary.Write(w, binary.LittleEndian, &node)
 }
 
 type DeviceLogicalUnitDevicePathNode struct {
 	LUN uint8
 }
 
-func (d *DeviceLogicalUnitDevicePathNode) ToString(_ DevicePathToStringFlags) string {
-	return fmt.Sprintf("Unit(0x%x)", d.LUN)
+func (n *DeviceLogicalUnitDevicePathNode) ToString(_ DevicePathToStringFlags) string {
+	return fmt.Sprintf("Unit(0x%x)", n.LUN)
 }
 
-func (d *DeviceLogicalUnitDevicePathNode) String() string {
-	return d.ToString(DevicePathDisplayOnly)
+func (n *DeviceLogicalUnitDevicePathNode) String() string {
+	return n.ToString(DevicePathDisplayOnly)
 }
 
-func (d *DeviceLogicalUnitDevicePathNode) Write(w io.Writer) error {
-	data := uefi.DEVICE_LOGICAL_UNIT_DEVICE_PATH{
+func (n *DeviceLogicalUnitDevicePathNode) Write(w io.Writer) error {
+	node := uefi.DEVICE_LOGICAL_UNIT_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MESSAGING_DEVICE_PATH),
 			SubType: uint8(uefi.MSG_DEVICE_LOGICAL_UNIT_DP)},
-		Lun: d.LUN}
-	data.Header.Length = uint16(binary.Size(data))
+		Lun: n.LUN}
+	node.Header.Length = uint16(binary.Size(node))
 
-	return binary.Write(w, binary.LittleEndian, &data)
+	return binary.Write(w, binary.LittleEndian, &node)
 }
 
 // SATADevicePathNode corresponds to a SATA device path node.
@@ -917,25 +922,25 @@ type SATADevicePathNode struct {
 	LUN                      uint16 // Logical unit number
 }
 
-func (d *SATADevicePathNode) ToString(_ DevicePathToStringFlags) string {
-	return fmt.Sprintf("Sata(0x%x,0x%x,0x%x)", d.HBAPortNumber, d.PortMultiplierPortNumber, d.LUN)
+func (n *SATADevicePathNode) ToString(_ DevicePathToStringFlags) string {
+	return fmt.Sprintf("Sata(0x%x,0x%x,0x%x)", n.HBAPortNumber, n.PortMultiplierPortNumber, n.LUN)
 }
 
-func (d *SATADevicePathNode) String() string {
-	return d.ToString(DevicePathDisplayOnly)
+func (n *SATADevicePathNode) String() string {
+	return n.ToString(DevicePathDisplayOnly)
 }
 
-func (d *SATADevicePathNode) Write(w io.Writer) error {
-	data := uefi.SATA_DEVICE_PATH{
+func (n *SATADevicePathNode) Write(w io.Writer) error {
+	node := uefi.SATA_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MESSAGING_DEVICE_PATH),
 			SubType: uint8(uefi.MSG_SATA_DP)},
-		HBAPortNumber:            d.HBAPortNumber,
-		PortMultiplierPortNumber: d.PortMultiplierPortNumber,
-		Lun:                      d.LUN}
-	data.Header.Length = uint16(binary.Size(data))
+		HBAPortNumber:            n.HBAPortNumber,
+		PortMultiplierPortNumber: n.PortMultiplierPortNumber,
+		Lun:                      n.LUN}
+	node.Header.Length = uint16(binary.Size(node))
 
-	return binary.Write(w, binary.LittleEndian, &data)
+	return binary.Write(w, binary.LittleEndian, &node)
 }
 
 // NVMENamespaceDevicePathNode corresponds to a NVME namespace device path node.
@@ -944,26 +949,26 @@ type NVMENamespaceDevicePathNode struct {
 	NamespaceUUID EUI64  // EUI-64 unique identifier. This is set to 0 where not supported
 }
 
-func (d *NVMENamespaceDevicePathNode) ToString(_ DevicePathToStringFlags) string {
-	return fmt.Sprintf("NVMe(0x%x,%s)", d.NamespaceID, d.NamespaceUUID)
+func (n *NVMENamespaceDevicePathNode) ToString(_ DevicePathToStringFlags) string {
+	return fmt.Sprintf("NVMe(0x%x,%s)", n.NamespaceID, n.NamespaceUUID)
 }
 
-func (d *NVMENamespaceDevicePathNode) String() string {
-	return d.ToString(DevicePathDisplayOnly)
+func (n *NVMENamespaceDevicePathNode) String() string {
+	return n.ToString(DevicePathDisplayOnly)
 }
 
-func (d *NVMENamespaceDevicePathNode) Write(w io.Writer) error {
+func (n *NVMENamespaceDevicePathNode) Write(w io.Writer) error {
 	// Convert the UUID back from EUI64 to uint64, big-endian.
-	uuid := binary.BigEndian.Uint64(d.NamespaceUUID[:])
-	data := uefi.NVME_NAMESPACE_DEVICE_PATH{
+	uuid := binary.BigEndian.Uint64(n.NamespaceUUID[:])
+	node := uefi.NVME_NAMESPACE_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MESSAGING_DEVICE_PATH),
 			SubType: uint8(uefi.MSG_NVME_NAMESPACE_DP)},
-		NamespaceId:   d.NamespaceID,
+		NamespaceId:   n.NamespaceID,
 		NamespaceUuid: uuid}
-	data.Header.Length = uint16(binary.Size(data))
+	node.Header.Length = uint16(binary.Size(node))
 
-	return binary.Write(w, binary.LittleEndian, &data)
+	return binary.Write(w, binary.LittleEndian, &node)
 }
 
 // MBRType describes a disk header type
@@ -1109,56 +1114,57 @@ type HardDriveDevicePathNode struct {
 	MBRType         MBRType            // Legacy MBR or GPT
 }
 
-func (d *HardDriveDevicePathNode) ToString(flags DevicePathToStringFlags) string {
+func (n *HardDriveDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	var builder bytes.Buffer
 
-	fmt.Fprintf(&builder, "HD(%d,%s,", d.PartitionNumber, d.Signature.Type())
-	switch d.Signature.Type() {
+	signature := n.Signature
+	if signature == nil {
+		signature = EmptyHardDriveSignature
+	}
+
+	fmt.Fprintf(&builder, "HD(%d,%s,", n.PartitionNumber, signature.Type())
+	switch signature.Type() {
 	default:
 		fmt.Fprintf(&builder, "0")
 	case HardDriveSignatureTypeMBR, HardDriveSignatureTypeGUID:
-		fmt.Fprintf(&builder, "%s", d.Signature)
+		fmt.Fprintf(&builder, "%s", signature)
 	}
 
 	if !flags.DisplayOnly() {
-		fmt.Fprintf(&builder, ",0x%x,0x%x", d.PartitionStart, d.PartitionSize)
+		fmt.Fprintf(&builder, ",0x%x,0x%x", n.PartitionStart, n.PartitionSize)
 	}
 	fmt.Fprintf(&builder, ")")
 
 	return builder.String()
 }
 
-func (d *HardDriveDevicePathNode) String() string {
-	return d.ToString(DevicePathDisplayOnly)
+func (n *HardDriveDevicePathNode) String() string {
+	return n.ToString(DevicePathDisplayOnly)
 }
 
-func (d *HardDriveDevicePathNode) Write(w io.Writer) error {
-	data := uefi.HARDDRIVE_DEVICE_PATH{
+func (n *HardDriveDevicePathNode) Write(w io.Writer) error {
+	node := uefi.HARDDRIVE_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MEDIA_DEVICE_PATH),
 			SubType: uint8(uefi.MEDIA_HARDDRIVE_DP)},
-		PartitionNumber: d.PartitionNumber,
-		PartitionStart:  d.PartitionStart,
-		PartitionSize:   d.PartitionSize,
-		MBRType:         uint8(d.MBRType)}
+		PartitionNumber: n.PartitionNumber,
+		PartitionStart:  n.PartitionStart,
+		PartitionSize:   n.PartitionSize,
+		MBRType:         uint8(n.MBRType)}
+	node.Header.Length = uint16(binary.Size(node))
 
-	if d.Signature != nil {
-		data.SignatureType = uint8(d.Signature.Type())
-
-		switch d.Signature.Type() {
-		case NoHardDriveSignature:
-			// There should be an empty signature.
-			if d.Signature.Data() != EmptyHardDriveSignature.Data() {
-				return errors.New("inconsistent signature and signature type: expected empty signature for NoHardDriveSignature signature type")
-			}
-		default:
-			data.Signature = d.Signature.Data()
-		}
+	signature := n.Signature
+	if signature == nil {
+		signature = EmptyHardDriveSignature
 	}
+	node.SignatureType = uint8(signature.Type())
 
-	data.Header.Length = uint16(binary.Size(data))
+	if signature.Type() == NoHardDriveSignature && signature.Data() != EmptyHardDriveSignature.Data() {
+		return errors.New("inconsistent signature and signature type: expected empty signature for NoHardDriveSignature signature type")
+	}
+	node.Signature = signature.Data()
 
-	return binary.Write(w, binary.LittleEndian, &data)
+	return binary.Write(w, binary.LittleEndian, &node)
 }
 
 // NewHardDriveDevicePathNodeFromDevice constructs a HardDriveDevicePathNode for the
@@ -1217,53 +1223,56 @@ type CDROMDevicePathNode struct {
 	PartitionSize  uint64
 }
 
-func (d *CDROMDevicePathNode) ToString(flags DevicePathToStringFlags) string {
+func (n *CDROMDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	if flags.DisplayOnly() {
-		return fmt.Sprintf("CDROM(0x%x)", d.BootEntry)
+		return fmt.Sprintf("CDROM(0x%x)", n.BootEntry)
 	}
-	return fmt.Sprintf("CDROM(0x%x,0x%x,0x%x)", d.BootEntry, d.PartitionStart, d.PartitionSize)
+	return fmt.Sprintf("CDROM(0x%x,0x%x,0x%x)", n.BootEntry, n.PartitionStart, n.PartitionSize)
 }
 
-func (d *CDROMDevicePathNode) String() string {
-	return d.ToString(DevicePathDisplayOnly)
+func (n *CDROMDevicePathNode) String() string {
+	return n.ToString(DevicePathDisplayOnly)
 }
 
-func (d *CDROMDevicePathNode) Write(w io.Writer) error {
-	data := uefi.CDROM_DEVICE_PATH{
+func (n *CDROMDevicePathNode) Write(w io.Writer) error {
+	node := uefi.CDROM_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MEDIA_DEVICE_PATH),
 			SubType: uint8(uefi.MEDIA_CDROM_DP)},
-		BootEntry:      d.BootEntry,
-		PartitionStart: d.PartitionStart,
-		PartitionSize:  d.PartitionSize}
-	data.Header.Length = uint16(binary.Size(data))
+		BootEntry:      n.BootEntry,
+		PartitionStart: n.PartitionStart,
+		PartitionSize:  n.PartitionSize}
+	node.Header.Length = uint16(binary.Size(node))
 
-	return binary.Write(w, binary.LittleEndian, &data)
+	return binary.Write(w, binary.LittleEndian, &node)
 }
 
 // FilePathDevicePathNode corresponds to a file path device path node.
 type FilePathDevicePathNode string
 
-func (d FilePathDevicePathNode) ToString(_ DevicePathToStringFlags) string {
-	return string(d)
+func (n FilePathDevicePathNode) ToString(_ DevicePathToStringFlags) string {
+	return string(n)
 }
 
-func (d FilePathDevicePathNode) String() string {
-	return d.ToString(DevicePathDisplayOnly)
+func (n FilePathDevicePathNode) String() string {
+	return n.ToString(DevicePathDisplayOnly)
 }
 
-func (d FilePathDevicePathNode) Write(w io.Writer) error {
-	data := uefi.FILEPATH_DEVICE_PATH{
+func (n FilePathDevicePathNode) Write(w io.Writer) error {
+	node := uefi.FILEPATH_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MEDIA_DEVICE_PATH),
 			SubType: uint8(uefi.MEDIA_FILEPATH_DP)},
-		PathName: ConvertUTF8ToUTF16(string(d) + "\x00")}
-	if binary.Size(data.PathName) > math.MaxUint16-binary.Size(data.Header) {
+		PathName: ConvertUTF8ToUTF16(string(n) + "\x00")}
+
+	length := int(binary.Size(node.Header))
+	pathSz := binary.Size(node.PathName)
+	if pathSz > math.MaxUint16-length {
 		return errors.New("PathName too large")
 	}
-	data.Header.Length = uint16(binary.Size(data.Header) + binary.Size(data.PathName))
+	node.Header.Length = uint16(length + pathSz)
 
-	return data.Write(w)
+	return node.Write(w)
 }
 
 // NewFilePathDevicePathNode constructs a new FilePathDevicePathNode from the supplied
@@ -1280,34 +1289,34 @@ func NewFilePathDevicePathNode(path string) (out FilePathDevicePathNode) {
 // MediaFvFileDevicePathNode corresponds to a firmware volume file device path node.
 type MediaFvFileDevicePathNode GUID
 
-func (d MediaFvFileDevicePathNode) ToString(flags DevicePathToStringFlags) string {
+func (n MediaFvFileDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	if flags.DisplayOnly() {
 		fvFileNameLookupMu.Lock()
 		defer fvFileNameLookupMu.Unlock()
 
 		if fvFileNameLookup != nil {
-			name, known := fvFileNameLookup(GUID(d))
+			name, known := fvFileNameLookup(GUID(n))
 			if known {
 				return fmt.Sprintf("FvFile(%s)", name)
 			}
 		}
 	}
-	return fmt.Sprintf("FvFile(%s)", GUID(d))
+	return fmt.Sprintf("FvFile(%s)", GUID(n))
 }
 
-func (d MediaFvFileDevicePathNode) String() string {
-	return d.ToString(DevicePathDisplayOnly)
+func (n MediaFvFileDevicePathNode) String() string {
+	return n.ToString(DevicePathDisplayOnly)
 }
 
-func (d MediaFvFileDevicePathNode) Write(w io.Writer) error {
-	data := uefi.MEDIA_FW_VOL_FILEPATH_DEVICE_PATH{
+func (n MediaFvFileDevicePathNode) Write(w io.Writer) error {
+	node := uefi.MEDIA_FW_VOL_FILEPATH_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MEDIA_DEVICE_PATH),
 			SubType: uint8(uefi.MEDIA_PIWG_FW_FILE_DP)},
-		FvFileName: uefi.EFI_GUID(d)}
-	data.Header.Length = uint16(binary.Size(data))
+		FvFileName: uefi.EFI_GUID(n)}
+	node.Header.Length = uint16(binary.Size(node))
 
-	return binary.Write(w, binary.LittleEndian, &data)
+	return binary.Write(w, binary.LittleEndian, &node)
 }
 
 var (
@@ -1336,34 +1345,34 @@ func RegisterMediaFvFileNameLookup(fn func(GUID) (string, bool)) {
 // MediaFvDevicePathNode corresponds to a firmware volume device path node.
 type MediaFvDevicePathNode GUID
 
-func (d MediaFvDevicePathNode) ToString(flags DevicePathToStringFlags) string {
+func (n MediaFvDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	if flags.DisplayOnly() {
 		fvNameLookupMu.Lock()
 		defer fvNameLookupMu.Unlock()
 
 		if fvNameLookup != nil {
-			name, known := fvNameLookup(GUID(d))
+			name, known := fvNameLookup(GUID(n))
 			if known {
 				return fmt.Sprintf("Fv(%s)", name)
 			}
 		}
 	}
-	return fmt.Sprintf("Fv(%s)", GUID(d))
+	return fmt.Sprintf("Fv(%s)", GUID(n))
 }
 
-func (d MediaFvDevicePathNode) String() string {
-	return d.ToString(DevicePathDisplayOnly)
+func (n MediaFvDevicePathNode) String() string {
+	return n.ToString(DevicePathDisplayOnly)
 }
 
-func (d MediaFvDevicePathNode) Write(w io.Writer) error {
-	data := uefi.MEDIA_FW_VOL_DEVICE_PATH{
+func (n MediaFvDevicePathNode) Write(w io.Writer) error {
+	node := uefi.MEDIA_FW_VOL_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MEDIA_DEVICE_PATH),
 			SubType: uint8(uefi.MEDIA_PIWG_FW_VOL_DP)},
-		FvName: uefi.EFI_GUID(d)}
-	data.Header.Length = uint16(binary.Size(data))
+		FvName: uefi.EFI_GUID(n)}
+	node.Header.Length = uint16(binary.Size(node))
 
-	return binary.Write(w, binary.LittleEndian, &data)
+	return binary.Write(w, binary.LittleEndian, &node)
 }
 
 var (
@@ -1394,40 +1403,40 @@ type MediaRelOffsetRangeDevicePathNode struct {
 	EndingOffset   uint64
 }
 
-func (d *MediaRelOffsetRangeDevicePathNode) ToString(_ DevicePathToStringFlags) string {
-	return fmt.Sprintf("Offset(0x%x,0x%x)", d.StartingOffset, d.EndingOffset)
+func (n *MediaRelOffsetRangeDevicePathNode) ToString(_ DevicePathToStringFlags) string {
+	return fmt.Sprintf("Offset(0x%x,0x%x)", n.StartingOffset, n.EndingOffset)
 }
 
-func (d *MediaRelOffsetRangeDevicePathNode) String() string {
-	return d.ToString(DevicePathDisplayOnly)
+func (n *MediaRelOffsetRangeDevicePathNode) String() string {
+	return n.ToString(DevicePathDisplayOnly)
 }
 
-func (d *MediaRelOffsetRangeDevicePathNode) Write(w io.Writer) error {
-	data := uefi.MEDIA_RELATIVE_OFFSET_RANGE_DEVICE_PATH{
+func (n *MediaRelOffsetRangeDevicePathNode) Write(w io.Writer) error {
+	node := uefi.MEDIA_RELATIVE_OFFSET_RANGE_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(uefi.MEDIA_DEVICE_PATH),
 			SubType: uint8(uefi.MEDIA_RELATIVE_OFFSET_RANGE_DP)},
-		StartingOffset: d.StartingOffset,
-		EndingOffset:   d.EndingOffset}
-	data.Header.Length = uint16(binary.Size(data))
+		StartingOffset: n.StartingOffset,
+		EndingOffset:   n.EndingOffset}
+	node.Header.Length = uint16(binary.Size(node))
 
-	return binary.Write(w, binary.LittleEndian, &data)
+	return binary.Write(w, binary.LittleEndian, &node)
 }
 
 func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 	buf := new(bytes.Buffer)
 	r2 := io.TeeReader(r, buf)
 
-	var h uefi.EFI_DEVICE_PATH_PROTOCOL
-	if err := binary.Read(r2, binary.LittleEndian, &h); err != nil {
+	var hdr uefi.EFI_DEVICE_PATH_PROTOCOL
+	if err := binary.Read(r2, binary.LittleEndian, &hdr); err != nil {
 		return nil, err
 	}
 
-	if h.Length < 4 {
-		return nil, fmt.Errorf("invalid length %d bytes (too small)", h.Length)
+	if hdr.Length < 4 {
+		return nil, fmt.Errorf("invalid length %d bytes (too small)", hdr.Length)
 	}
 
-	if _, err := io.CopyN(buf, r, int64(h.Length-4)); err != nil {
+	if _, err := io.CopyN(buf, r, int64(hdr.Length-4)); err != nil {
 		return nil, ioerr.EOFIsUnexpected(err)
 	}
 
@@ -1436,16 +1445,17 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 		case err == io.EOF:
 			fallthrough
 		case errors.Is(err, io.ErrUnexpectedEOF):
-			err = fmt.Errorf("invalid length %d bytes (too small)", h.Length)
+			err = fmt.Errorf("invalid length %d bytes (too small)", hdr.Length)
 		case err != nil:
+			// Unexpected error should be returned untouched.
 		case buf.Len() > 0:
-			err = fmt.Errorf("invalid length %d bytes (too large)", h.Length)
+			err = fmt.Errorf("invalid length %d bytes (too large)", hdr.Length)
 		}
 	}()
 
-	switch h.Type {
+	switch hdr.Type {
 	case uefi.HARDWARE_DEVICE_PATH:
-		switch h.SubType {
+		switch hdr.SubType {
 		case uefi.HW_PCI_DP:
 			var n uefi.PCI_DEVICE_PATH
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
@@ -1456,7 +1466,7 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 			return readVendorDevicePathNode(buf)
 		}
 	case uefi.ACPI_DEVICE_PATH:
-		switch h.SubType {
+		switch hdr.SubType {
 		case uefi.ACPI_DP:
 			var n uefi.ACPI_HID_DEVICE_PATH
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
@@ -1479,7 +1489,7 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 			return node, nil
 		}
 	case uefi.MESSAGING_DEVICE_PATH:
-		switch h.SubType {
+		switch hdr.SubType {
 		case uefi.MSG_ATAPI_DP:
 			var n uefi.ATAPI_DEVICE_PATH
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
@@ -1577,7 +1587,7 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 				NamespaceUUID: uuid}, nil
 		}
 	case uefi.MEDIA_DEVICE_PATH:
-		switch h.SubType {
+		switch hdr.SubType {
 		case uefi.MEDIA_HARDDRIVE_DP:
 			var n uefi.HARDDRIVE_DEVICE_PATH
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
