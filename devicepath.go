@@ -330,7 +330,7 @@ type PCIDevicePathNode struct {
 }
 
 func (n *PCIDevicePathNode) ToString(_ DevicePathToStringFlags) string {
-	return fmt.Sprintf("Pci(0x%x,0x%x)", n.Device, n.Function)
+	return fmt.Sprintf("Pci(%#x,%#x)", n.Device, n.Function)
 }
 
 func (n *PCIDevicePathNode) String() string {
@@ -479,20 +479,20 @@ func (n *ACPIDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	if n.HID.Vendor() == "PNP" {
 		switch n.HID.Product() {
 		case 0x0a03:
-			return fmt.Sprintf("PciRoot(0x%x)", n.UID)
+			return fmt.Sprintf("PciRoot(%#x)", n.UID)
 		case 0x0a08:
-			return fmt.Sprintf("PcieRoot(0x%x)", n.UID)
+			return fmt.Sprintf("PcieRoot(%#x)", n.UID)
 		case 0x0604:
-			return fmt.Sprintf("Floppy(0x%x)", n.UID)
+			return fmt.Sprintf("Floppy(%#x)", n.UID)
 		case 0x0301:
-			return fmt.Sprintf("Keyboard(0x%x)", n.UID)
+			return fmt.Sprintf("Keyboard(%#x)", n.UID)
 		case 0x0501:
-			return fmt.Sprintf("Serial(0x%x)", n.UID)
+			return fmt.Sprintf("Serial(%#x)", n.UID)
 		case 0x0401:
-			return fmt.Sprintf("ParallelPort(0x%x)", n.UID)
+			return fmt.Sprintf("ParallelPort(%#x)", n.UID)
 		}
 	}
-	return fmt.Sprintf("Acpi(%s,0x%x)", n.HID, n.UID)
+	return fmt.Sprintf("Acpi(%s,%#x)", n.HID, n.UID)
 }
 
 func (n *ACPIDevicePathNode) String() string {
@@ -525,18 +525,18 @@ type ACPIExtendedDevicePathNode struct {
 
 func (n *ACPIExtendedDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	switch {
-	case n.HIDStr == "" && n.CIDStr == "" && n.UIDStr != "":
-		return fmt.Sprintf("AcpiExp(%s,%s,%s)", n.HID, n.CID, n.UIDStr)
 	case flags.DisplayOnly() && n.HID.Vendor() == "PNP" && (n.HID.Product() == 0x0a03 || (n.CID.Product() == 0x0a03 && n.HID.Product() != 0x0a08)):
 		if n.UIDStr != "" {
 			return fmt.Sprintf("PciRoot(%s)", n.UIDStr)
 		}
-		return fmt.Sprintf("PciRoot(0x%x)", n.UID)
+		return fmt.Sprintf("PciRoot(%#x)", n.UID)
 	case flags.DisplayOnly() && n.HID.Vendor() == "PNP" && (n.HID.Product() == 0x0a08 || n.CID.Product() == 0x0a08):
 		if n.UIDStr != "" {
 			return fmt.Sprintf("PcieRoot(%s)", n.UIDStr)
 		}
-		return fmt.Sprintf("PcieRoot(0x%x)", n.UID)
+		return fmt.Sprintf("PcieRoot(%#x)", n.UID)
+	case n.HIDStr == "" && n.CIDStr == "" && n.UIDStr != "":
+		return fmt.Sprintf("AcpiExp(%s,%s,%s)", n.HID, n.CID, n.UIDStr)
 	}
 
 	if !flags.DisplayOnly() {
@@ -553,7 +553,7 @@ func (n *ACPIExtendedDevicePathNode) ToString(flags DevicePathToStringFlags) str
 			uidStr = "<nil>"
 		}
 
-		return fmt.Sprintf("AcpiEx(%s,%s,0x%x,%s,%s,%s)", n.HID, n.CID, n.UID, hidStr, cidStr, uidStr)
+		return fmt.Sprintf("AcpiEx(%s,%s,%#x,%s,%s,%s)", n.HID, n.CID, n.UID, hidStr, cidStr, uidStr)
 	}
 
 	hidText := n.HID.String()
@@ -568,7 +568,7 @@ func (n *ACPIExtendedDevicePathNode) ToString(flags DevicePathToStringFlags) str
 	if n.UIDStr != "" {
 		return fmt.Sprintf("AcpiEx(%s,%s,%s)", hidText, cidText, n.UIDStr)
 	}
-	return fmt.Sprintf("AcpiEx(%s,%s,0x%x)", hidText, cidText, n.UID)
+	return fmt.Sprintf("AcpiEx(%s,%s,%#x)", hidText, cidText, n.UID)
 }
 
 func (n *ACPIExtendedDevicePathNode) String() string {
@@ -656,9 +656,9 @@ type ATAPIDevicePathNode struct {
 
 func (n *ATAPIDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	if flags.DisplayOnly() {
-		return fmt.Sprintf("Ata(0x%x)", n.LUN)
+		return fmt.Sprintf("Ata(%#x)", n.LUN)
 	}
-	return fmt.Sprintf("Ata(%s,%s,0x%x)", n.Controller, n.Drive, n.LUN)
+	return fmt.Sprintf("Ata(%s,%s,%#x)", n.Controller, n.Drive, n.LUN)
 }
 
 func (n *ATAPIDevicePathNode) String() string {
@@ -685,7 +685,7 @@ type SCSIDevicePathNode struct {
 }
 
 func (n *SCSIDevicePathNode) ToString(_ DevicePathToStringFlags) string {
-	return fmt.Sprintf("Scsi(0x%x,0x%x)", n.PUN, n.LUN)
+	return fmt.Sprintf("Scsi(%#x,%#x)", n.PUN, n.LUN)
 }
 
 func (n *SCSIDevicePathNode) String() string {
@@ -711,7 +711,7 @@ type USBDevicePathNode struct {
 }
 
 func (n *USBDevicePathNode) ToString(_ DevicePathToStringFlags) string {
-	return fmt.Sprintf("USB(0x%x,0x%x)", n.ParentPortNumber, n.InterfaceNumber)
+	return fmt.Sprintf("USB(%#x,%#x)", n.ParentPortNumber, n.InterfaceNumber)
 }
 
 func (n *USBDevicePathNode) String() string {
@@ -784,10 +784,10 @@ func (n *USBClassDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	case USBClassWireless:
 		fmt.Fprintf(&builder, "UsbWireless")
 	default:
-		return fmt.Sprintf("UsbClass(0x%x,0x%x,0x%x,0x%x,0x%x)", n.VendorId, n.ProductId, n.DeviceClass, n.DeviceSubClass, n.DeviceProtocol)
+		return fmt.Sprintf("UsbClass(%#x,%#x,%#x,%#x,%#x)", n.VendorId, n.ProductId, n.DeviceClass, n.DeviceSubClass, n.DeviceProtocol)
 	}
 
-	fmt.Fprintf(&builder, "(0x%x,0x%x,0x%x,0x%x)", n.VendorId, n.ProductId, n.DeviceSubClass, n.DeviceProtocol)
+	fmt.Fprintf(&builder, "(%#x,%#x,%#x,%#x)", n.VendorId, n.ProductId, n.DeviceSubClass, n.DeviceProtocol)
 	return builder.String()
 }
 
@@ -865,7 +865,7 @@ type USBWWIDDevicePathNode struct {
 }
 
 func (n *USBWWIDDevicePathNode) ToString(_ DevicePathToStringFlags) string {
-	return fmt.Sprintf("UsbWwid(0x%x,0x%x,0x%x,\"%s\"", n.VendorId, n.ProductId, n.InterfaceNumber, n.SerialNumber)
+	return fmt.Sprintf("UsbWwid(%#x,%#x,%#x,\"%s\"", n.VendorId, n.ProductId, n.InterfaceNumber, n.SerialNumber)
 }
 
 func (n *USBWWIDDevicePathNode) String() string {
@@ -897,7 +897,7 @@ type DeviceLogicalUnitDevicePathNode struct {
 }
 
 func (n *DeviceLogicalUnitDevicePathNode) ToString(_ DevicePathToStringFlags) string {
-	return fmt.Sprintf("Unit(0x%x)", n.LUN)
+	return fmt.Sprintf("Unit(%#x)", n.LUN)
 }
 
 func (n *DeviceLogicalUnitDevicePathNode) String() string {
@@ -923,7 +923,7 @@ type SATADevicePathNode struct {
 }
 
 func (n *SATADevicePathNode) ToString(_ DevicePathToStringFlags) string {
-	return fmt.Sprintf("Sata(0x%x,0x%x,0x%x)", n.HBAPortNumber, n.PortMultiplierPortNumber, n.LUN)
+	return fmt.Sprintf("Sata(%#x,%#x,%#x)", n.HBAPortNumber, n.PortMultiplierPortNumber, n.LUN)
 }
 
 func (n *SATADevicePathNode) String() string {
@@ -950,7 +950,7 @@ type NVMENamespaceDevicePathNode struct {
 }
 
 func (n *NVMENamespaceDevicePathNode) ToString(_ DevicePathToStringFlags) string {
-	return fmt.Sprintf("NVMe(0x%x,%s)", n.NamespaceID, n.NamespaceUUID)
+	return fmt.Sprintf("NVMe(%#x,%s)", n.NamespaceID, n.NamespaceUUID)
 }
 
 func (n *NVMENamespaceDevicePathNode) String() string {
@@ -1074,7 +1074,7 @@ type MBRHardDriveSignature uint32
 
 // String implements [fmt.Stringer].
 func (s MBRHardDriveSignature) String() string {
-	return fmt.Sprintf("0x%08x", uint32(s))
+	return fmt.Sprintf("%#08x", uint32(s))
 }
 
 // Data implements [HardDriveSignature.Data].
@@ -1131,7 +1131,7 @@ func (n *HardDriveDevicePathNode) ToString(flags DevicePathToStringFlags) string
 	}
 
 	if !flags.DisplayOnly() {
-		fmt.Fprintf(&builder, ",0x%x,0x%x", n.PartitionStart, n.PartitionSize)
+		fmt.Fprintf(&builder, ",%#x,%#x", n.PartitionStart, n.PartitionSize)
 	}
 	fmt.Fprintf(&builder, ")")
 
@@ -1225,9 +1225,9 @@ type CDROMDevicePathNode struct {
 
 func (n *CDROMDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	if flags.DisplayOnly() {
-		return fmt.Sprintf("CDROM(0x%x)", n.BootEntry)
+		return fmt.Sprintf("CDROM(%#x)", n.BootEntry)
 	}
-	return fmt.Sprintf("CDROM(0x%x,0x%x,0x%x)", n.BootEntry, n.PartitionStart, n.PartitionSize)
+	return fmt.Sprintf("CDROM(%#x,%#x,%#x)", n.BootEntry, n.PartitionStart, n.PartitionSize)
 }
 
 func (n *CDROMDevicePathNode) String() string {
@@ -1404,7 +1404,7 @@ type MediaRelOffsetRangeDevicePathNode struct {
 }
 
 func (n *MediaRelOffsetRangeDevicePathNode) ToString(_ DevicePathToStringFlags) string {
-	return fmt.Sprintf("Offset(0x%x,0x%x)", n.StartingOffset, n.EndingOffset)
+	return fmt.Sprintf("Offset(%#x,%#x)", n.StartingOffset, n.EndingOffset)
 }
 
 func (n *MediaRelOffsetRangeDevicePathNode) String() string {
