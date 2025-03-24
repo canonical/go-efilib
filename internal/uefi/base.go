@@ -32,3 +32,11 @@ type EFI_TABLE_HEADER struct {
 type EFI_MAC_ADDRESS struct {
 	Addr [32]uint8
 }
+
+type EFI_IPv4_ADDRESS struct {
+	Addr [4]uint8
+}
+
+type EFI_IPv6_ADDRESS struct {
+	Addr [16]uint8
+}

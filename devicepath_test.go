@@ -119,7 +119,7 @@ func (s *dpSuite) TestReadDevicePathPXE(c *C) {
 		"00000000000000000000000000000000000000000001030c1b0000000000000000000000000000000000000000000000007fff0400"))
 	path, err := ReadDevicePath(r)
 	c.Assert(err, IsNil)
-	c.Check(path.String(), Equals, "\\PciRoot(0x1)\\Pci(0x0,0x0)\\Pci(0x0,0x0)\\MacAddr(a0369ff5a7a8,0x1)\\Msg(12,0000000000000000000000000000000000000000000000)")
+	c.Check(path.String(), Equals, "\\PciRoot(0x1)\\Pci(0x0,0x0)\\Pci(0x0,0x0)\\MacAddr(a0369ff5a7a8,0x1)\\IPv4(0:0:0:0)")
 
 	expected := DevicePath{
 		&ACPIDevicePathNode{
@@ -138,10 +138,15 @@ func (s *dpSuite) TestReadDevicePathPXE(c *C) {
 			MACAddress: EUI48{0xa0, 0x36, 0x9f, 0xf5, 0xa7, 0xa8},
 			IfType:     NetworkInterfaceTypeEthernet,
 		},
-		&UnsupportedDevicePathNode{
-			Type:    MessagingDevicePath,
-			SubType: 12,
-			Data:    DecodeHexString(c, "0000000000000000000000000000000000000000000000"),
+		&IPv4DevicePathNode{
+			LocalAddress:       IPv4Address{0, 0, 0, 0},
+			RemoteAddress:      IPv4Address{0, 0, 0, 0},
+			LocalPort:          0,
+			RemotePort:         0,
+			Protocol:           0,
+			LocalAddressOrigin: IPv4AddressDHCPAssigned,
+			GatewayAddress:     IPv4Address{0, 0, 0, 0},
+			SubnetMask:         IPv4Address{0, 0, 0, 0},
 		},
 	}
 	c.Check(path, DeepEquals, expected)

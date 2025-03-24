@@ -861,6 +861,111 @@ func (n *MACAddrDevicePathNode) Write(w io.Writer) error {
 	return binary.Write(w, binary.LittleEndian, &node)
 }
 
+// IPv4DevicePathNode corresponds to an IPv4 address device path node.
+type IPv4DevicePathNode struct {
+	LocalAddress       IPv4Address       // Local IP address
+	RemoteAddress      IPv4Address       // Remote IP address
+	LocalPort          uint16            // Local port (if Protocol is IPProtocolTCP or IPProtocolUDP)
+	RemotePort         uint16            // Remote port (if Protocol is IPProtocolTCP or IPProtocolUDP)
+	Protocol           IPProtocol        // IP protocol
+	LocalAddressOrigin IPv4AddressOrigin // The origin of the local address (static or DHCP)
+	GatewayAddress     IPv4Address       // Gateway IP address
+	SubnetMask         IPv4Address       // Used to determine the range of IP addresses on the subnet associated with LocalAddress
+}
+
+// ToString implements [DevicePathNode.ToString].
+func (n *IPv4DevicePathNode) ToString(flags DevicePathToStringFlags) string {
+	var s bytes.Buffer
+	fmt.Fprintf(&s, "IPv4(%s", n.RemoteAddress)
+
+	if flags.DisplayOnly() {
+		fmt.Fprintf(&s, ")")
+		return s.String()
+	}
+
+	fmt.Fprintf(&s, ",%s,%s,%s,%s,%s)", n.Protocol, n.LocalAddressOrigin, n.LocalAddress, n.GatewayAddress, n.SubnetMask)
+
+	return s.String()
+}
+
+// String implements [fmt.Stringer].
+func (n *IPv4DevicePathNode) String() string {
+	return n.ToString(DevicePathDisplayOnly)
+}
+
+// Write implements [DevicePathNode.Write].
+func (n *IPv4DevicePathNode) Write(w io.Writer) error {
+	node := uefi.IPv4_DEVICE_PATH{
+		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
+			Type:    uint8(uefi.MESSAGING_DEVICE_PATH),
+			SubType: uint8(uefi.MSG_IPv4_DP),
+		},
+		LocalIpAddress:   uefi.EFI_IPv4_ADDRESS{Addr: [4]uint8(n.LocalAddress)},
+		RemoteIpAddress:  uefi.EFI_IPv4_ADDRESS{Addr: [4]uint8(n.RemoteAddress)},
+		LocalPort:        n.LocalPort,
+		RemotePort:       n.RemotePort,
+		Protocol:         uint16(n.Protocol),
+		StaticIpAddress:  bool(n.LocalAddressOrigin),
+		GatewayIpAddress: uefi.EFI_IPv4_ADDRESS{Addr: [4]uint8(n.GatewayAddress)},
+		SubnetMask:       uefi.EFI_IPv4_ADDRESS{Addr: [4]uint8(n.SubnetMask)},
+	}
+	node.Header.Length = uint16(binary.Size(node))
+
+	return binary.Write(w, binary.LittleEndian, &node)
+}
+
+// IPv6DevicePathNode corresponds to an IPv6 address device path node.
+type IPv6DevicePathNode struct {
+	LocalAddress       IPv6Address       // Local IP address
+	RemoteAddress      IPv6Address       // Remote IP address
+	LocalPort          uint16            // Local port (if Protocol is IPProtocolTCP or IPProtocolUDP)
+	RemotePort         uint16            // Remote port (if Protocol is IPProtocolTCP or IPProtocolUDP)
+	Protocol           IPProtocol        // IP protocol
+	LocalAddressOrigin IPv6AddressOrigin // The origin of the local address (static, SLAAC, or DHCPv6)
+	PrefixLength       uint8             // Prefix length in bits - used to determine the range of IP addresses on the subnet associated with LocalAddress
+	GatewayAddress     IPv6Address       // Gateway IP address
+}
+
+func (n *IPv6DevicePathNode) ToString(flags DevicePathToStringFlags) string {
+	var s bytes.Buffer
+	fmt.Fprintf(&s, "IPv6(%s", n.RemoteAddress)
+
+	if flags.DisplayOnly() {
+		fmt.Fprintf(&s, ")")
+		return s.String()
+	}
+
+	fmt.Fprintf(&s, ",%s,%s,%s,%#x,%s)", n.Protocol, n.LocalAddressOrigin, n.LocalAddress, n.PrefixLength, n.GatewayAddress)
+
+	return s.String()
+}
+
+// String implements [fmt.Stringer].
+func (n *IPv6DevicePathNode) String() string {
+	return n.ToString(DevicePathDisplayOnly)
+}
+
+// Write implements [DevicePathNode.Write].
+func (n *IPv6DevicePathNode) Write(w io.Writer) error {
+	node := uefi.IPv6_DEVICE_PATH{
+		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
+			Type:    uint8(uefi.MESSAGING_DEVICE_PATH),
+			SubType: uint8(uefi.MSG_IPv6_DP),
+		},
+		LocalIpAddress:   uefi.EFI_IPv6_ADDRESS{Addr: [16]uint8(n.LocalAddress)},
+		RemoteIpAddress:  uefi.EFI_IPv6_ADDRESS{Addr: [16]uint8(n.RemoteAddress)},
+		LocalPort:        n.LocalPort,
+		RemotePort:       n.RemotePort,
+		Protocol:         uint16(n.Protocol),
+		IpAddressOrigin:  uint8(n.LocalAddressOrigin),
+		PrefixLength:     n.PrefixLength,
+		GatewayIpAddress: uefi.EFI_IPv6_ADDRESS{Addr: [16]uint8(n.GatewayAddress)},
+	}
+	node.Header.Length = uint16(binary.Size(node))
+
+	return binary.Write(w, binary.LittleEndian, &node)
+}
+
 // USBWWIDDevicePathNode corresponds to a USB WWID device path node.
 type USBWWIDDevicePathNode struct {
 	InterfaceNumber uint16
@@ -1548,6 +1653,34 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 			}
 
 			return node, nil
+		case uefi.MSG_IPv4_DP:
+			var n uefi.IPv4_DEVICE_PATH
+			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
+				return nil, err
+			}
+			return &IPv4DevicePathNode{
+				LocalAddress:       IPv4Address(n.LocalIpAddress.Addr),
+				RemoteAddress:      IPv4Address(n.RemoteIpAddress.Addr),
+				LocalPort:          n.LocalPort,
+				RemotePort:         n.RemotePort,
+				Protocol:           IPProtocol(n.Protocol),
+				LocalAddressOrigin: IPv4AddressOrigin(n.StaticIpAddress),
+				GatewayAddress:     IPv4Address(n.GatewayIpAddress.Addr),
+				SubnetMask:         IPv4Address(n.SubnetMask.Addr)}, nil
+		case uefi.MSG_IPv6_DP:
+			var n uefi.IPv6_DEVICE_PATH
+			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
+				return nil, err
+			}
+			return &IPv6DevicePathNode{
+				LocalAddress:       IPv6Address(n.LocalIpAddress.Addr),
+				RemoteAddress:      IPv6Address(n.RemoteIpAddress.Addr),
+				LocalPort:          n.LocalPort,
+				RemotePort:         n.RemotePort,
+				Protocol:           IPProtocol(n.Protocol),
+				LocalAddressOrigin: IPv6AddressOrigin(n.IpAddressOrigin),
+				PrefixLength:       n.PrefixLength,
+				GatewayAddress:     IPv6Address(n.GatewayIpAddress.Addr)}, nil
 		case uefi.MSG_VENDOR_DP:
 			return readVendorDevicePathNode(buf)
 		case uefi.MSG_USB_WWID_DP:

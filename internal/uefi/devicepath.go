@@ -17,6 +17,11 @@ const (
 )
 
 const (
+	RFC_1700_TCP_PROTOCOL = 6
+	RFC_1700_UDP_PROTOCOL = 17
+)
+
+const (
 	NO_DISK_SIGNATURE   = 0x00
 	SIGNATURE_TYPE_MBR  = 0x01
 	SIGNATURE_TYPE_GUID = 0x02
@@ -48,6 +53,8 @@ const (
 	MSG_USB_CLASS_DP           = 0x0f
 	MSG_VENDOR_DP              = 0x0a
 	MSG_MAC_ADDR_DP            = 0x0b
+	MSG_IPv4_DP                = 0x0c
+	MSG_IPv6_DP                = 0x0d
 	MSG_USB_WWID_DP            = 0x10
 	MSG_DEVICE_LOGICAL_UNIT_DP = 0x11
 	MSG_SATA_DP                = 0x12
@@ -129,6 +136,30 @@ type MAC_ADDR_DEVICE_PATH struct {
 	Header     EFI_DEVICE_PATH_PROTOCOL
 	MacAddress EFI_MAC_ADDRESS
 	IfType     uint8
+}
+
+type IPv4_DEVICE_PATH struct {
+	Header           EFI_DEVICE_PATH_PROTOCOL
+	LocalIpAddress   EFI_IPv4_ADDRESS
+	RemoteIpAddress  EFI_IPv4_ADDRESS
+	LocalPort        uint16
+	RemotePort       uint16
+	Protocol         uint16
+	StaticIpAddress  bool
+	GatewayIpAddress EFI_IPv4_ADDRESS
+	SubnetMask       EFI_IPv4_ADDRESS
+}
+
+type IPv6_DEVICE_PATH struct {
+	Header           EFI_DEVICE_PATH_PROTOCOL
+	LocalIpAddress   EFI_IPv6_ADDRESS
+	RemoteIpAddress  EFI_IPv6_ADDRESS
+	LocalPort        uint16
+	RemotePort       uint16
+	Protocol         uint16
+	IpAddressOrigin  uint8
+	PrefixLength     uint8
+	GatewayIpAddress EFI_IPv6_ADDRESS
 }
 
 type USB_WWID_DEVICE_PATH struct {

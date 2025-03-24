@@ -7,6 +7,9 @@ package efi
 import (
 	"errors"
 	"fmt"
+	"net/netip"
+
+	"github.com/canonical/go-efilib/internal/uefi"
 )
 
 // NetworkInterfaceType describes the type of network hardware.
@@ -16,6 +19,95 @@ const (
 	NetworkInterfaceTypeReserved NetworkInterfaceType = 0
 	NetworkInterfaceTypeEthernet NetworkInterfaceType = 1
 )
+
+// IPProtocol describes an IP protocol
+type IPProtocol uint16
+
+const (
+	IPProtocolTCP IPProtocol = uefi.RFC_1700_TCP_PROTOCOL
+	IPProtocolUDP IPProtocol = uefi.RFC_1700_UDP_PROTOCOL
+)
+
+func (p IPProtocol) String() string {
+	switch p {
+	case IPProtocolTCP:
+		return "TCP"
+	case IPProtocolUDP:
+		return "UDP"
+	default:
+		return fmt.Sprintf("%#x", uint16(p))
+	}
+}
+
+// IPv4Address corresponds to an IP v4 address.
+type IPv4Address [4]uint8
+
+// String implements [fmt.Stringer].
+func (a IPv4Address) String() string {
+	return fmt.Sprintf("%d:%d:%d:%d", a[0], a[1], a[2], a[3])
+}
+
+// AsNetIPAddr returns the address as a [netip.Addr].
+func (a IPv4Address) AsNetIPAddr() netip.Addr {
+	return netip.AddrFrom4([4]uint8(a))
+}
+
+// IPv4AddressOrigin descibes how an IP v4 address was assigned.
+type IPv4AddressOrigin bool
+
+const (
+	IPv4AddressDHCPAssigned IPv4AddressOrigin = false // Assigned by a DHCP server.
+	StaticIPv4Address       IPv4AddressOrigin = true  // Statically assigned.
+)
+
+// String implements [fmt.Stringer].
+func (o IPv4AddressOrigin) String() string {
+	switch o {
+	case IPv4AddressDHCPAssigned:
+		return "DHCP"
+	case StaticIPv4Address:
+		return "Static"
+	}
+	panic("not reached")
+}
+
+// IPv6Address corresponds to an IP v6 address.
+type IPv6Address [16]uint8
+
+// String implements [fmt.Stringer].
+func (a IPv6Address) String() string {
+	return fmt.Sprintf("%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x",
+		a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8],
+		a[9], a[10], a[11], a[12], a[13], a[14], a[15])
+}
+
+// AsNetIPAddr returns the address as a [netip.Addr].
+func (a IPv6Address) AsNetIPAddr() netip.Addr {
+	return netip.AddrFrom16([16]uint8(a))
+}
+
+// IPv6AddressOrigin descibes how an IP v6 address was assigned.
+type IPv6AddressOrigin uint8
+
+const (
+	StaticIPv6Address        IPv6AddressOrigin = 0 // Statically assigned.
+	IPv6AddressSLAACAssigned IPv6AddressOrigin = 1 // Assigned using SLAAC.
+	IPv6AddressDHCPAssigned  IPv6AddressOrigin = 2 // Assigned by a DHCPv6 server.
+)
+
+// String implements [fmt.Stringer].
+func (o IPv6AddressOrigin) String() string {
+	switch o {
+	case StaticIPv6Address:
+		return "Static"
+	case IPv6AddressSLAACAssigned:
+		return "StatelessAutoConfigure"
+	case IPv6AddressDHCPAssigned:
+		return "StatefulAutoConfigure"
+	default:
+		return fmt.Sprintf("%#x", uint8(o))
+	}
+}
 
 // MACAddressType describes the type of a MAC address.
 type MACAddressType int
@@ -34,7 +126,7 @@ type MACAddress interface {
 	// which is how MAC addresses are represented in UEFI.
 	Bytes32() [32]uint8
 
-	Type() MACAddressType // Type address type
+	Type() MACAddressType // Address type
 }
 
 // EUI64 represents a EUI-64 (64-bit Extended Unique Identifier).
