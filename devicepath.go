@@ -80,9 +80,14 @@ const (
 )
 
 // DevicePathType is the type of a device path node.
-type DevicePathType uint8
+// Deprecated: use [DevicePathNodeType].
+type DevicePathType = DevicePathNodeType
 
-func (t DevicePathType) String() string {
+// DevicePathNodeType is the type of a device path node.
+type DevicePathNodeType uint8
+
+// String implements [fmt.Stringer].
+func (t DevicePathNodeType) String() string {
 	switch t {
 	case HardwareDevicePath:
 		return "HardwarePath"
@@ -100,16 +105,71 @@ func (t DevicePathType) String() string {
 }
 
 const (
-	HardwareDevicePath  DevicePathType = uefi.HARDWARE_DEVICE_PATH
-	ACPIDevicePath      DevicePathType = uefi.ACPI_DEVICE_PATH
-	MessagingDevicePath DevicePathType = uefi.MESSAGING_DEVICE_PATH
-	MediaDevicePath     DevicePathType = uefi.MEDIA_DEVICE_PATH
-	BBSDevicePath       DevicePathType = uefi.BBS_DEVICE_PATH
+	HardwareDevicePath  DevicePathNodeType = uefi.HARDWARE_DEVICE_PATH
+	ACPIDevicePath      DevicePathNodeType = uefi.ACPI_DEVICE_PATH
+	MessagingDevicePath DevicePathNodeType = uefi.MESSAGING_DEVICE_PATH
+	MediaDevicePath     DevicePathNodeType = uefi.MEDIA_DEVICE_PATH
+	BBSDevicePath       DevicePathNodeType = uefi.BBS_DEVICE_PATH
 )
 
 // DevicePathSubType is the sub-type of a device path node. The meaning of
-// this depends on the [DevicePathType].
-type DevicePathSubType uint8
+// this depends on the [DevicePathNodeType].
+// Deprecated: use [DevicePathNodeSubType].
+type DevicePathSubType = DevicePathNodeSubType
+
+// DevicePathNodeSubType is the sub-type of a device path node. The meaning of
+// this depends on the [DevicePathNodeType].
+type DevicePathNodeSubType uint8
+
+// DevicePathNodeCompoundType describes the compound type of a device path node,
+// comprised of the type and sub-type.
+type DevicePathNodeCompoundType uint16
+
+// Type returns the devicepath node type.
+func (t DevicePathNodeCompoundType) Type() DevicePathNodeType {
+	return DevicePathNodeType(t >> 8)
+}
+
+// Subtype returns the devicepath node sub-type.
+func (t DevicePathNodeCompoundType) SubType() DevicePathNodeSubType {
+	return DevicePathNodeSubType(t)
+}
+
+// IsValid indicates whether this compound type is valid. If either the
+// type or sub-type are 0, then it is invalid.
+func (t DevicePathNodeCompoundType) IsValid() bool {
+	return t.Type() != 0 && t.SubType() != 0
+}
+
+const (
+	DevicePathNodePCIType      DevicePathNodeCompoundType = DevicePathNodeCompoundType(HardwareDevicePath)<<8 | DevicePathNodeCompoundType(uefi.HW_PCI_DP)
+	DevicePathNodeVendorHWType DevicePathNodeCompoundType = DevicePathNodeCompoundType(HardwareDevicePath)<<8 | DevicePathNodeCompoundType(uefi.HW_VENDOR_DP)
+
+	DevicePathNodeACPIType         DevicePathNodeCompoundType = DevicePathNodeCompoundType(ACPIDevicePath)<<8 | DevicePathNodeCompoundType(uefi.ACPI_DP)
+	DevicePathNodeACPIExtendedType DevicePathNodeCompoundType = DevicePathNodeCompoundType(ACPIDevicePath)<<8 | DevicePathNodeCompoundType(uefi.ACPI_EXTENDED_DP)
+
+	DevicePathNodeATAPIType             DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MSG_ATAPI_DP)
+	DevicePathNodeSCSIType              DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MSG_SCSI_DP)
+	DevicePathNodeUSBType               DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MSG_USB_DP)
+	DevicePathNodeUSBClassType          DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MSG_USB_CLASS_DP)
+	DevicePathNodeVendorMsgType         DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MSG_VENDOR_DP)
+	DevicePathNodeMACAddrType           DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MSG_MAC_ADDR_DP)
+	DevicePathNodeIPv4Type              DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MSG_IPv4_DP)
+	DevicePathNodeIPv6Type              DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MSG_IPv6_DP)
+	DevicePathNodeUSBWWIDType           DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MSG_USB_WWID_DP)
+	DevicePathNodeDeviceLogicalUnitType DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MSG_DEVICE_LOGICAL_UNIT_DP)
+	DevicePathNodeSATAType              DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MSG_SATA_DP)
+	DevicePathNodeNVMENamespaceType     DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MSG_NVME_NAMESPACE_DP)
+	DevicePathNodeURIType               DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MSG_URI_DP)
+
+	DevicePathNodeHardDriveType           DevicePathNodeCompoundType = DevicePathNodeCompoundType(MediaDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MEDIA_HARDDRIVE_DP)
+	DevicePathNodeCDROMType               DevicePathNodeCompoundType = DevicePathNodeCompoundType(MediaDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MEDIA_CDROM_DP)
+	DevicePathNodeVendorMediaType         DevicePathNodeCompoundType = DevicePathNodeCompoundType(MediaDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MEDIA_VENDOR_DP)
+	DevicePathNodeFilePathType            DevicePathNodeCompoundType = DevicePathNodeCompoundType(MediaDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MEDIA_FILEPATH_DP)
+	DevicePathNodeFwFileType              DevicePathNodeCompoundType = DevicePathNodeCompoundType(MediaDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MEDIA_PIWG_FW_FILE_DP)
+	DevicePathNodeFwVolType               DevicePathNodeCompoundType = DevicePathNodeCompoundType(MediaDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MEDIA_PIWG_FW_VOL_DP)
+	DevicePathNodeRelativeOffsetRangeType DevicePathNodeCompoundType = DevicePathNodeCompoundType(MediaDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MEDIA_RELATIVE_OFFSET_RANGE_DP)
+)
 
 // DevicePathToStringFlags defines flags for [DevicePath.ToString] and
 // DevicePathNode.ToString.
@@ -127,6 +187,7 @@ const (
 
 // DevicePathNode represents a single node in a device path.
 type DevicePathNode interface {
+	CompoundType() DevicePathNodeCompoundType
 	fmt.Stringer
 	ToString(flags DevicePathToStringFlags) string
 	Write(w io.Writer) error
@@ -146,6 +207,7 @@ func (p DevicePath) ToString(flags DevicePathToStringFlags) string {
 	return s.String()
 }
 
+// String implements [fmt.Stringer].
 func (p DevicePath) String() string {
 	return p.ToString(DevicePathDisplayOnly)
 }
@@ -282,11 +344,17 @@ type GenericDevicePathNode = UnsupportedDevicePathNode
 // UnsupportedDevicePathNode corresponds to a device path nodes with a type that is
 // not handled by this package
 type UnsupportedDevicePathNode struct {
-	Type    DevicePathType
+	Type    DevicePathNodeType
 	SubType DevicePathSubType // the meaning of the sub-type depends on the Type field.
 	Data    []byte            // An opaque blob of data associated with this node
 }
 
+// CompoundType implements [DevicePathNode.CompoundType].
+func (n *UnsupportedDevicePathNode) CompoundType() DevicePathNodeCompoundType {
+	return DevicePathNodeCompoundType(n.Type)<<8 | DevicePathNodeCompoundType(n.SubType)
+}
+
+// ToString implements [DevicePathNode.ToString].
 func (n *UnsupportedDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	var builder bytes.Buffer
 
@@ -305,10 +373,12 @@ func (n *UnsupportedDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	return builder.String()
 }
 
+// String implements [fmt.Stringer].
 func (n *UnsupportedDevicePathNode) String() string {
 	return n.ToString(DevicePathDisplayOnly)
 }
 
+// Write implements [DevicePathNode.Write].
 func (n *UnsupportedDevicePathNode) Write(w io.Writer) error {
 	hdr := uefi.EFI_DEVICE_PATH_PROTOCOL{
 		Type:    uint8(n.Type),
@@ -334,19 +404,26 @@ type PCIDevicePathNode struct {
 	Device   uint8 // Device number of PCI bus
 }
 
+// CompoundType implements [DevicePathNode.CompoundType].
+func (n *PCIDevicePathNode) CompoundType() DevicePathNodeCompoundType {
+	return DevicePathNodePCIType
+}
+
 func (n *PCIDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	return fmt.Sprintf("Pci(%#x,%#x)", n.Device, n.Function)
 }
 
+// String implements [fmt.Stringer].
 func (n *PCIDevicePathNode) String() string {
 	return n.ToString(DevicePathDisplayOnly)
 }
 
+// Write implements [DevicePathNode.Write].
 func (n *PCIDevicePathNode) Write(w io.Writer) error {
 	node := uefi.PCI_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
-			Type:    uint8(uefi.HARDWARE_DEVICE_PATH),
-			SubType: uint8(uefi.HW_PCI_DP)},
+			Type:    uint8(n.CompoundType().Type()),
+			SubType: uint8(n.CompoundType().SubType())},
 		Function: n.Function,
 		Device:   n.Device}
 	node.Header.Length = uint16(binary.Size(node))
@@ -356,11 +433,27 @@ func (n *PCIDevicePathNode) Write(w io.Writer) error {
 
 // VendorDevicePathNode corresponds to a vendor specific node.
 type VendorDevicePathNode struct {
-	Type DevicePathType // The type of this node
-	GUID GUID           // The vendor specific GUID
-	Data []byte         // Vendor specific data
+	Type DevicePathNodeType // The type of this node
+	GUID GUID               // The vendor specific GUID
+	Data []byte             // Vendor specific data
 }
 
+// CompoundType implements [DevicePathNode.CompoundType].
+func (n *VendorDevicePathNode) CompoundType() DevicePathNodeCompoundType {
+	switch n.Type {
+	case HardwareDevicePath:
+		return DevicePathNodeVendorHWType
+	case MediaDevicePath:
+		return DevicePathNodeVendorMediaType
+	case MessagingDevicePath:
+		return DevicePathNodeVendorMsgType
+	default:
+		// Return an invalid compound type.
+		return DevicePathNodeCompoundType(n.Type) << 8
+	}
+}
+
+// ToString implements [DevicePathNode.ToString].
 func (n *VendorDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	var t string
 	switch n.Type {
@@ -383,27 +476,21 @@ func (n *VendorDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	return s.String()
 }
 
+// String implement [fmt.Stringer].
 func (n *VendorDevicePathNode) String() string {
 	return n.ToString(DevicePathDisplayOnly)
 }
 
+// Write implements [DevicePathNode.Write].
 func (n *VendorDevicePathNode) Write(w io.Writer) error {
-	var subType uint8
-	switch n.Type {
-	case HardwareDevicePath:
-		subType = uefi.HW_VENDOR_DP
-	case MessagingDevicePath:
-		subType = uefi.MSG_VENDOR_DP
-	case MediaDevicePath:
-		subType = uefi.MEDIA_VENDOR_DP
-	default:
+	if !n.CompoundType().IsValid() {
 		return errors.New("invalid device path type")
 	}
 
 	node := uefi.VENDOR_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
-			Type:    uint8(n.Type),
-			SubType: subType},
+			Type:    uint8(n.CompoundType().Type()),
+			SubType: uint8(n.CompoundType().SubType())},
 		Guid: uefi.EFI_GUID(n.GUID)}
 	nodeSz := binary.Size(node)
 
@@ -427,8 +514,11 @@ func readVendorDevicePathNode(r io.Reader) (out *VendorDevicePathNode, err error
 	}
 
 	out = &VendorDevicePathNode{
-		Type: DevicePathType(n.Header.Type),
+		Type: DevicePathNodeType(n.Header.Type),
 		GUID: GUID(n.Guid),
+	}
+	if !out.CompoundType().IsValid() {
+		panic("invalid device path type")
 	}
 
 	// The rest of the data from this io.Reader is for us.
@@ -453,6 +543,7 @@ func (id EISAID) Product() uint16 {
 	return uint16(id >> 16)
 }
 
+// String implements [fmt.Stringer].
 func (id EISAID) String() string {
 	if id == 0 {
 		return "0"
@@ -480,6 +571,12 @@ type ACPIDevicePathNode struct {
 	UID uint32 // Unique ID
 }
 
+// CompoundType implements [DevicePathNode.CompoundType].
+func (n *ACPIDevicePathNode) CompoundType() DevicePathNodeCompoundType {
+	return DevicePathNodeACPIType
+}
+
+// ToString implements [DevicePathNode.ToString].
 func (n *ACPIDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	if n.HID.Vendor() == "PNP" {
 		switch n.HID.Product() {
@@ -500,15 +597,17 @@ func (n *ACPIDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	return fmt.Sprintf("Acpi(%s,%#x)", n.HID, n.UID)
 }
 
+// String implements [fmt.Stringer].
 func (n *ACPIDevicePathNode) String() string {
 	return n.ToString(DevicePathDisplayOnly)
 }
 
+// Write implements [DevicePathNode.Write].
 func (n *ACPIDevicePathNode) Write(w io.Writer) error {
 	node := uefi.ACPI_HID_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
-			Type:    uint8(uefi.ACPI_DEVICE_PATH),
-			SubType: uint8(uefi.ACPI_DP)},
+			Type:    uint8(n.CompoundType().Type()),
+			SubType: uint8(n.CompoundType().SubType())},
 		HID: uint32(n.HID),
 		UID: uint32(n.UID)}
 	node.Header.Length = uint16(binary.Size(node))
@@ -528,6 +627,12 @@ type ACPIExtendedDevicePathNode struct {
 	CIDStr string
 }
 
+// CompoundType implements [DevicePathNode.CompoundType].
+func (n *ACPIExtendedDevicePathNode) CompoundType() DevicePathNodeCompoundType {
+	return DevicePathNodeACPIExtendedType
+}
+
+// ToString implements [DevicePathNode.ToString].
 func (n *ACPIExtendedDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	switch {
 	case flags.DisplayOnly() && n.HID.Vendor() == "PNP" && (n.HID.Product() == 0x0a03 || (n.CID.Product() == 0x0a03 && n.HID.Product() != 0x0a08)):
@@ -576,15 +681,17 @@ func (n *ACPIExtendedDevicePathNode) ToString(flags DevicePathToStringFlags) str
 	return fmt.Sprintf("AcpiEx(%s,%s,%#x)", hidText, cidText, n.UID)
 }
 
+// String implements [fmt.Stringer].
 func (n *ACPIExtendedDevicePathNode) String() string {
 	return n.ToString(DevicePathDisplayOnly)
 }
 
+// Write implements [DevicePathNode.Write].
 func (n *ACPIExtendedDevicePathNode) Write(w io.Writer) error {
 	node := uefi.ACPI_EXTENDED_HID_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
-			Type:    uint8(uefi.ACPI_DEVICE_PATH),
-			SubType: uint8(uefi.ACPI_EXTENDED_DP)},
+			Type:    uint8(n.CompoundType().Type()),
+			SubType: uint8(n.CompoundType().SubType())},
 		HID: uint32(n.HID),
 		UID: n.UID,
 		CID: uint32(n.CID)}
@@ -617,6 +724,7 @@ func (n *ACPIExtendedDevicePathNode) Write(w io.Writer) error {
 // ATAPIControllerRole describes the port that an IDE device is connected to.
 type ATAPIControllerRole uint8
 
+// String implements [fmt.Stringer].
 func (r ATAPIControllerRole) String() string {
 	switch r {
 	case ATAPIControllerPrimary:
@@ -636,6 +744,7 @@ const (
 // ATAPIDriveRole describes the role of a device on a specific IDE port.
 type ATAPIDriveRole uint8
 
+// String implements [fmt.Stringer].
 func (r ATAPIDriveRole) String() string {
 	switch r {
 	case ATAPIDriveMaster:
@@ -659,6 +768,12 @@ type ATAPIDevicePathNode struct {
 	LUN        uint16 // Logical unit number
 }
 
+// CompoundType implements [DevicePathNode.CompoundType].
+func (n *ATAPIDevicePathNode) CompoundType() DevicePathNodeCompoundType {
+	return DevicePathNodeATAPIType
+}
+
+// ToString implements [DevicePathNode.ToString].
 func (n *ATAPIDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	if flags.DisplayOnly() {
 		return fmt.Sprintf("Ata(%#x)", n.LUN)
@@ -666,15 +781,17 @@ func (n *ATAPIDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	return fmt.Sprintf("Ata(%s,%s,%#x)", n.Controller, n.Drive, n.LUN)
 }
 
+// String implements [fmt.Stringer].
 func (n *ATAPIDevicePathNode) String() string {
 	return n.ToString(DevicePathDisplayOnly)
 }
 
+// Write implements [DevicePathNode.Write].
 func (n *ATAPIDevicePathNode) Write(w io.Writer) error {
 	node := uefi.ATAPI_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
-			Type:    uint8(uefi.MESSAGING_DEVICE_PATH),
-			SubType: uint8(uefi.MSG_ATAPI_DP)},
+			Type:    uint8(n.CompoundType().Type()),
+			SubType: uint8(n.CompoundType().SubType())},
 		PrimarySecondary: uint8(n.Controller),
 		SlaveMaster:      uint8(n.Drive),
 		Lun:              n.LUN}
@@ -689,19 +806,27 @@ type SCSIDevicePathNode struct {
 	LUN uint16 // Logical unit number
 }
 
+// CompoundType implements [DevicePathNode.CompoundType].
+func (n *SCSIDevicePathNode) CompoundType() DevicePathNodeCompoundType {
+	return DevicePathNodeSCSIType
+}
+
+// ToString implements [DevicePathNode.ToString].
 func (n *SCSIDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	return fmt.Sprintf("Scsi(%#x,%#x)", n.PUN, n.LUN)
 }
 
+// String implements [fmt.Stringer].
 func (n *SCSIDevicePathNode) String() string {
 	return n.ToString(DevicePathDisplayOnly)
 }
 
+// Write implements [DevicePathNode.Write].
 func (n *SCSIDevicePathNode) Write(w io.Writer) error {
 	node := uefi.SCSI_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
-			Type:    uint8(uefi.MESSAGING_DEVICE_PATH),
-			SubType: uint8(uefi.MSG_SCSI_DP)},
+			Type:    uint8(n.CompoundType().Type()),
+			SubType: uint8(n.CompoundType().SubType())},
 		Pun: n.PUN,
 		Lun: n.LUN}
 	node.Header.Length = uint16(binary.Size(node))
@@ -715,19 +840,27 @@ type USBDevicePathNode struct {
 	InterfaceNumber  uint8
 }
 
+// CompoundType implements [DevicePathNode.CompoundType].
+func (n *USBDevicePathNode) CompoundType() DevicePathNodeCompoundType {
+	return DevicePathNodeUSBType
+}
+
+// ToString implements [DevicePathNode.ToString].
 func (n *USBDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	return fmt.Sprintf("USB(%#x,%#x)", n.ParentPortNumber, n.InterfaceNumber)
 }
 
+// String implements [fmt.Stringer].
 func (n *USBDevicePathNode) String() string {
 	return n.ToString(DevicePathDisplayOnly)
 }
 
+// Write implements [DevicePathNode.Write].
 func (n *USBDevicePathNode) Write(w io.Writer) error {
 	node := uefi.USB_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
-			Type:    uint8(uefi.MESSAGING_DEVICE_PATH),
-			SubType: uint8(uefi.MSG_USB_DP)},
+			Type:    uint8(n.CompoundType().Type()),
+			SubType: uint8(n.CompoundType().SubType())},
 		ParentPortNumber: n.ParentPortNumber,
 		InterfaceNumber:  n.InterfaceNumber}
 	node.Header.Length = uint16(binary.Size(node))
@@ -761,6 +894,12 @@ type USBClassDevicePathNode struct {
 	DeviceProtocol uint8
 }
 
+// CompoundType implements [DevicePathNode.CompoundType].
+func (n *USBClassDevicePathNode) CompoundType() DevicePathNodeCompoundType {
+	return DevicePathNodeUSBClassType
+}
+
+// ToString implements [DevicePathNode.ToString].
 func (n *USBClassDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	var builder bytes.Buffer
 	switch n.DeviceClass {
@@ -796,15 +935,17 @@ func (n *USBClassDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	return builder.String()
 }
 
+// String implements [fmt.Stringer].
 func (n *USBClassDevicePathNode) String() string {
 	return n.ToString(DevicePathDisplayOnly)
 }
 
+// Write implements [DevicePathNode.Write].
 func (n *USBClassDevicePathNode) Write(w io.Writer) error {
 	node := uefi.USB_CLASS_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
-			Type:    uint8(uefi.MESSAGING_DEVICE_PATH),
-			SubType: uint8(uefi.MSG_USB_CLASS_DP)},
+			Type:    uint8(n.CompoundType().Type()),
+			SubType: uint8(n.CompoundType().SubType())},
 		VendorId:       n.VendorId,
 		ProductId:      n.ProductId,
 		DeviceClass:    uint8(n.DeviceClass),
@@ -819,6 +960,11 @@ func (n *USBClassDevicePathNode) Write(w io.Writer) error {
 type MACAddrDevicePathNode struct {
 	MACAddress MACAddress
 	IfType     NetworkInterfaceType
+}
+
+// CompoundType implements [DevicePathNode.CompoundType].
+func (n *MACAddrDevicePathNode) CompoundType() DevicePathNodeCompoundType {
+	return DevicePathNodeMACAddrType
 }
 
 // ToString implements [DevicePathNode.ToString].
@@ -845,8 +991,8 @@ func (n *MACAddrDevicePathNode) String() string {
 func (n *MACAddrDevicePathNode) Write(w io.Writer) error {
 	node := uefi.MAC_ADDR_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
-			Type:    uint8(uefi.MESSAGING_DEVICE_PATH),
-			SubType: uint8(uefi.MSG_MAC_ADDR_DP),
+			Type:    uint8(n.CompoundType().Type()),
+			SubType: uint8(n.CompoundType().SubType()),
 		},
 		IfType: uint8(n.IfType),
 	}
@@ -873,6 +1019,11 @@ type IPv4DevicePathNode struct {
 	SubnetMask         IPv4Address       // Used to determine the range of IP addresses on the subnet associated with LocalAddress
 }
 
+// CompoundType implements [DevicePathNode.CompoundType].
+func (n *IPv4DevicePathNode) CompoundType() DevicePathNodeCompoundType {
+	return DevicePathNodeIPv4Type
+}
+
 // ToString implements [DevicePathNode.ToString].
 func (n *IPv4DevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	var s bytes.Buffer
@@ -897,8 +1048,8 @@ func (n *IPv4DevicePathNode) String() string {
 func (n *IPv4DevicePathNode) Write(w io.Writer) error {
 	node := uefi.IPv4_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
-			Type:    uint8(uefi.MESSAGING_DEVICE_PATH),
-			SubType: uint8(uefi.MSG_IPv4_DP),
+			Type:    uint8(n.CompoundType().Type()),
+			SubType: uint8(n.CompoundType().SubType()),
 		},
 		LocalIpAddress:   uefi.EFI_IPv4_ADDRESS{Addr: [4]uint8(n.LocalAddress)},
 		RemoteIpAddress:  uefi.EFI_IPv4_ADDRESS{Addr: [4]uint8(n.RemoteAddress)},
@@ -926,6 +1077,12 @@ type IPv6DevicePathNode struct {
 	GatewayAddress     IPv6Address       // Gateway IP address
 }
 
+// CompoundType implements [DevicePathNode.CompoundType].
+func (n *IPv6DevicePathNode) CompoundType() DevicePathNodeCompoundType {
+	return DevicePathNodeIPv6Type
+}
+
+// ToString implements [DevicePathNode.ToString].
 func (n *IPv6DevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	var s bytes.Buffer
 	fmt.Fprintf(&s, "IPv6(%s", n.RemoteAddress)
@@ -949,8 +1106,8 @@ func (n *IPv6DevicePathNode) String() string {
 func (n *IPv6DevicePathNode) Write(w io.Writer) error {
 	node := uefi.IPv6_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
-			Type:    uint8(uefi.MESSAGING_DEVICE_PATH),
-			SubType: uint8(uefi.MSG_IPv6_DP),
+			Type:    uint8(n.CompoundType().Type()),
+			SubType: uint8(n.CompoundType().SubType()),
 		},
 		LocalIpAddress:   uefi.EFI_IPv6_ADDRESS{Addr: [16]uint8(n.LocalAddress)},
 		RemoteIpAddress:  uefi.EFI_IPv6_ADDRESS{Addr: [16]uint8(n.RemoteAddress)},
@@ -974,19 +1131,27 @@ type USBWWIDDevicePathNode struct {
 	SerialNumber    string
 }
 
+// CompoundType implements [DevicePathNode.CompoundType].
+func (n *USBWWIDDevicePathNode) CompoundType() DevicePathNodeCompoundType {
+	return DevicePathNodeUSBWWIDType
+}
+
+// ToString implements [DevicePathNode.ToString].
 func (n *USBWWIDDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	return fmt.Sprintf("UsbWwid(%#x,%#x,%#x,\"%s\"", n.VendorId, n.ProductId, n.InterfaceNumber, n.SerialNumber)
 }
 
+// String implements [fmt.Stringer].
 func (n *USBWWIDDevicePathNode) String() string {
 	return n.ToString(DevicePathDisplayOnly)
 }
 
+// Write implements [DevicePathNode.Write].
 func (n *USBWWIDDevicePathNode) Write(w io.Writer) error {
 	node := uefi.USB_WWID_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
-			Type:    uint8(uefi.MESSAGING_DEVICE_PATH),
-			SubType: uint8(uefi.MSG_USB_WWID_DP)},
+			Type:    uint8(n.CompoundType().Type()),
+			SubType: uint8(n.CompoundType().SubType())},
 		InterfaceNumber: n.InterfaceNumber,
 		VendorId:        n.VendorId,
 		ProductId:       n.ProductId,
@@ -1006,19 +1171,27 @@ type DeviceLogicalUnitDevicePathNode struct {
 	LUN uint8
 }
 
+// CompoundType implements [DevicePathNode.CompoundType].
+func (n *DeviceLogicalUnitDevicePathNode) CompoundType() DevicePathNodeCompoundType {
+	return DevicePathNodeDeviceLogicalUnitType
+}
+
+// ToString implements [DevicePathNode.ToString].
 func (n *DeviceLogicalUnitDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	return fmt.Sprintf("Unit(%#x)", n.LUN)
 }
 
+// String implements [fmt.Stringer].
 func (n *DeviceLogicalUnitDevicePathNode) String() string {
 	return n.ToString(DevicePathDisplayOnly)
 }
 
+// Write implements [DevicePathNode.Write].
 func (n *DeviceLogicalUnitDevicePathNode) Write(w io.Writer) error {
 	node := uefi.DEVICE_LOGICAL_UNIT_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
-			Type:    uint8(uefi.MESSAGING_DEVICE_PATH),
-			SubType: uint8(uefi.MSG_DEVICE_LOGICAL_UNIT_DP)},
+			Type:    uint8(n.CompoundType().Type()),
+			SubType: uint8(n.CompoundType().SubType())},
 		Lun: n.LUN}
 	node.Header.Length = uint16(binary.Size(node))
 
@@ -1032,19 +1205,27 @@ type SATADevicePathNode struct {
 	LUN                      uint16 // Logical unit number
 }
 
+// CompoundType implements [DevicePathNode.CompoundType].
+func (n *SATADevicePathNode) CompoundType() DevicePathNodeCompoundType {
+	return DevicePathNodeSATAType
+}
+
+// ToString implements [DevicePathNode.ToString].
 func (n *SATADevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	return fmt.Sprintf("Sata(%#x,%#x,%#x)", n.HBAPortNumber, n.PortMultiplierPortNumber, n.LUN)
 }
 
+// String implements [fmt.Stringer].
 func (n *SATADevicePathNode) String() string {
 	return n.ToString(DevicePathDisplayOnly)
 }
 
+// Write implements [DevicePathNode.Write].
 func (n *SATADevicePathNode) Write(w io.Writer) error {
 	node := uefi.SATA_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
-			Type:    uint8(uefi.MESSAGING_DEVICE_PATH),
-			SubType: uint8(uefi.MSG_SATA_DP)},
+			Type:    uint8(n.CompoundType().Type()),
+			SubType: uint8(n.CompoundType().SubType())},
 		HBAPortNumber:            n.HBAPortNumber,
 		PortMultiplierPortNumber: n.PortMultiplierPortNumber,
 		Lun:                      n.LUN}
@@ -1059,21 +1240,29 @@ type NVMENamespaceDevicePathNode struct {
 	NamespaceUUID EUI64  // EUI-64 unique identifier. This is set to 0 where not supported
 }
 
+// CompoundType implements [DevicePathNode.CompoundType].
+func (n *NVMENamespaceDevicePathNode) CompoundType() DevicePathNodeCompoundType {
+	return DevicePathNodeNVMENamespaceType
+}
+
+// ToString implements [DevicePathNode.ToString].
 func (n *NVMENamespaceDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	return fmt.Sprintf("NVMe(%#x,%s)", n.NamespaceID, n.NamespaceUUID)
 }
 
+// String implements [fmt.Stringer].
 func (n *NVMENamespaceDevicePathNode) String() string {
 	return n.ToString(DevicePathDisplayOnly)
 }
 
+// Write implements [DevicePathNode.Write].
 func (n *NVMENamespaceDevicePathNode) Write(w io.Writer) error {
 	// Convert the UUID back from EUI64 to uint64, big-endian.
 	uuid := binary.BigEndian.Uint64(n.NamespaceUUID[:])
 	node := uefi.NVME_NAMESPACE_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
-			Type:    uint8(uefi.MESSAGING_DEVICE_PATH),
-			SubType: uint8(uefi.MSG_NVME_NAMESPACE_DP)},
+			Type:    uint8(n.CompoundType().Type()),
+			SubType: uint8(n.CompoundType().SubType())},
 		NamespaceId:   n.NamespaceID,
 		NamespaceUuid: uuid}
 	node.Header.Length = uint16(binary.Size(node))
@@ -1224,6 +1413,12 @@ type HardDriveDevicePathNode struct {
 	MBRType         MBRType            // Legacy MBR or GPT
 }
 
+// CompoundType implements [DevicePathNode.CompoundType].
+func (n *HardDriveDevicePathNode) CompoundType() DevicePathNodeCompoundType {
+	return DevicePathNodeHardDriveType
+}
+
+// ToString implements [DevicePathNode.ToString].
 func (n *HardDriveDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	var builder bytes.Buffer
 
@@ -1248,15 +1443,17 @@ func (n *HardDriveDevicePathNode) ToString(flags DevicePathToStringFlags) string
 	return builder.String()
 }
 
+// ToString implements [DevicePathNode.ToString].
 func (n *HardDriveDevicePathNode) String() string {
 	return n.ToString(DevicePathDisplayOnly)
 }
 
+// Write implements [DevicePathNode.Write].
 func (n *HardDriveDevicePathNode) Write(w io.Writer) error {
 	node := uefi.HARDDRIVE_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
-			Type:    uint8(uefi.MEDIA_DEVICE_PATH),
-			SubType: uint8(uefi.MEDIA_HARDDRIVE_DP)},
+			Type:    uint8(n.CompoundType().Type()),
+			SubType: uint8(n.CompoundType().SubType())},
 		PartitionNumber: n.PartitionNumber,
 		PartitionStart:  n.PartitionStart,
 		PartitionSize:   n.PartitionSize,
@@ -1333,6 +1530,12 @@ type CDROMDevicePathNode struct {
 	PartitionSize  uint64
 }
 
+// CompoundType implements [DevicePathNode.CompoundType].
+func (n *CDROMDevicePathNode) CompoundType() DevicePathNodeCompoundType {
+	return DevicePathNodeCDROMType
+}
+
+// ToString implements [DevicePathNode.ToString].
 func (n *CDROMDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	if flags.DisplayOnly() {
 		return fmt.Sprintf("CDROM(%#x)", n.BootEntry)
@@ -1340,15 +1543,17 @@ func (n *CDROMDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	return fmt.Sprintf("CDROM(%#x,%#x,%#x)", n.BootEntry, n.PartitionStart, n.PartitionSize)
 }
 
+// String implements [fmt.Stringer].
 func (n *CDROMDevicePathNode) String() string {
 	return n.ToString(DevicePathDisplayOnly)
 }
 
+// Write implements [DevicePathNode.Write].
 func (n *CDROMDevicePathNode) Write(w io.Writer) error {
 	node := uefi.CDROM_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
-			Type:    uint8(uefi.MEDIA_DEVICE_PATH),
-			SubType: uint8(uefi.MEDIA_CDROM_DP)},
+			Type:    uint8(n.CompoundType().Type()),
+			SubType: uint8(n.CompoundType().SubType())},
 		BootEntry:      n.BootEntry,
 		PartitionStart: n.PartitionStart,
 		PartitionSize:  n.PartitionSize}
@@ -1360,19 +1565,27 @@ func (n *CDROMDevicePathNode) Write(w io.Writer) error {
 // FilePathDevicePathNode corresponds to a file path device path node.
 type FilePathDevicePathNode string
 
+// CompoundType implements [DevicePathNode.CompoundType].
+func (n FilePathDevicePathNode) CompoundType() DevicePathNodeCompoundType {
+	return DevicePathNodeFilePathType
+}
+
+// ToString implements [DevicePathNode.ToString].
 func (n FilePathDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	return string(n)
 }
 
+// String implements [fmt.Stringer].
 func (n FilePathDevicePathNode) String() string {
 	return n.ToString(DevicePathDisplayOnly)
 }
 
+// Write implements [DevicePathNode.Write].
 func (n FilePathDevicePathNode) Write(w io.Writer) error {
 	node := uefi.FILEPATH_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
-			Type:    uint8(uefi.MEDIA_DEVICE_PATH),
-			SubType: uint8(uefi.MEDIA_FILEPATH_DP)},
+			Type:    uint8(n.CompoundType().Type()),
+			SubType: uint8(n.CompoundType().SubType())},
 		PathName: ConvertUTF8ToUTF16(string(n) + "\x00")}
 
 	length := int(binary.Size(node.Header))
@@ -1399,6 +1612,12 @@ func NewFilePathDevicePathNode(path string) (out FilePathDevicePathNode) {
 // MediaFvFileDevicePathNode corresponds to a firmware volume file device path node.
 type MediaFvFileDevicePathNode GUID
 
+// CompoundType implements [DevicePathNode.CompoundType].
+func (n MediaFvFileDevicePathNode) CompoundType() DevicePathNodeCompoundType {
+	return DevicePathNodeFwFileType
+}
+
+// ToString implements [DevicePathNode.ToString].
 func (n MediaFvFileDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	if flags.DisplayOnly() {
 		fvFileNameLookupMu.Lock()
@@ -1414,15 +1633,17 @@ func (n MediaFvFileDevicePathNode) ToString(flags DevicePathToStringFlags) strin
 	return fmt.Sprintf("FvFile(%s)", GUID(n))
 }
 
+// String implements [fmt.Stringer].
 func (n MediaFvFileDevicePathNode) String() string {
 	return n.ToString(DevicePathDisplayOnly)
 }
 
+// Write implements [DevicePathNode.Write].
 func (n MediaFvFileDevicePathNode) Write(w io.Writer) error {
 	node := uefi.MEDIA_FW_VOL_FILEPATH_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
-			Type:    uint8(uefi.MEDIA_DEVICE_PATH),
-			SubType: uint8(uefi.MEDIA_PIWG_FW_FILE_DP)},
+			Type:    uint8(n.CompoundType().Type()),
+			SubType: uint8(n.CompoundType().SubType())},
 		FvFileName: uefi.EFI_GUID(n)}
 	node.Header.Length = uint16(binary.Size(node))
 
@@ -1455,6 +1676,12 @@ func RegisterMediaFvFileNameLookup(fn func(GUID) (string, bool)) {
 // MediaFvDevicePathNode corresponds to a firmware volume device path node.
 type MediaFvDevicePathNode GUID
 
+// CompoundType implements [DevicePathNode.CompoundType].
+func (n MediaFvDevicePathNode) CompoundType() DevicePathNodeCompoundType {
+	return DevicePathNodeFwVolType
+}
+
+// ToString implements [DevicePathNode.ToString].
 func (n MediaFvDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	if flags.DisplayOnly() {
 		fvNameLookupMu.Lock()
@@ -1470,15 +1697,17 @@ func (n MediaFvDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	return fmt.Sprintf("Fv(%s)", GUID(n))
 }
 
+// String implements [fmt.Stringer].
 func (n MediaFvDevicePathNode) String() string {
 	return n.ToString(DevicePathDisplayOnly)
 }
 
+// Write implements [DevicePathNode.Write].
 func (n MediaFvDevicePathNode) Write(w io.Writer) error {
 	node := uefi.MEDIA_FW_VOL_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
-			Type:    uint8(uefi.MEDIA_DEVICE_PATH),
-			SubType: uint8(uefi.MEDIA_PIWG_FW_VOL_DP)},
+			Type:    uint8(n.CompoundType().Type()),
+			SubType: uint8(n.CompoundType().SubType())},
 		FvName: uefi.EFI_GUID(n)}
 	node.Header.Length = uint16(binary.Size(node))
 
@@ -1513,19 +1742,27 @@ type MediaRelOffsetRangeDevicePathNode struct {
 	EndingOffset   uint64
 }
 
+// CompoundType implements [DevicePathNode.CompoundType].
+func (n *MediaRelOffsetRangeDevicePathNode) CompoundType() DevicePathNodeCompoundType {
+	return DevicePathNodeRelativeOffsetRangeType
+}
+
+// ToString implements [DevicePathNode.ToString].
 func (n *MediaRelOffsetRangeDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	return fmt.Sprintf("Offset(%#x,%#x)", n.StartingOffset, n.EndingOffset)
 }
 
+// String implements [fmt.Stringer].
 func (n *MediaRelOffsetRangeDevicePathNode) String() string {
 	return n.ToString(DevicePathDisplayOnly)
 }
 
+// Write implements [DevicePathNode.Write].
 func (n *MediaRelOffsetRangeDevicePathNode) Write(w io.Writer) error {
 	node := uefi.MEDIA_RELATIVE_OFFSET_RANGE_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
-			Type:    uint8(uefi.MEDIA_DEVICE_PATH),
-			SubType: uint8(uefi.MEDIA_RELATIVE_OFFSET_RANGE_DP)},
+			Type:    uint8(n.CompoundType().Type()),
+			SubType: uint8(n.CompoundType().SubType())},
 		StartingOffset: n.StartingOffset,
 		EndingOffset:   n.EndingOffset}
 	node.Header.Length = uint16(binary.Size(node))
@@ -1801,7 +2038,7 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 		return nil, err
 	}
 	data, _ := io.ReadAll(buf)
-	return &UnsupportedDevicePathNode{Type: DevicePathType(n.Type), SubType: DevicePathSubType(n.SubType), Data: data}, nil
+	return &UnsupportedDevicePathNode{Type: DevicePathNodeType(n.Type), SubType: DevicePathSubType(n.SubType), Data: data}, nil
 }
 
 // ReadDevicePath decodes a device path from the supplied io.Reader. It will read
