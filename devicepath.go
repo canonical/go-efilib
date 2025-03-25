@@ -246,6 +246,9 @@ const (
 	// to the shorter text representation.
 	DevicePathDisplayOnly DevicePathToStringFlags = 1 << 0
 
+	// DevicePathAllowShortcuts indicates that that vendor specific
+	// device path nodes should print using a type-specific format
+	// based on the vendor GUID, if it is recognized.
 	DevicePathAllowShortcuts DevicePathToStringFlags = 1 << 1
 )
 
@@ -253,9 +256,14 @@ const (
 type DevicePathNode interface {
 	CompoundType() DevicePathNodeCompoundType                 // Return the compound type of this node
 	AsGenericDevicePathNode() (*GenericDevicePathNode, error) // Convert this node to a GenericDevicePathNode
-	fmt.Stringer                                              // Return the display only string for this node. For more control, use ToString
-	ToString(flags DevicePathToStringFlags) string            // Return a string for this node
-	Write(w io.Writer) error                                  // Serialize this node to the supplied io.Writer
+
+	// String should return a string for this node, equivalent to
+	// ToString(DevicePathNodeDisplayOnly|DevicePathNodeAllowShortcuts).
+	// For more control, use ToString
+	String() string
+
+	ToString(flags DevicePathToStringFlags) string // Return a string for this node
+	Write(w io.Writer) error                       // Serialize this node to the supplied io.Writer
 }
 
 // DevicePath represents a complete device path with the first node
