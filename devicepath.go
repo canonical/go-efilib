@@ -298,27 +298,45 @@ func (p DevicePath) matchesInternal(other DevicePath, onlyFull bool) DevicePathM
 		return DevicePathNoMatch
 	}
 
-	// Check if other is a short-form path. If so, convert p to the same type of
-	// short-form path and test if there is a short-form match.
-	switch other.ShortFormType() {
+	// Check if the shortest path is a short-form path. If so, convert the longer
+	// path to the same type of short-form path and test if there is a short-form
+	// match.
+	var (
+		shortestPath DevicePath
+		longestPath  DevicePath
+	)
+	switch {
+	case len(p) > len(other):
+		shortestPath = other
+		longestPath = p
+	case len(p) < len(other):
+		shortestPath = p
+		longestPath = other
+	default:
+		// Both paths are the same length and were not a full match.
+		// There is no match here.
+		return DevicePathNoMatch
+	}
+
+	switch shortestPath.ShortFormType() {
 	case DevicePathShortFormHD:
-		p = DevicePathFindFirstOccurrence[*HardDriveDevicePathNode](p)
-		if res := p.matchesInternal(other, true); res == DevicePathFullMatch {
+		longestPath = DevicePathFindFirstOccurrence[*HardDriveDevicePathNode](longestPath)
+		if res := longestPath.matchesInternal(shortestPath, true); res == DevicePathFullMatch {
 			return DevicePathShortFormHDMatch
 		}
 	case DevicePathShortFormUSBWWID:
-		p = DevicePathFindFirstOccurrence[*USBWWIDDevicePathNode](p)
-		if res := p.matchesInternal(other, true); res == DevicePathFullMatch {
+		longestPath = DevicePathFindFirstOccurrence[*USBWWIDDevicePathNode](longestPath)
+		if res := longestPath.matchesInternal(shortestPath, true); res == DevicePathFullMatch {
 			return DevicePathShortFormUSBWWIDMatch
 		}
 	case DevicePathShortFormUSBClass:
-		p = DevicePathFindFirstOccurrence[*USBClassDevicePathNode](p)
-		if res := p.matchesInternal(other, true); res == DevicePathFullMatch {
+		longestPath = DevicePathFindFirstOccurrence[*USBClassDevicePathNode](longestPath)
+		if res := longestPath.matchesInternal(shortestPath, true); res == DevicePathFullMatch {
 			return DevicePathShortFormUSBClassMatch
 		}
 	case DevicePathShortFormFilePath:
-		p = DevicePathFindFirstOccurrence[FilePathDevicePathNode](p)
-		if res := p.matchesInternal(other, true); res == DevicePathFullMatch {
+		longestPath = DevicePathFindFirstOccurrence[FilePathDevicePathNode](longestPath)
+		if res := longestPath.matchesInternal(shortestPath, true); res == DevicePathFullMatch {
 			return DevicePathShortFormFileMatch
 		}
 	}
@@ -327,10 +345,10 @@ func (p DevicePath) matchesInternal(other DevicePath, onlyFull bool) DevicePathM
 }
 
 // Matches indicates whether other matches this path in some way, and returns
-// the type of match. If other is a HD() short-form path, this may return
-// DevicePathShortFormHDMatch. If other is a UsbWwid() short-form path, this may
-// return DevicePathShortFormUSBWWIDMatch. If other is a UsbClass() short-form path,
-// this may return DevicePathShortFormUSBClassMatch. If other is a file path short-form
+// the type of match. If either path is a HD() short-form path, this may return
+// DevicePathShortFormHDMatch. If either path is a UsbWwid() short-form path, this may
+// return DevicePathShortFormUSBWWIDMatch. If either path is a UsbClass() short-form path,
+// this may return DevicePathShortFormUSBClassMatch. If either path is a file path short-form
 // path, this may return DevicePathShortFormFileMatch. This returns DevicePathFullMatch
 // if the supplied path fully matches, and DevicePathNoMatch if there is no match.
 func (p DevicePath) Matches(other DevicePath) DevicePathMatch {

@@ -381,6 +381,33 @@ func (d *dpSuite) TestDevicePathMatchesShortFile(c *C) {
 	c.Check(path.Matches(filePath), Equals, DevicePathShortFormFileMatch)
 }
 
+func (d *dpSuite) TestDevicePathMatchesShortFileSwapped(c *C) {
+	path := DevicePath{
+		&ACPIDevicePathNode{
+			HID: 0x0a0341d0,
+			UID: 0x0},
+		&PCIDevicePathNode{
+			Function: 0x0,
+			Device:   0x1d},
+		&PCIDevicePathNode{
+			Function: 0x0,
+			Device:   0x0},
+		&NVMENamespaceDevicePathNode{
+			NamespaceID:   0x1,
+			NamespaceUUID: zeroEUI64},
+		&HardDriveDevicePathNode{
+			PartitionNumber: 1,
+			PartitionStart:  0x800,
+			PartitionSize:   0x100000,
+			Signature:       GUIDHardDriveSignature(MakeGUID(0x66de947b, 0xfdb2, 0x4525, 0xb752, [...]uint8{0x30, 0xd6, 0x6b, 0xb2, 0xb9, 0x60})),
+			MBRType:         GPT},
+		FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}
+
+	filePath := DevicePath{
+		FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}
+	c.Check(filePath.Matches(path), Equals, DevicePathShortFormFileMatch)
+}
+
 func (d *dpSuite) TestDevicePathMatchesEmpty(c *C) {
 	p := DevicePath{}
 	c.Check(p.Matches(DevicePath{}), Equals, DevicePathFullMatch)
