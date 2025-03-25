@@ -208,10 +208,16 @@ func (f DevicePathToStringFlags) DisplayOnly() bool {
 	return f&DevicePathDisplayOnly > 0
 }
 
+func (f DevicePathToStringFlags) AllowShortcuts() bool {
+	return f&DevicePathAllowShortcuts > 0
+}
+
 const (
 	// DevicePathDisplayOnly indicates that each node is converted
 	// to the shorter text representation.
 	DevicePathDisplayOnly DevicePathToStringFlags = 1 << 0
+
+	DevicePathAllowShortcuts DevicePathToStringFlags = 1 << 1
 )
 
 // DevicePathNode represents a single node in a device path.
@@ -240,7 +246,7 @@ func (p DevicePath) ToString(flags DevicePathToStringFlags) string {
 // String implements [fmt.Stringer], and returns the display only string.
 // For more control, use [DevicePath.ToString].
 func (p DevicePath) String() string {
-	return p.ToString(DevicePathDisplayOnly)
+	return p.ToString(DevicePathDisplayOnly | DevicePathAllowShortcuts)
 }
 
 // Bytes returns the serialized form of this device path.
@@ -534,13 +540,35 @@ func (n *VendorDevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathNode
 }
 
 // ToString implements [DevicePathNode.ToString].
-func (n *VendorDevicePathNode) ToString(_ DevicePathToStringFlags) string {
+func (n *VendorDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	var t string
 	switch n.Type {
 	case HardwareDevicePath:
 		t = "Hw"
 	case MessagingDevicePath:
 		t = "Msg"
+		if flags.AllowShortcuts() {
+			switch n.GUID {
+			case PCAnsiGuid:
+				return "VenPcAnsi()"
+			case VT100Guid:
+				return "VenVt100()"
+			case VT100PlusGuid:
+				return "VenVt100Plus()"
+			case VTUTF8Guid:
+				return "VenUtf8()"
+			case DebugPortProtocolGuid:
+				return "DebugPort()"
+			case DevicePathMessagingUARTFlowControl:
+				if str, ok := n.uartFlowControlString(); ok {
+					return str
+				}
+			case SASDevicePathGuid:
+				if str, ok := n.sasString(); ok {
+					return str
+				}
+			}
+		}
 	case MediaDevicePath:
 		t = "Media"
 	default:
@@ -585,6 +613,92 @@ func (n *VendorDevicePathNode) Write(w io.Writer) error {
 	}
 	_, err := w.Write(n.Data)
 	return err
+}
+
+func (n *VendorDevicePathNode) uartFlowControlString() (string, bool) {
+	var ufc uefi.UART_FLOW_CONTROL_DEVICE_PATH
+	buf := new(bytes.Buffer)
+	if err := n.Write(buf); err != nil {
+		return "", false
+	}
+
+	if err := binary.Read(buf, binary.LittleEndian, &ufc); err != nil {
+		return "", false
+	}
+
+	var value string
+	switch ufc.FlowControlMap & 3 {
+	case 0:
+		value = "None"
+	case 1:
+		value = "Hardware"
+	case 2:
+		value = "XonXoff"
+	default:
+		value = fmt.Sprintf("%#x", strconv.FormatUint(uint64(ufc.FlowControlMap), 10))
+	}
+
+	return fmt.Sprintf("UartFlowControl(%s)", value), true
+}
+
+func (n *VendorDevicePathNode) sasString() (string, bool) {
+	var sas uefi.SAS_DEVICE_PATH
+	buf := new(bytes.Buffer)
+	if err := n.Write(buf); err != nil {
+		return "", false
+	}
+
+	if err := binary.Read(buf, binary.LittleEndian, &sas); err != nil {
+		return "", false
+	}
+
+	s := new(bytes.Buffer)
+	fmt.Fprintf(s, "SAS(%#x,%#x,%#x,", sas.SasAddress, sas.Lun, sas.RelativeTargetPort)
+
+	info := sas.DeviceTopology
+	switch {
+	case info&0xf == 0 && info&0x80 == 0:
+		fmt.Fprintf(s, "NoTopology,0,0,0,")
+	case info&0xf <= 2 && info&0x80 == 0:
+		var sasOrSata string
+		switch {
+		case info&0x10 == 0:
+			sasOrSata = "SAS"
+		default:
+			sasOrSata = "SATA"
+		}
+
+		var location string
+		switch {
+		case info&0x20 == 0:
+			location = "Internal"
+		default:
+			location = "External"
+		}
+
+		var connect string
+		switch {
+		case info&0x40 == 0:
+			connect = "Direct"
+		default:
+			connect = "Expanded"
+		}
+
+		fmt.Fprintf(s, "%s,%s,%s,", sasOrSata, location, connect)
+
+		switch {
+		case info&0xf == 1:
+			fmt.Fprintf(s, "0,") // DriveBay
+		default:
+			fmt.Fprintf(s, "%#x,", ((info>>8)&0xff)+1) // DriveBay
+		}
+	default:
+		fmt.Fprintf(s, "%#x,0,0,0,", info)
+	}
+
+	fmt.Fprintf(s, "%#x)", sas.Reserved)
+
+	return s.String(), true
 }
 
 func readVendorDevicePathNode(r io.Reader) (out *VendorDevicePathNode, err error) {
@@ -684,7 +798,7 @@ func (n *ACPIDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 
 // String implements [fmt.Stringer].
 func (n *ACPIDevicePathNode) String() string {
-	return n.ToString(DevicePathDisplayOnly)
+	return n.ToString(DevicePathDisplayOnly | DevicePathAllowShortcuts)
 }
 
 // Write implements [DevicePathNode.Write].
@@ -773,7 +887,7 @@ func (n *ACPIExtendedDevicePathNode) ToString(flags DevicePathToStringFlags) str
 
 // String implements [fmt.Stringer].
 func (n *ACPIExtendedDevicePathNode) String() string {
-	return n.ToString(DevicePathDisplayOnly)
+	return n.ToString(DevicePathDisplayOnly | DevicePathAllowShortcuts)
 }
 
 // Write implements [DevicePathNode.Write].
@@ -878,7 +992,7 @@ func (n *ATAPIDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 
 // String implements [fmt.Stringer].
 func (n *ATAPIDevicePathNode) String() string {
-	return n.ToString(DevicePathDisplayOnly)
+	return n.ToString(DevicePathDisplayOnly | DevicePathAllowShortcuts)
 }
 
 // Write implements [DevicePathNode.Write].
@@ -918,7 +1032,7 @@ func (n *SCSIDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 
 // String implements [fmt.Stringer].
 func (n *SCSIDevicePathNode) String() string {
-	return n.ToString(DevicePathDisplayOnly)
+	return n.ToString(DevicePathDisplayOnly | DevicePathAllowShortcuts)
 }
 
 // Write implements [DevicePathNode.Write].
@@ -957,7 +1071,7 @@ func (n *USBDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 
 // String implements [fmt.Stringer].
 func (n *USBDevicePathNode) String() string {
-	return n.ToString(DevicePathDisplayOnly)
+	return n.ToString(DevicePathDisplayOnly | DevicePathAllowShortcuts)
 }
 
 // Write implements [DevicePathNode.Write].
@@ -1047,7 +1161,7 @@ func (n *USBClassDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 
 // String implements [fmt.Stringer].
 func (n *USBClassDevicePathNode) String() string {
-	return n.ToString(DevicePathDisplayOnly)
+	return n.ToString(DevicePathDisplayOnly | DevicePathAllowShortcuts)
 }
 
 // Write implements [DevicePathNode.Write].
@@ -1099,7 +1213,7 @@ func (n *MACAddrDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 
 // String implements [fmt.Stringer].
 func (n *MACAddrDevicePathNode) String() string {
-	return n.ToString(DevicePathDisplayOnly)
+	return n.ToString(DevicePathDisplayOnly | DevicePathAllowShortcuts)
 }
 
 // Write implements [DevicePathNode.Write].
@@ -1161,7 +1275,7 @@ func (n *IPv4DevicePathNode) ToString(flags DevicePathToStringFlags) string {
 
 // String implements [fmt.Stringer].
 func (n *IPv4DevicePathNode) String() string {
-	return n.ToString(DevicePathDisplayOnly)
+	return n.ToString(DevicePathDisplayOnly | DevicePathAllowShortcuts)
 }
 
 // Write implements [DevicePathNode.Write].
@@ -1224,7 +1338,7 @@ func (n *IPv6DevicePathNode) ToString(flags DevicePathToStringFlags) string {
 
 // String implements [fmt.Stringer].
 func (n *IPv6DevicePathNode) String() string {
-	return n.ToString(DevicePathDisplayOnly)
+	return n.ToString(DevicePathDisplayOnly | DevicePathAllowShortcuts)
 }
 
 // Write implements [DevicePathNode.Write].
@@ -1273,7 +1387,7 @@ func (n *USBWWIDDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 
 // String implements [fmt.Stringer].
 func (n *USBWWIDDevicePathNode) String() string {
-	return n.ToString(DevicePathDisplayOnly)
+	return n.ToString(DevicePathDisplayOnly | DevicePathAllowShortcuts)
 }
 
 // Write implements [DevicePathNode.Write].
@@ -1318,7 +1432,7 @@ func (n *DeviceLogicalUnitDevicePathNode) ToString(_ DevicePathToStringFlags) st
 
 // String implements [fmt.Stringer].
 func (n *DeviceLogicalUnitDevicePathNode) String() string {
-	return n.ToString(DevicePathDisplayOnly)
+	return n.ToString(DevicePathDisplayOnly | DevicePathAllowShortcuts)
 }
 
 // Write implements [DevicePathNode.Write].
@@ -1357,7 +1471,7 @@ func (n *SATADevicePathNode) ToString(_ DevicePathToStringFlags) string {
 
 // String implements [fmt.Stringer].
 func (n *SATADevicePathNode) String() string {
-	return n.ToString(DevicePathDisplayOnly)
+	return n.ToString(DevicePathDisplayOnly | DevicePathAllowShortcuts)
 }
 
 // Write implements [DevicePathNode.Write].
@@ -1397,7 +1511,7 @@ func (n *NVMENamespaceDevicePathNode) ToString(_ DevicePathToStringFlags) string
 
 // String implements [fmt.Stringer].
 func (n *NVMENamespaceDevicePathNode) String() string {
-	return n.ToString(DevicePathDisplayOnly)
+	return n.ToString(DevicePathDisplayOnly | DevicePathAllowShortcuts)
 }
 
 // Write implements [DevicePathNode.Write].
@@ -1595,7 +1709,7 @@ func (n *HardDriveDevicePathNode) ToString(flags DevicePathToStringFlags) string
 
 // ToString implements [DevicePathNode.ToString].
 func (n *HardDriveDevicePathNode) String() string {
-	return n.ToString(DevicePathDisplayOnly)
+	return n.ToString(DevicePathDisplayOnly | DevicePathAllowShortcuts)
 }
 
 // Write implements [DevicePathNode.Write].
@@ -1700,7 +1814,7 @@ func (n *CDROMDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 
 // String implements [fmt.Stringer].
 func (n *CDROMDevicePathNode) String() string {
-	return n.ToString(DevicePathDisplayOnly)
+	return n.ToString(DevicePathDisplayOnly | DevicePathAllowShortcuts)
 }
 
 // Write implements [DevicePathNode.Write].
@@ -1737,7 +1851,7 @@ func (n FilePathDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 
 // String implements [fmt.Stringer].
 func (n FilePathDevicePathNode) String() string {
-	return n.ToString(DevicePathDisplayOnly)
+	return n.ToString(DevicePathDisplayOnly | DevicePathAllowShortcuts)
 }
 
 // Write implements [DevicePathNode.Write].
@@ -1800,7 +1914,7 @@ func (n MediaFvFileDevicePathNode) ToString(flags DevicePathToStringFlags) strin
 
 // String implements [fmt.Stringer].
 func (n MediaFvFileDevicePathNode) String() string {
-	return n.ToString(DevicePathDisplayOnly)
+	return n.ToString(DevicePathDisplayOnly | DevicePathAllowShortcuts)
 }
 
 // Write implements [DevicePathNode.Write].
@@ -1869,7 +1983,7 @@ func (n MediaFvDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 
 // String implements [fmt.Stringer].
 func (n MediaFvDevicePathNode) String() string {
-	return n.ToString(DevicePathDisplayOnly)
+	return n.ToString(DevicePathDisplayOnly | DevicePathAllowShortcuts)
 }
 
 // Write implements [DevicePathNode.Write].
@@ -1929,7 +2043,7 @@ func (n *MediaRelOffsetRangeDevicePathNode) ToString(_ DevicePathToStringFlags) 
 
 // String implements [fmt.Stringer].
 func (n *MediaRelOffsetRangeDevicePathNode) String() string {
-	return n.ToString(DevicePathDisplayOnly)
+	return n.ToString(DevicePathDisplayOnly | DevicePathAllowShortcuts)
 }
 
 // Write implements [DevicePathNode.Write].

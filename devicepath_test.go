@@ -19,11 +19,11 @@ type dpSuite struct{}
 
 var _ = Suite(&dpSuite{})
 
-func (s *dpSuite) TestReadDevicePath(c *C) {
-	r := bytes.NewReader(DecodeHexString(c, "02010c00d041030a0000000001010600001d0101060000000317100001000000000000000000000004012a000100"+
+func (s *dpSuite) TestReadAndWriteDevicePath(c *C) {
+	b := DecodeHexString(c, "02010c00d041030a0000000001010600001d0101060000000317100001000000000000000000000004012a000100"+
 		"0000000800000000000000001000000000007b94de66b2fd2545b75230d66bb2b9600202040434005c004500460049005c007500620075006e00740075005c007"+
-		"300680069006d007800360034002e0065006600690000007fff0400"))
-	path, err := ReadDevicePath(r)
+		"300680069006d007800360034002e0065006600690000007fff0400")
+	path, err := ReadDevicePath(bytes.NewReader(b))
 	c.Assert(err, IsNil)
 	c.Check(path.String(), Equals, "\\PciRoot(0x0)\\Pci(0x1d,0x0)\\Pci(0x0,0x0)\\NVMe(0x1,00-00-00-00-00-00-00-00)"+
 		"\\HD(1,GPT,66de947b-fdb2-4525-b752-30d66bb2b960)\\\\EFI\\ubuntu\\shimx64.efi")
@@ -49,14 +49,38 @@ func (s *dpSuite) TestReadDevicePath(c *C) {
 			MBRType:         GPT},
 		FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}
 	c.Check(path, DeepEquals, expected)
+
+	var buf bytes.Buffer
+	c.Check(path.Write(&buf), IsNil)
+	c.Check(buf.Bytes(), DeepEquals, b)
 }
 
-func (s *dpSuite) TestReadDevicePathUnrecognizedType(c *C) {
-	r := bytes.NewReader(DecodeHexString(c, "02ff1800000000000000000000000000564d42757300000001553400a2e5179b9108dd42b65380"+
+func (s *dpSuite) TestDevicePathToString(c *C) {
+	b := DecodeHexString(c, "02010c00d041030a0000000001010600001d0101060000000317100001000000000000000000000004012a000100"+
+		"0000000800000000000000001000000000007b94de66b2fd2545b75230d66bb2b9600202040434005c004500460049005c007500620075006e00740075005c007"+
+		"300680069006d007800360034002e0065006600690000007fff0400")
+	path, err := ReadDevicePath(bytes.NewReader(b))
+	c.Assert(err, IsNil)
+	c.Check(path.ToString(0), Equals, "\\PciRoot(0x0)\\Pci(0x1d,0x0)\\Pci(0x0,0x0)\\NVMe(0x1,00-00-00-00-00-00-00-00)"+
+		"\\HD(1,GPT,66de947b-fdb2-4525-b752-30d66bb2b960,0x800,0x100000)\\\\EFI\\ubuntu\\shimx64.efi")
+}
+
+func (s *dpSuite) TestDevicePathToStringDisplayOnly(c *C) {
+	b := DecodeHexString(c, "02010c00d041030a0000000001010600001d0101060000000317100001000000000000000000000004012a000100"+
+		"0000000800000000000000001000000000007b94de66b2fd2545b75230d66bb2b9600202040434005c004500460049005c007500620075006e00740075005c007"+
+		"300680069006d007800360034002e0065006600690000007fff0400")
+	path, err := ReadDevicePath(bytes.NewReader(b))
+	c.Assert(err, IsNil)
+	c.Check(path.ToString(DevicePathDisplayOnly), Equals, "\\PciRoot(0x0)\\Pci(0x1d,0x0)\\Pci(0x0,0x0)\\NVMe(0x1,00-00-00-00-00-00-00-00)"+
+		"\\HD(1,GPT,66de947b-fdb2-4525-b752-30d66bb2b960)\\\\EFI\\ubuntu\\shimx64.efi")
+}
+
+func (s *dpSuite) TestReadAndWriteDevicePathUnrecognizedType(c *C) {
+	b := DecodeHexString(c, "02ff1800000000000000000000000000564d42757300000001553400a2e5179b9108dd42b65380"+
 		"b5c22809bad96361baa104294db60572e2ffb1dc7f5a80e5d23e369c4494ed50c0a0cd8656030208000000000004012a000f0000000028000000"+
 		"0000000050030000000000dbfe3389532f0b49a2455c7fa1f986320202040434005c004500460049005c007500620075006e00740075005c0073"+
-		"00680069006d007800360034002e0065006600690000007fff0400"))
-	path, err := ReadDevicePath(r)
+		"00680069006d007800360034002e0065006600690000007fff0400")
+	path, err := ReadDevicePath(bytes.NewReader(b))
 	c.Assert(err, IsNil)
 	c.Check(path.String(), Equals, "\\AcpiPath(255,000000000000000000000000564d427573000000)"+
 		"\\HardwarePath(85,a2e5179b9108dd42b65380b5c22809bad96361baa104294db60572e2ffb1dc7f5a80e5d23e369c4494ed50c0a0cd8656)"+
@@ -82,14 +106,42 @@ func (s *dpSuite) TestReadDevicePathUnrecognizedType(c *C) {
 			MBRType:         GPT},
 		FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}
 	c.Check(path, DeepEquals, expected)
+
+	var buf bytes.Buffer
+	c.Check(path.Write(&buf), IsNil)
+	c.Check(buf.Bytes(), DeepEquals, b)
 }
 
-func (s *dpSuite) TestReadDevicePathHyperV(c *C) {
-	r := bytes.NewReader(DecodeHexString(c, "02021800000000000000000000000000564d42757300000001043400a2e5179b9108dd42b65380"+
+func (s *dpSuite) TestDevicePathToStringUnrecognizedType(c *C) {
+	b := DecodeHexString(c, "02ff1800000000000000000000000000564d42757300000001553400a2e5179b9108dd42b65380"+
 		"b5c22809bad96361baa104294db60572e2ffb1dc7f5a80e5d23e369c4494ed50c0a0cd8656030208000000000004012a000f0000000028000000"+
 		"0000000050030000000000dbfe3389532f0b49a2455c7fa1f986320202040434005c004500460049005c007500620075006e00740075005c0073"+
-		"00680069006d007800360034002e0065006600690000007fff0400"))
-	path, err := ReadDevicePath(r)
+		"00680069006d007800360034002e0065006600690000007fff0400")
+	path, err := ReadDevicePath(bytes.NewReader(b))
+	c.Assert(err, IsNil)
+	c.Check(path.ToString(0), Equals, "\\AcpiPath(255,000000000000000000000000564d427573000000)"+
+		"\\HardwarePath(85,a2e5179b9108dd42b65380b5c22809bad96361baa104294db60572e2ffb1dc7f5a80e5d23e369c4494ed50c0a0cd8656)"+
+		"\\Scsi(0x0,0x0)\\HD(15,GPT,8933fedb-2f53-490b-a245-5c7fa1f98632,0x2800,0x35000)\\\\EFI\\ubuntu\\shimx64.efi")
+}
+
+func (s *dpSuite) TestDevicePathToStringUnrecognizedTypeDisplayOnly(c *C) {
+	b := DecodeHexString(c, "02ff1800000000000000000000000000564d42757300000001553400a2e5179b9108dd42b65380"+
+		"b5c22809bad96361baa104294db60572e2ffb1dc7f5a80e5d23e369c4494ed50c0a0cd8656030208000000000004012a000f0000000028000000"+
+		"0000000050030000000000dbfe3389532f0b49a2455c7fa1f986320202040434005c004500460049005c007500620075006e00740075005c0073"+
+		"00680069006d007800360034002e0065006600690000007fff0400")
+	path, err := ReadDevicePath(bytes.NewReader(b))
+	c.Assert(err, IsNil)
+	c.Check(path.ToString(DevicePathDisplayOnly), Equals, "\\AcpiPath(255,000000000000000000000000564d427573000000)"+
+		"\\HardwarePath(85,a2e5179b9108dd42b65380b5c22809bad96361baa104294db60572e2ffb1dc7f5a80e5d23e369c4494ed50c0a0cd8656)"+
+		"\\Scsi(0x0,0x0)\\HD(15,GPT,8933fedb-2f53-490b-a245-5c7fa1f98632)\\\\EFI\\ubuntu\\shimx64.efi")
+}
+
+func (s *dpSuite) TestReadAndWriteDevicePathHyperV(c *C) {
+	b := DecodeHexString(c, "02021800000000000000000000000000564d42757300000001043400a2e5179b9108dd42b65380"+
+		"b5c22809bad96361baa104294db60572e2ffb1dc7f5a80e5d23e369c4494ed50c0a0cd8656030208000000000004012a000f0000000028000000"+
+		"0000000050030000000000dbfe3389532f0b49a2455c7fa1f986320202040434005c004500460049005c007500620075006e00740075005c0073"+
+		"00680069006d007800360034002e0065006600690000007fff0400")
+	path, err := ReadDevicePath(bytes.NewReader(b))
 	c.Assert(err, IsNil)
 	c.Check(path.String(), Equals, "\\AcpiEx(VMBus,0,0x0)"+
 		"\\VenHw(9b17e5a2-0891-42dd-b653-80b5c22809ba,d96361baa104294db60572e2ffb1dc7f5a80e5d23e369c4494ed50c0a0cd8656)"+
@@ -112,12 +164,40 @@ func (s *dpSuite) TestReadDevicePathHyperV(c *C) {
 			MBRType:         GPT},
 		FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}
 	c.Check(path, DeepEquals, expected)
+
+	var buf bytes.Buffer
+	c.Check(path.Write(&buf), IsNil)
+	c.Check(buf.Bytes(), DeepEquals, b)
 }
 
-func (s *dpSuite) TestReadDevicePathPXE(c *C) {
-	r := bytes.NewReader(DecodeHexString(c, "02010c00d041030a01000000010106000000010106000000030b2500a0369ff5a7a80000000000"+
-		"00000000000000000000000000000000000000000001030c1b0000000000000000000000000000000000000000000000007fff0400"))
-	path, err := ReadDevicePath(r)
+func (s *dpSuite) TestDevicePathToStringHyperV(c *C) {
+	b := DecodeHexString(c, "02021800000000000000000000000000564d42757300000001043400a2e5179b9108dd42b65380"+
+		"b5c22809bad96361baa104294db60572e2ffb1dc7f5a80e5d23e369c4494ed50c0a0cd8656030208000000000004012a000f0000000028000000"+
+		"0000000050030000000000dbfe3389532f0b49a2455c7fa1f986320202040434005c004500460049005c007500620075006e00740075005c0073"+
+		"00680069006d007800360034002e0065006600690000007fff0400")
+	path, err := ReadDevicePath(bytes.NewReader(b))
+	c.Assert(err, IsNil)
+	c.Check(path.ToString(0), Equals, "\\AcpiEx(0,0,0x0,VMBus,<nil>,<nil>)"+
+		"\\VenHw(9b17e5a2-0891-42dd-b653-80b5c22809ba,d96361baa104294db60572e2ffb1dc7f5a80e5d23e369c4494ed50c0a0cd8656)"+
+		"\\Scsi(0x0,0x0)\\HD(15,GPT,8933fedb-2f53-490b-a245-5c7fa1f98632,0x2800,0x35000)\\\\EFI\\ubuntu\\shimx64.efi")
+}
+
+func (s *dpSuite) TestDevicePathToStringHyperVDisplayOnly(c *C) {
+	b := DecodeHexString(c, "02021800000000000000000000000000564d42757300000001043400a2e5179b9108dd42b65380"+
+		"b5c22809bad96361baa104294db60572e2ffb1dc7f5a80e5d23e369c4494ed50c0a0cd8656030208000000000004012a000f0000000028000000"+
+		"0000000050030000000000dbfe3389532f0b49a2455c7fa1f986320202040434005c004500460049005c007500620075006e00740075005c0073"+
+		"00680069006d007800360034002e0065006600690000007fff0400")
+	path, err := ReadDevicePath(bytes.NewReader(b))
+	c.Assert(err, IsNil)
+	c.Check(path.ToString(DevicePathDisplayOnly), Equals, "\\AcpiEx(VMBus,0,0x0)"+
+		"\\VenHw(9b17e5a2-0891-42dd-b653-80b5c22809ba,d96361baa104294db60572e2ffb1dc7f5a80e5d23e369c4494ed50c0a0cd8656)"+
+		"\\Scsi(0x0,0x0)\\HD(15,GPT,8933fedb-2f53-490b-a245-5c7fa1f98632)\\\\EFI\\ubuntu\\shimx64.efi")
+}
+
+func (s *dpSuite) TestReadAndWriteDevicePathPXE(c *C) {
+	b := DecodeHexString(c, "02010c00d041030a01000000010106000000010106000000030b2500a0369ff5a7a80000000000"+
+		"00000000000000000000000000000000000000000001030c1b0000000000000000000000000000000000000000000000007fff0400")
+	path, err := ReadDevicePath(bytes.NewReader(b))
 	c.Assert(err, IsNil)
 	c.Check(path.String(), Equals, "\\PciRoot(0x1)\\Pci(0x0,0x0)\\Pci(0x0,0x0)\\MacAddr(a0369ff5a7a8,0x1)\\IPv4(0:0:0:0)")
 
@@ -150,21 +230,117 @@ func (s *dpSuite) TestReadDevicePathPXE(c *C) {
 		},
 	}
 	c.Check(path, DeepEquals, expected)
+
+	var buf bytes.Buffer
+	c.Check(path.Write(&buf), IsNil)
+	c.Check(buf.Bytes(), DeepEquals, b)
 }
 
-func (s *dpSuite) TestWriteDevicePath(c *C) {
-	src := DecodeHexString(c, "02010c00d041030a0000000001010600001d0101060000000317100001000000000000000000000004012a000100"+
-		"0000000800000000000000001000000000007b94de66b2fd2545b75230d66bb2b9600202040434005c004500460049005c007500620075006e00740075005c007"+
-		"300680069006d007800360034002e0065006600690000007fff0400")
-	path, err := ReadDevicePath(bytes.NewReader(src))
+func (s *dpSuite) TestDevicePathToStringPXE(c *C) {
+	b := DecodeHexString(c, "02010c00d041030a01000000010106000000010106000000030b2500a0369ff5a7a80000000000"+
+		"00000000000000000000000000000000000000000001030c1b0000000000000000000000000000000000000000000000007fff0400")
+	path, err := ReadDevicePath(bytes.NewReader(b))
 	c.Assert(err, IsNil)
-
-	w := new(bytes.Buffer)
-	c.Check(path.Write(w), IsNil)
-	c.Check(w.Bytes(), DeepEquals, src)
+	c.Check(path.ToString(0), Equals, "\\PciRoot(0x1)\\Pci(0x0,0x0)\\Pci(0x0,0x0)\\MacAddr(a0369ff5a7a8,0x1)\\IPv4(0:0:0:0,0x0,DHCP,0:0:0:0,0:0:0:0,0:0:0:0)")
 }
 
-func (d *dpSuite) TestDevicePathBytes(c *C) {
+func (s *dpSuite) TestDevicePathToStringPXEDisplayOnly(c *C) {
+	b := DecodeHexString(c, "02010c00d041030a01000000010106000000010106000000030b2500a0369ff5a7a80000000000"+
+		"00000000000000000000000000000000000000000001030c1b0000000000000000000000000000000000000000000000007fff0400")
+	path, err := ReadDevicePath(bytes.NewReader(b))
+	c.Assert(err, IsNil)
+	c.Check(path.ToString(DevicePathDisplayOnly), Equals, "\\PciRoot(0x1)\\Pci(0x0,0x0)\\Pci(0x0,0x0)\\MacAddr(a0369ff5a7a8,0x1)\\IPv4(0:0:0:0)")
+}
+
+func (s *dpSuite) TestReadAndWriteDevicePathSAS(c *C) {
+	b := DecodeHexString(c, "02010c00d041030a02000000010106000000010106000000030a2c00b4dd87d48b00d911afdc00"+
+		"1083ffca4d00000000176c41005800035000000000000000007100010004012a000100000000080000000000000098210000000000cafc"+
+		"7cae5dd5b743a500283fe1fb3f920202040434005c004500460049005c005500420055004e00540055005c005300480049004d00580036"+
+		"0034002e0045004600490000007fff0400")
+	path, err := ReadDevicePath(bytes.NewReader(b))
+	c.Assert(err, IsNil)
+	c.Check(path.String(), Equals, "\\PciRoot(0x2)\\Pci(0x0,0x0)\\Pci(0x0,0x0)"+
+		"\\SAS(0x5003005800416c17,0x0,0x1,SATA,External,Expanded,0,0x0)\\HD(1,GPT,ae7cfcca-d55d-43b7-a500-283fe1fb3f92)\\\\EFI\\UBUNTU\\SHIMX64.EFI")
+
+	expected := DevicePath{
+		&ACPIDevicePathNode{
+			HID: 0x0a0341d0,
+			UID: 0x2,
+		},
+		&PCIDevicePathNode{
+			Function: 0x0,
+			Device:   0x0,
+		},
+		&PCIDevicePathNode{
+			Function: 0x0,
+			Device:   0x0,
+		},
+		&VendorDevicePathNode{
+			Type: MessagingDevicePath,
+			GUID: MakeGUID(0xd487ddb4, 0x008b, 0x11d9, 0xafdc, [...]uint8{0x00, 0x10, 0x83, 0xff, 0xca, 0x4d}),
+			Data: DecodeHexString(c, "00000000176c410058000350000000000000000071000100")},
+		&HardDriveDevicePathNode{
+			PartitionNumber: 1,
+			PartitionStart:  0x800,
+			PartitionSize:   0x219800,
+			Signature:       GUIDHardDriveSignature(MakeGUID(0xae7cfcca, 0xd55d, 0x43b7, 0xa500, [...]uint8{0x28, 0x3f, 0xe1, 0xfb, 0x3f, 0x92})),
+			MBRType:         GPT},
+		FilePathDevicePathNode("\\EFI\\UBUNTU\\SHIMX64.EFI")}
+	c.Check(path, DeepEquals, expected)
+
+	var buf bytes.Buffer
+	c.Check(path.Write(&buf), IsNil)
+	c.Check(buf.Bytes(), DeepEquals, b)
+}
+
+func (s *dpSuite) TestDevicePathToStringSAS(c *C) {
+	b := DecodeHexString(c, "02010c00d041030a02000000010106000000010106000000030a2c00b4dd87d48b00d911afdc00"+
+		"1083ffca4d00000000176c41005800035000000000000000007100010004012a000100000000080000000000000098210000000000cafc"+
+		"7cae5dd5b743a500283fe1fb3f920202040434005c004500460049005c005500420055004e00540055005c005300480049004d00580036"+
+		"0034002e0045004600490000007fff0400")
+	path, err := ReadDevicePath(bytes.NewReader(b))
+	c.Assert(err, IsNil)
+	c.Check(path.ToString(0), Equals, "\\PciRoot(0x2)\\Pci(0x0,0x0)\\Pci(0x0,0x0)"+
+		"\\VenMsg(d487ddb4-008b-11d9-afdc-001083ffca4d,00000000176c410058000350000000000000000071000100)"+
+		"\\HD(1,GPT,ae7cfcca-d55d-43b7-a500-283fe1fb3f92,0x800,0x219800)\\\\EFI\\UBUNTU\\SHIMX64.EFI")
+}
+
+func (s *dpSuite) TestDevicePathToStringSASDisplayOnly(c *C) {
+	b := DecodeHexString(c, "02010c00d041030a02000000010106000000010106000000030a2c00b4dd87d48b00d911afdc00"+
+		"1083ffca4d00000000176c41005800035000000000000000007100010004012a000100000000080000000000000098210000000000cafc"+
+		"7cae5dd5b743a500283fe1fb3f920202040434005c004500460049005c005500420055004e00540055005c005300480049004d00580036"+
+		"0034002e0045004600490000007fff0400")
+	path, err := ReadDevicePath(bytes.NewReader(b))
+	c.Assert(err, IsNil)
+	c.Check(path.ToString(DevicePathDisplayOnly), Equals, "\\PciRoot(0x2)\\Pci(0x0,0x0)\\Pci(0x0,0x0)"+
+		"\\VenMsg(d487ddb4-008b-11d9-afdc-001083ffca4d,00000000176c410058000350000000000000000071000100)"+
+		"\\HD(1,GPT,ae7cfcca-d55d-43b7-a500-283fe1fb3f92)\\\\EFI\\UBUNTU\\SHIMX64.EFI")
+}
+
+func (s *dpSuite) TestDevicePathToStringSASAllowShortcuts(c *C) {
+	b := DecodeHexString(c, "02010c00d041030a02000000010106000000010106000000030a2c00b4dd87d48b00d911afdc00"+
+		"1083ffca4d00000000176c41005800035000000000000000007100010004012a000100000000080000000000000098210000000000cafc"+
+		"7cae5dd5b743a500283fe1fb3f920202040434005c004500460049005c005500420055004e00540055005c005300480049004d00580036"+
+		"0034002e0045004600490000007fff0400")
+	path, err := ReadDevicePath(bytes.NewReader(b))
+	c.Assert(err, IsNil)
+	c.Check(path.ToString(DevicePathAllowShortcuts), Equals, "\\PciRoot(0x2)\\Pci(0x0,0x0)\\Pci(0x0,0x0)"+
+		"\\SAS(0x5003005800416c17,0x0,0x1,SATA,External,Expanded,0,0x0)"+
+		"\\HD(1,GPT,ae7cfcca-d55d-43b7-a500-283fe1fb3f92,0x800,0x219800)\\\\EFI\\UBUNTU\\SHIMX64.EFI")
+}
+
+func (s *dpSuite) TestDevicePathToStringSASDisplayOnlyAndAllowShortcuts(c *C) {
+	b := DecodeHexString(c, "02010c00d041030a02000000010106000000010106000000030a2c00b4dd87d48b00d911afdc00"+
+		"1083ffca4d00000000176c41005800035000000000000000007100010004012a000100000000080000000000000098210000000000cafc"+
+		"7cae5dd5b743a500283fe1fb3f920202040434005c004500460049005c005500420055004e00540055005c005300480049004d00580036"+
+		"0034002e0045004600490000007fff0400")
+	path, err := ReadDevicePath(bytes.NewReader(b))
+	c.Assert(err, IsNil)
+	c.Check(path.ToString(DevicePathDisplayOnly|DevicePathAllowShortcuts), Equals, "\\PciRoot(0x2)\\Pci(0x0,0x0)\\Pci(0x0,0x0)"+
+		"\\SAS(0x5003005800416c17,0x0,0x1,SATA,External,Expanded,0,0x0)\\HD(1,GPT,ae7cfcca-d55d-43b7-a500-283fe1fb3f92)\\\\EFI\\UBUNTU\\SHIMX64.EFI")
+}
+
+func (s *dpSuite) TestDevicePathBytes(c *C) {
 	src := DecodeHexString(c, "02010c00d041030a0000000001010600001d0101060000000317100001000000000000000000000004012a000100"+
 		"0000000800000000000000001000000000007b94de66b2fd2545b75230d66bb2b9600202040434005c004500460049005c007500620075006e00740075005c007"+
 		"300680069006d007800360034002e0065006600690000007fff0400")
@@ -176,23 +352,23 @@ func (d *dpSuite) TestDevicePathBytes(c *C) {
 	c.Check(b, DeepEquals, src)
 }
 
-func (d *dpSuite) TestNewFilePathDevicePathNode(c *C) {
+func (s *dpSuite) TestNewFilePathDevicePathNode(c *C) {
 	p := NewFilePathDevicePathNode("EFI/ubuntu/shimx64.efi")
 	c.Check(p, Equals, FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi"))
 }
 
-func (d *dpSuite) TestNewFilePathDevicePathNode2(c *C) {
+func (s *dpSuite) TestNewFilePathDevicePathNode2(c *C) {
 	p := NewFilePathDevicePathNode("/EFI/ubuntu/shimx64.efi")
 	c.Check(p, Equals, FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi"))
 }
 
-func (d *dpSuite) TestEISAID(c *C) {
+func (s *dpSuite) TestEISAID(c *C) {
 	id := EISAID(0xa5a541d0)
 	c.Check(id.Vendor(), Equals, "PNP")
 	c.Check(id.Product(), DeepEquals, uint16(0xa5a5))
 }
 
-func (d *dpSuite) TestNewEISAID(c *C) {
+func (s *dpSuite) TestNewEISAID(c *C) {
 	id, err := NewEISAID("PNP", 0x0a08)
 	c.Check(err, IsNil)
 	c.Check(id, Equals, EISAID(0x0a0841d0))
@@ -203,7 +379,7 @@ type testNewHardDriveDevicePathNodeFromDeviceData struct {
 	expected *HardDriveDevicePathNode
 }
 
-func (d *dpSuite) testNewHardDriveDevicePathNodeFromDevice(c *C, data *testNewHardDriveDevicePathNodeFromDeviceData) {
+func (s *dpSuite) testNewHardDriveDevicePathNodeFromDevice(c *C, data *testNewHardDriveDevicePathNodeFromDeviceData) {
 	f, err := os.Open("testdata/partitiontables/valid")
 	c.Assert(err, IsNil)
 	defer f.Close()
@@ -216,8 +392,8 @@ func (d *dpSuite) testNewHardDriveDevicePathNodeFromDevice(c *C, data *testNewHa
 	c.Check(node, DeepEquals, data.expected)
 }
 
-func (d *dpSuite) TestNewHardDriveDevicePathNodeFromDevice1(c *C) {
-	d.testNewHardDriveDevicePathNodeFromDevice(c, &testNewHardDriveDevicePathNodeFromDeviceData{
+func (s *dpSuite) TestNewHardDriveDevicePathNodeFromDevice1(c *C) {
+	s.testNewHardDriveDevicePathNodeFromDevice(c, &testNewHardDriveDevicePathNodeFromDeviceData{
 		part: 1,
 		expected: &HardDriveDevicePathNode{
 			PartitionNumber: 1,
@@ -227,8 +403,8 @@ func (d *dpSuite) TestNewHardDriveDevicePathNodeFromDevice1(c *C) {
 			MBRType:         GPT}})
 }
 
-func (d *dpSuite) TestNewHardDriveDevicePathNodeFromDevice2(c *C) {
-	d.testNewHardDriveDevicePathNodeFromDevice(c, &testNewHardDriveDevicePathNodeFromDeviceData{
+func (s *dpSuite) TestNewHardDriveDevicePathNodeFromDevice2(c *C) {
+	s.testNewHardDriveDevicePathNodeFromDevice(c, &testNewHardDriveDevicePathNodeFromDeviceData{
 		part: 3,
 		expected: &HardDriveDevicePathNode{
 			PartitionNumber: 3,
@@ -243,7 +419,7 @@ type testNewHardDriveDevicePathNodeFromDeviceErrorData struct {
 	part int
 }
 
-func (d *dpSuite) testNewHardDriveDevicePathNodeFromDeviceError(c *C, data *testNewHardDriveDevicePathNodeFromDeviceErrorData) error {
+func (s *dpSuite) testNewHardDriveDevicePathNodeFromDeviceError(c *C, data *testNewHardDriveDevicePathNodeFromDeviceErrorData) error {
 	f, err := os.Open(data.path)
 	c.Assert(err, IsNil)
 	defer f.Close()
@@ -255,31 +431,31 @@ func (d *dpSuite) testNewHardDriveDevicePathNodeFromDeviceError(c *C, data *test
 	return err
 }
 
-func (d *dpSuite) TestNewHardDriveDevicePathNodeFromDeviceInvalidPart1(c *C) {
-	c.Check(d.testNewHardDriveDevicePathNodeFromDeviceError(c, &testNewHardDriveDevicePathNodeFromDeviceErrorData{
+func (s *dpSuite) TestNewHardDriveDevicePathNodeFromDeviceInvalidPart1(c *C) {
+	c.Check(s.testNewHardDriveDevicePathNodeFromDeviceError(c, &testNewHardDriveDevicePathNodeFromDeviceErrorData{
 		path: "testdata/partitiontables/valid",
 		part: 0}), ErrorMatches, "invalid partition number")
 }
 
-func (d *dpSuite) TestNewHardDriveDevicePathNodeFromDeviceInvalidPart2(c *C) {
-	c.Check(d.testNewHardDriveDevicePathNodeFromDeviceError(c, &testNewHardDriveDevicePathNodeFromDeviceErrorData{
+func (s *dpSuite) TestNewHardDriveDevicePathNodeFromDeviceInvalidPart2(c *C) {
+	c.Check(s.testNewHardDriveDevicePathNodeFromDeviceError(c, &testNewHardDriveDevicePathNodeFromDeviceErrorData{
 		path: "testdata/partitiontables/valid",
 		part: 300}), ErrorMatches, "invalid partition number 300: device only has 128 partitions")
 }
 
-func (d *dpSuite) TestNewHardDriveDevicePathNodeFromDeviceInvalidPart3(c *C) {
-	c.Check(d.testNewHardDriveDevicePathNodeFromDeviceError(c, &testNewHardDriveDevicePathNodeFromDeviceErrorData{
+func (s *dpSuite) TestNewHardDriveDevicePathNodeFromDeviceInvalidPart3(c *C) {
+	c.Check(s.testNewHardDriveDevicePathNodeFromDeviceError(c, &testNewHardDriveDevicePathNodeFromDeviceErrorData{
 		path: "testdata/partitiontables/valid",
 		part: 5}), ErrorMatches, "requested partition is unused")
 }
 
-func (d *dpSuite) TestNewHardDriveDevicePathNodeFromDeviceInvalidHeader(c *C) {
-	c.Check(d.testNewHardDriveDevicePathNodeFromDeviceError(c, &testNewHardDriveDevicePathNodeFromDeviceErrorData{
+func (s *dpSuite) TestNewHardDriveDevicePathNodeFromDeviceInvalidHeader(c *C) {
+	c.Check(s.testNewHardDriveDevicePathNodeFromDeviceError(c, &testNewHardDriveDevicePathNodeFromDeviceErrorData{
 		path: "testdata/partitiontables/invalid-primary-hdr-checksum",
 		part: 1}), Equals, ErrCRCCheck)
 }
 
-func (d *dpSuite) TestNewHardDriveDevicePathNodeFromMBRDevice(c *C) {
+func (s *dpSuite) TestNewHardDriveDevicePathNodeFromMBRDevice(c *C) {
 	f, err := os.Open("testdata/partitiontables/mbr")
 	c.Assert(err, IsNil)
 	defer f.Close()
@@ -297,7 +473,7 @@ func (d *dpSuite) TestNewHardDriveDevicePathNodeFromMBRDevice(c *C) {
 		MBRType:         LegacyMBR})
 }
 
-func (d *dpSuite) TestDevicePathMatchesFull(c *C) {
+func (s *dpSuite) TestDevicePathMatchesFull(c *C) {
 	path := DevicePath{
 		&ACPIDevicePathNode{
 			HID: 0x0a0341d0,
@@ -321,7 +497,7 @@ func (d *dpSuite) TestDevicePathMatchesFull(c *C) {
 	c.Check(path.Matches(path), Equals, DevicePathFullMatch)
 }
 
-func (d *dpSuite) TestDevicePathMatchesShortHD(c *C) {
+func (s *dpSuite) TestDevicePathMatchesShortHD(c *C) {
 	path := DevicePath{
 		&ACPIDevicePathNode{
 			HID: 0x0a0341d0,
@@ -354,7 +530,7 @@ func (d *dpSuite) TestDevicePathMatchesShortHD(c *C) {
 	c.Check(path.Matches(hdPath), Equals, DevicePathShortFormHDMatch)
 }
 
-func (d *dpSuite) TestDevicePathMatchesShortFile(c *C) {
+func (s *dpSuite) TestDevicePathMatchesShortFile(c *C) {
 	path := DevicePath{
 		&ACPIDevicePathNode{
 			HID: 0x0a0341d0,
@@ -381,7 +557,7 @@ func (d *dpSuite) TestDevicePathMatchesShortFile(c *C) {
 	c.Check(path.Matches(filePath), Equals, DevicePathShortFormFileMatch)
 }
 
-func (d *dpSuite) TestDevicePathMatchesShortFileSwapped(c *C) {
+func (s *dpSuite) TestDevicePathMatchesShortFileSwapped(c *C) {
 	path := DevicePath{
 		&ACPIDevicePathNode{
 			HID: 0x0a0341d0,
@@ -408,12 +584,12 @@ func (d *dpSuite) TestDevicePathMatchesShortFileSwapped(c *C) {
 	c.Check(filePath.Matches(path), Equals, DevicePathShortFormFileMatch)
 }
 
-func (d *dpSuite) TestDevicePathMatchesEmpty(c *C) {
+func (s *dpSuite) TestDevicePathMatchesEmpty(c *C) {
 	p := DevicePath{}
 	c.Check(p.Matches(DevicePath{}), Equals, DevicePathFullMatch)
 }
 
-func (d *dpSuite) TestDevicePathMatchesEmptyOtherNoMatch(c *C) {
+func (s *dpSuite) TestDevicePathMatchesEmptyOtherNoMatch(c *C) {
 	path := DevicePath{
 		&ACPIDevicePathNode{
 			HID: 0x0a0341d0,
@@ -437,7 +613,7 @@ func (d *dpSuite) TestDevicePathMatchesEmptyOtherNoMatch(c *C) {
 	c.Check(path.Matches(DevicePath{}), Equals, DevicePathNoMatch)
 }
 
-func (d *dpSuite) TestDevicePathMatchesFullNoMatch(c *C) {
+func (s *dpSuite) TestDevicePathMatchesFullNoMatch(c *C) {
 	path := DevicePath{
 		&ACPIDevicePathNode{
 			HID: 0x0a0341d0,
@@ -482,7 +658,7 @@ func (d *dpSuite) TestDevicePathMatchesFullNoMatch(c *C) {
 	c.Check(path.Matches(other), Equals, DevicePathNoMatch)
 }
 
-func (d *dpSuite) TestDevicePathMatchesShortHDNoMatch(c *C) {
+func (s *dpSuite) TestDevicePathMatchesShortHDNoMatch(c *C) {
 	path := DevicePath{
 		&ACPIDevicePathNode{
 			HID: 0x0a0341d0,
@@ -515,7 +691,7 @@ func (d *dpSuite) TestDevicePathMatchesShortHDNoMatch(c *C) {
 	c.Check(path.Matches(hdPath), Equals, DevicePathNoMatch)
 }
 
-func (d *dpSuite) TestDevicePathMatchesShortFileNoMatch(c *C) {
+func (s *dpSuite) TestDevicePathMatchesShortFileNoMatch(c *C) {
 	path := DevicePath{
 		&ACPIDevicePathNode{
 			HID: 0x0a0341d0,

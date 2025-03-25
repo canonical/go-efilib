@@ -292,3 +292,19 @@ type MEDIA_RELATIVE_OFFSET_RANGE_DEVICE_PATH struct {
 	StartingOffset uint64
 	EndingOffset   uint64
 }
+
+type UART_FLOW_CONTROL_DEVICE_PATH struct {
+	Header         EFI_DEVICE_PATH_PROTOCOL
+	Guid           EFI_GUID
+	FlowControlMap uint32
+}
+
+type SAS_DEVICE_PATH struct {
+	Header             EFI_DEVICE_PATH_PROTOCOL
+	Guid               EFI_GUID
+	Reserved           uint32
+	SasAddress         uint64
+	Lun                uint64
+	DeviceTopology     uint16
+	RelativeTargetPort uint16
+}
