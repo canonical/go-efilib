@@ -1124,6 +1124,7 @@ func (n *USBDevicePathNode) Write(w io.Writer) error {
 	return binary.Write(w, binary.LittleEndian, &node)
 }
 
+// USBClass defines the base class of a USB interface.
 type USBClass uint8
 
 const (
@@ -1139,15 +1140,64 @@ const (
 	USBClassVideo       USBClass = 0x0e
 	USBClassDiagnostic  USBClass = 0xdc
 	USBClassWireless    USBClass = 0xe0
+	USBClassAppSpecific USBClass = 0xfe
 )
+
+// String implements [fmt.Stringer].
+func (c USBClass) String() string {
+	switch c {
+	case USBClassAudio:
+		return "UsbAudio"
+	case USBClassCDCControl:
+		return "UsbCDCControl"
+	case USBClassHID:
+		return "UsbHID"
+	case USBClassImage:
+		return "UsbImage"
+	case USBClassPrinter:
+		return "UsbPrinter"
+	case USBClassMassStorage:
+		return "UsbMassStorage"
+	case USBClassHub:
+		return "UsbHub"
+	case USBClassCDCData:
+		return "UsbCDCData"
+	case USBClassSmartCard:
+		return "UsbSmartCard"
+	case USBClassVideo:
+		return "UsbVideo"
+	case USBClassDiagnostic:
+		return "UsbDiagnostic"
+	case USBClassWireless:
+		return "UsbWireless"
+	case USBClassAppSpecific:
+		return "UsbAppSpecific"
+	default:
+		return fmt.Sprintf("%#x", uint8(c))
+	}
+}
+
+// USBSubClass defines the sub class of a USB interface. The meaning of
+// this is dependent on the value of [USBClass].
+type USBSubClass uint8
+
+const (
+	USBSubClassAppSpecificFWUpdate           USBSubClass = 0x01
+	USBSubClassAppSpecificIRDABridge         USBSubClass = 0x02
+	USBSubClassAppSpecificTestAndMeasurement USBSubClass = 0x03
+)
+
+// USBProtocol defines the protocol of a USB interface. The meaning of
+// this is dependent on the values of [USBClass] and [USBSubClass].
+type USBProtocol uint8
 
 // USBClassDevicePathNode corresponds to a USB class device path node.
 type USBClassDevicePathNode struct {
 	VendorId       uint16
 	ProductId      uint16
 	DeviceClass    USBClass
-	DeviceSubClass uint8
-	DeviceProtocol uint8
+	DeviceSubClass USBSubClass
+	DeviceProtocol USBProtocol
 }
 
 // CompoundType implements [DevicePathNode.CompoundType].
@@ -1162,38 +1212,23 @@ func (n *USBClassDevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathNo
 
 // ToString implements [DevicePathNode.ToString].
 func (n *USBClassDevicePathNode) ToString(_ DevicePathToStringFlags) string {
-	var builder bytes.Buffer
 	switch n.DeviceClass {
-	case USBClassAudio:
-		fmt.Fprintf(&builder, "UsbAudio")
-	case USBClassCDCControl:
-		fmt.Fprintf(&builder, "UsbCDCControl")
-	case USBClassHID:
-		fmt.Fprintf(&builder, "UsbHID")
-	case USBClassImage:
-		fmt.Fprintf(&builder, "UsbImage")
-	case USBClassPrinter:
-		fmt.Fprintf(&builder, "UsbPrinter")
-	case USBClassMassStorage:
-		fmt.Fprintf(&builder, "UsbMassStorage")
-	case USBClassHub:
-		fmt.Fprintf(&builder, "UsbHub")
-	case USBClassCDCData:
-		fmt.Fprintf(&builder, "UsbCDCData")
-	case USBClassSmartCard:
-		fmt.Fprintf(&builder, "UsbSmartCard")
-	case USBClassVideo:
-		fmt.Fprintf(&builder, "UsbVideo")
-	case USBClassDiagnostic:
-		fmt.Fprintf(&builder, "UsbDiagnostic")
-	case USBClassWireless:
-		fmt.Fprintf(&builder, "UsbWireless")
-	default:
-		return fmt.Sprintf("UsbClass(%#x,%#x,%#x,%#x,%#x)", n.VendorId, n.ProductId, n.DeviceClass, n.DeviceSubClass, n.DeviceProtocol)
+	case USBClassAudio, USBClassCDCControl, USBClassHID, USBClassImage,
+		USBClassPrinter, USBClassMassStorage, USBClassHub, USBClassCDCData,
+		USBClassSmartCard, USBClassVideo, USBClassDiagnostic, USBClassWireless:
+		return fmt.Sprintf("%s(%#x,%#x,%#x,%#x)", n.DeviceClass, n.VendorId, n.ProductId, n.DeviceSubClass, n.DeviceProtocol)
+	case USBClassAppSpecific:
+		switch n.DeviceSubClass {
+		case USBSubClassAppSpecificFWUpdate:
+			return fmt.Sprintf("UsbDeviceFirmwareUpdate(%#x,%#x,%#x)", n.VendorId, n.ProductId, n.DeviceProtocol)
+		case USBSubClassAppSpecificIRDABridge:
+			return fmt.Sprintf("UsbIrdaBridge(%#x,%#x,%#x)", n.VendorId, n.ProductId, n.DeviceProtocol)
+		case USBSubClassAppSpecificTestAndMeasurement:
+			return fmt.Sprintf("UsbTestAndMeasurement(%#x,%#x,%#x)", n.VendorId, n.ProductId, n.DeviceProtocol)
+		}
 	}
 
-	fmt.Fprintf(&builder, "(%#x,%#x,%#x,%#x)", n.VendorId, n.ProductId, n.DeviceSubClass, n.DeviceProtocol)
-	return builder.String()
+	return fmt.Sprintf("UsbClass(%#x,%#x,%#x,%#x,%#x)", n.VendorId, n.ProductId, n.DeviceClass, n.DeviceSubClass, n.DeviceProtocol)
 }
 
 // String implements [fmt.Stringer].
@@ -1210,8 +1245,8 @@ func (n *USBClassDevicePathNode) Write(w io.Writer) error {
 		VendorId:       n.VendorId,
 		ProductId:      n.ProductId,
 		DeviceClass:    uint8(n.DeviceClass),
-		DeviceSubClass: n.DeviceSubClass,
-		DeviceProtocol: n.DeviceProtocol}
+		DeviceSubClass: uint8(n.DeviceSubClass),
+		DeviceProtocol: uint8(n.DeviceProtocol)}
 	node.Header.Length = uint16(binary.Size(node))
 
 	return binary.Write(w, binary.LittleEndian, &node)
@@ -2239,8 +2274,8 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 				VendorId:       n.VendorId,
 				ProductId:      n.ProductId,
 				DeviceClass:    USBClass(n.DeviceClass),
-				DeviceSubClass: n.DeviceSubClass,
-				DeviceProtocol: n.DeviceProtocol}, nil
+				DeviceSubClass: USBSubClass(n.DeviceSubClass),
+				DeviceProtocol: USBProtocol(n.DeviceProtocol)}, nil
 		case uefi.MSG_MAC_ADDR_DP:
 			var n uefi.MAC_ADDR_DEVICE_PATH
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
