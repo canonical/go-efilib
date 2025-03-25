@@ -449,7 +449,7 @@ func readGenericDevicePathNode(r io.Reader) (*GenericDevicePathNode, error) {
 		Data:    data}, nil
 }
 
-func convertToGenericDevicePathNode[T DevicePathNode](n T) (*GenericDevicePathNode, error) {
+func convertToGenericDevicePathNode(n DevicePathNode) (*GenericDevicePathNode, error) {
 	buf := new(bytes.Buffer)
 	if err := n.Write(buf); err != nil {
 		return nil, err
