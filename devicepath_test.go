@@ -324,7 +324,7 @@ func (s *dpSuite) TestDevicePathToStringSASAllowShortcuts(c *C) {
 		"0034002e0045004600490000007fff0400")
 	path, err := ReadDevicePath(bytes.NewReader(b))
 	c.Assert(err, IsNil)
-	c.Check(path.ToString(DevicePathAllowShortcuts), Equals, "\\PciRoot(0x2)\\Pci(0x0,0x0)\\Pci(0x0,0x0)"+
+	c.Check(path.ToString(DevicePathAllowVendorShortcuts), Equals, "\\PciRoot(0x2)\\Pci(0x0,0x0)\\Pci(0x0,0x0)"+
 		"\\SAS(0x5003005800416c17,0x0,0x1,SATA,External,Expanded,0,0x0)"+
 		"\\HD(1,GPT,ae7cfcca-d55d-43b7-a500-283fe1fb3f92,0x800,0x219800)\\\\EFI\\UBUNTU\\SHIMX64.EFI")
 }
@@ -336,7 +336,7 @@ func (s *dpSuite) TestDevicePathToStringSASDisplayOnlyAndAllowShortcuts(c *C) {
 		"0034002e0045004600490000007fff0400")
 	path, err := ReadDevicePath(bytes.NewReader(b))
 	c.Assert(err, IsNil)
-	c.Check(path.ToString(DevicePathDisplayOnly|DevicePathAllowShortcuts), Equals, "\\PciRoot(0x2)\\Pci(0x0,0x0)\\Pci(0x0,0x0)"+
+	c.Check(path.ToString(DevicePathDisplayOnly|DevicePathAllowVendorShortcuts), Equals, "\\PciRoot(0x2)\\Pci(0x0,0x0)\\Pci(0x0,0x0)"+
 		"\\SAS(0x5003005800416c17,0x0,0x1,SATA,External,Expanded,0,0x0)\\HD(1,GPT,ae7cfcca-d55d-43b7-a500-283fe1fb3f92)\\\\EFI\\UBUNTU\\SHIMX64.EFI")
 }
 

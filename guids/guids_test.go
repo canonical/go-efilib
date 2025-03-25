@@ -43,7 +43,7 @@ func (s *guidsSuite) TestListAll(c *C) {
 	c.Check(guids, DeepEquals, allGuids)
 }
 
-func (s *guidsSuite) TestFvFileIntegration(c *C) {
+func (s *guidsSuite) TestFWFileIntegration(c *C) {
 	file := efi.FWFileDevicePathNode(efi.MakeGUID(0x821aca26, 0x29ea, 0x4993, 0x839f, [...]byte{0x59, 0x7f, 0xc0, 0x21, 0x70, 0x8d}))
-	c.Check(file.String(), Equals, "FvFile(AbsoluteAbtInstaller)")
+	c.Check(file.ToString(efi.DevicePathDisplayOnly|efi.DevicePathDisplayFWGUIDNames), Equals, "FvFile(AbsoluteAbtInstaller)")
 }
