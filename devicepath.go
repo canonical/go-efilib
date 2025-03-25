@@ -216,10 +216,11 @@ const (
 
 // DevicePathNode represents a single node in a device path.
 type DevicePathNode interface {
-	CompoundType() DevicePathNodeCompoundType      // Return the compound type of this node
-	fmt.Stringer                                   // Return the display only string for this node. For more control, use ToString
-	ToString(flags DevicePathToStringFlags) string // Return a string for this node
-	Write(w io.Writer) error                       // Serialize this node to the supplied io.Writer
+	CompoundType() DevicePathNodeCompoundType                 // Return the compound type of this node
+	AsGenericDevicePathNode() (*GenericDevicePathNode, error) // Convert this node to a GenericDevicePathNode
+	fmt.Stringer                                              // Return the display only string for this node. For more control, use ToString
+	ToString(flags DevicePathToStringFlags) string            // Return a string for this node
+	Write(w io.Writer) error                                  // Serialize this node to the supplied io.Writer
 }
 
 // DevicePath represents a complete device path with the first node
@@ -355,7 +356,7 @@ func (p DevicePath) ShortFormType() DevicePathShortFormType {
 	case *USBClassDevicePathNode:
 		_ = n
 		return DevicePathShortFormUSBClass
-	case *UnsupportedDevicePathNode:
+	case *GenericDevicePathNode:
 		if n.Type == MessagingDevicePath && n.SubType == uefi.MSG_URI_DP {
 			return DevicePathShortFormURI
 		}
@@ -367,25 +368,46 @@ func (p DevicePath) ShortFormType() DevicePathShortFormType {
 }
 
 // GenericDevicePathNode corresponds to a device path nodes with a type that is
-// not handled by this package.
-// Deprecated: use [UnsupportedDevicePathNode].
-type GenericDevicePathNode = UnsupportedDevicePathNode
-
-// UnsupportedDevicePathNode corresponds to a device path nodes with a type that is
 // not handled by this package
-type UnsupportedDevicePathNode struct {
+type GenericDevicePathNode struct {
 	Type    DevicePathNodeType
 	SubType DevicePathSubType // the meaning of the sub-type depends on the Type field.
 	Data    []byte            // An opaque blob of data associated with this node
 }
 
+func readGenericDevicePathNode(r io.Reader) (*GenericDevicePathNode, error) {
+	var n uefi.EFI_DEVICE_PATH_PROTOCOL
+	if err := binary.Read(r, binary.LittleEndian, &n); err != nil {
+		return nil, err
+	}
+	data, _ := io.ReadAll(r)
+
+	return &GenericDevicePathNode{
+		Type:    DevicePathNodeType(n.Type),
+		SubType: DevicePathSubType(n.SubType),
+		Data:    data}, nil
+}
+
+func convertToGenericDevicePathNode[T DevicePathNode](n T) (*GenericDevicePathNode, error) {
+	buf := new(bytes.Buffer)
+	if err := n.Write(buf); err != nil {
+		return nil, err
+	}
+	return readGenericDevicePathNode(buf)
+}
+
 // CompoundType implements [DevicePathNode.CompoundType].
-func (n *UnsupportedDevicePathNode) CompoundType() DevicePathNodeCompoundType {
+func (n *GenericDevicePathNode) CompoundType() DevicePathNodeCompoundType {
 	return DevicePathNodeCompoundType(n.Type)<<8 | DevicePathNodeCompoundType(n.SubType)
 }
 
+// AsGenericDevicePathNode implements [DevicePathNode.AsGenericDevicePathNode].
+func (n *GenericDevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathNode, error) {
+	return convertToGenericDevicePathNode(n)
+}
+
 // ToString implements [DevicePathNode.ToString].
-func (n *UnsupportedDevicePathNode) ToString(_ DevicePathToStringFlags) string {
+func (n *GenericDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	var builder bytes.Buffer
 
 	switch n.Type {
@@ -404,12 +426,12 @@ func (n *UnsupportedDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 }
 
 // String implements [fmt.Stringer].
-func (n *UnsupportedDevicePathNode) String() string {
+func (n *GenericDevicePathNode) String() string {
 	return n.ToString(DevicePathDisplayOnly)
 }
 
 // Write implements [DevicePathNode.Write].
-func (n *UnsupportedDevicePathNode) Write(w io.Writer) error {
+func (n *GenericDevicePathNode) Write(w io.Writer) error {
 	hdr := uefi.EFI_DEVICE_PATH_PROTOCOL{
 		Type:    uint8(n.Type),
 		SubType: uint8(n.SubType)}
@@ -437,6 +459,11 @@ type PCIDevicePathNode struct {
 // CompoundType implements [DevicePathNode.CompoundType].
 func (n *PCIDevicePathNode) CompoundType() DevicePathNodeCompoundType {
 	return DevicePathNodePCIType
+}
+
+// AsGenericDevicePathNode implements [DevicePathNode.AsGenericDevicePathNode].
+func (n *PCIDevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathNode, error) {
+	return convertToGenericDevicePathNode(n)
 }
 
 func (n *PCIDevicePathNode) ToString(_ DevicePathToStringFlags) string {
@@ -481,6 +508,11 @@ func (n *VendorDevicePathNode) CompoundType() DevicePathNodeCompoundType {
 		// Return an invalid compound type.
 		return DevicePathNodeCompoundType(n.Type) << 8
 	}
+}
+
+// AsGenericDevicePathNode implements [DevicePathNode.AsGenericDevicePathNode].
+func (n *VendorDevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathNode, error) {
+	return convertToGenericDevicePathNode(n)
 }
 
 // ToString implements [DevicePathNode.ToString].
@@ -606,6 +638,11 @@ func (n *ACPIDevicePathNode) CompoundType() DevicePathNodeCompoundType {
 	return DevicePathNodeACPIType
 }
 
+// AsGenericDevicePathNode implements [DevicePathNode.AsGenericDevicePathNode].
+func (n *ACPIDevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathNode, error) {
+	return convertToGenericDevicePathNode(n)
+}
+
 // ToString implements [DevicePathNode.ToString].
 func (n *ACPIDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	if n.HID.Vendor() == "PNP" {
@@ -660,6 +697,11 @@ type ACPIExtendedDevicePathNode struct {
 // CompoundType implements [DevicePathNode.CompoundType].
 func (n *ACPIExtendedDevicePathNode) CompoundType() DevicePathNodeCompoundType {
 	return DevicePathNodeACPIExtendedType
+}
+
+// AsGenericDevicePathNode implements [DevicePathNode.AsGenericDevicePathNode].
+func (n *ACPIExtendedDevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathNode, error) {
+	return convertToGenericDevicePathNode(n)
 }
 
 // ToString implements [DevicePathNode.ToString].
@@ -803,6 +845,11 @@ func (n *ATAPIDevicePathNode) CompoundType() DevicePathNodeCompoundType {
 	return DevicePathNodeATAPIType
 }
 
+// AsGenericDevicePathNode implements [DevicePathNode.AsGenericDevicePathNode].
+func (n *ATAPIDevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathNode, error) {
+	return convertToGenericDevicePathNode(n)
+}
+
 // ToString implements [DevicePathNode.ToString].
 func (n *ATAPIDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	if flags.DisplayOnly() {
@@ -841,6 +888,11 @@ func (n *SCSIDevicePathNode) CompoundType() DevicePathNodeCompoundType {
 	return DevicePathNodeSCSIType
 }
 
+// AsGenericDevicePathNode implements [DevicePathNode.AsGenericDevicePathNode].
+func (n *SCSIDevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathNode, error) {
+	return convertToGenericDevicePathNode(n)
+}
+
 // ToString implements [DevicePathNode.ToString].
 func (n *SCSIDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	return fmt.Sprintf("Scsi(%#x,%#x)", n.PUN, n.LUN)
@@ -873,6 +925,11 @@ type USBDevicePathNode struct {
 // CompoundType implements [DevicePathNode.CompoundType].
 func (n *USBDevicePathNode) CompoundType() DevicePathNodeCompoundType {
 	return DevicePathNodeUSBType
+}
+
+// AsGenericDevicePathNode implements [DevicePathNode.AsGenericDevicePathNode].
+func (n *USBDevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathNode, error) {
+	return convertToGenericDevicePathNode(n)
 }
 
 // ToString implements [DevicePathNode.ToString].
@@ -927,6 +984,11 @@ type USBClassDevicePathNode struct {
 // CompoundType implements [DevicePathNode.CompoundType].
 func (n *USBClassDevicePathNode) CompoundType() DevicePathNodeCompoundType {
 	return DevicePathNodeUSBClassType
+}
+
+// AsGenericDevicePathNode implements [DevicePathNode.AsGenericDevicePathNode].
+func (n *USBClassDevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathNode, error) {
+	return convertToGenericDevicePathNode(n)
 }
 
 // ToString implements [DevicePathNode.ToString].
@@ -992,6 +1054,11 @@ type MACAddrDevicePathNode struct {
 	IfType     NetworkInterfaceType
 }
 
+// AsGenericDevicePathNode implements [DevicePathNode.AsGenericDevicePathNode].
+func (n *MACAddrDevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathNode, error) {
+	return convertToGenericDevicePathNode(n)
+}
+
 // CompoundType implements [DevicePathNode.CompoundType].
 func (n *MACAddrDevicePathNode) CompoundType() DevicePathNodeCompoundType {
 	return DevicePathNodeMACAddrType
@@ -1054,6 +1121,11 @@ func (n *IPv4DevicePathNode) CompoundType() DevicePathNodeCompoundType {
 	return DevicePathNodeIPv4Type
 }
 
+// AsGenericDevicePathNode implements [DevicePathNode.AsGenericDevicePathNode].
+func (n *IPv4DevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathNode, error) {
+	return convertToGenericDevicePathNode(n)
+}
+
 // ToString implements [DevicePathNode.ToString].
 func (n *IPv4DevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	var s bytes.Buffer
@@ -1112,6 +1184,11 @@ func (n *IPv6DevicePathNode) CompoundType() DevicePathNodeCompoundType {
 	return DevicePathNodeIPv6Type
 }
 
+// AsGenericDevicePathNode implements [DevicePathNode.AsGenericDevicePathNode].
+func (n *IPv6DevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathNode, error) {
+	return convertToGenericDevicePathNode(n)
+}
+
 // ToString implements [DevicePathNode.ToString].
 func (n *IPv6DevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	var s bytes.Buffer
@@ -1166,6 +1243,11 @@ func (n *USBWWIDDevicePathNode) CompoundType() DevicePathNodeCompoundType {
 	return DevicePathNodeUSBWWIDType
 }
 
+// AsGenericDevicePathNode implements [DevicePathNode.AsGenericDevicePathNode].
+func (n *USBWWIDDevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathNode, error) {
+	return convertToGenericDevicePathNode(n)
+}
+
 // ToString implements [DevicePathNode.ToString].
 func (n *USBWWIDDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	return fmt.Sprintf("UsbWwid(%#x,%#x,%#x,\"%s\"", n.VendorId, n.ProductId, n.InterfaceNumber, n.SerialNumber)
@@ -1206,6 +1288,11 @@ func (n *DeviceLogicalUnitDevicePathNode) CompoundType() DevicePathNodeCompoundT
 	return DevicePathNodeDeviceLogicalUnitType
 }
 
+// AsGenericDevicePathNode implements [DevicePathNode.AsGenericDevicePathNode].
+func (n *DeviceLogicalUnitDevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathNode, error) {
+	return convertToGenericDevicePathNode(n)
+}
+
 // ToString implements [DevicePathNode.ToString].
 func (n *DeviceLogicalUnitDevicePathNode) ToString(_ DevicePathToStringFlags) string {
 	return fmt.Sprintf("Unit(%#x)", n.LUN)
@@ -1238,6 +1325,11 @@ type SATADevicePathNode struct {
 // CompoundType implements [DevicePathNode.CompoundType].
 func (n *SATADevicePathNode) CompoundType() DevicePathNodeCompoundType {
 	return DevicePathNodeSATAType
+}
+
+// AsGenericDevicePathNode implements [DevicePathNode.AsGenericDevicePathNode].
+func (n *SATADevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathNode, error) {
+	return convertToGenericDevicePathNode(n)
 }
 
 // ToString implements [DevicePathNode.ToString].
@@ -1273,6 +1365,11 @@ type NVMENamespaceDevicePathNode struct {
 // CompoundType implements [DevicePathNode.CompoundType].
 func (n *NVMENamespaceDevicePathNode) CompoundType() DevicePathNodeCompoundType {
 	return DevicePathNodeNVMENamespaceType
+}
+
+// AsGenericDevicePathNode implements [DevicePathNode.AsGenericDevicePathNode].
+func (n *NVMENamespaceDevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathNode, error) {
+	return convertToGenericDevicePathNode(n)
 }
 
 // ToString implements [DevicePathNode.ToString].
@@ -1448,6 +1545,11 @@ func (n *HardDriveDevicePathNode) CompoundType() DevicePathNodeCompoundType {
 	return DevicePathNodeHardDriveType
 }
 
+// AsGenericDevicePathNode implements [DevicePathNode.AsGenericDevicePathNode].
+func (n *HardDriveDevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathNode, error) {
+	return convertToGenericDevicePathNode(n)
+}
+
 // ToString implements [DevicePathNode.ToString].
 func (n *HardDriveDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	var builder bytes.Buffer
@@ -1565,6 +1667,11 @@ func (n *CDROMDevicePathNode) CompoundType() DevicePathNodeCompoundType {
 	return DevicePathNodeCDROMType
 }
 
+// AsGenericDevicePathNode implements [DevicePathNode.AsGenericDevicePathNode].
+func (n *CDROMDevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathNode, error) {
+	return convertToGenericDevicePathNode(n)
+}
+
 // ToString implements [DevicePathNode.ToString].
 func (n *CDROMDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	if flags.DisplayOnly() {
@@ -1598,6 +1705,11 @@ type FilePathDevicePathNode string
 // CompoundType implements [DevicePathNode.CompoundType].
 func (n FilePathDevicePathNode) CompoundType() DevicePathNodeCompoundType {
 	return DevicePathNodeFilePathType
+}
+
+// AsGenericDevicePathNode implements [DevicePathNode.AsGenericDevicePathNode].
+func (n FilePathDevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathNode, error) {
+	return convertToGenericDevicePathNode(n)
 }
 
 // ToString implements [DevicePathNode.ToString].
@@ -1645,6 +1757,11 @@ type MediaFvFileDevicePathNode GUID
 // CompoundType implements [DevicePathNode.CompoundType].
 func (n MediaFvFileDevicePathNode) CompoundType() DevicePathNodeCompoundType {
 	return DevicePathNodeFwFileType
+}
+
+// AsGenericDevicePathNode implements [DevicePathNode.AsGenericDevicePathNode].
+func (n MediaFvFileDevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathNode, error) {
+	return convertToGenericDevicePathNode(n)
 }
 
 // ToString implements [DevicePathNode.ToString].
@@ -1711,6 +1828,11 @@ func (n MediaFvDevicePathNode) CompoundType() DevicePathNodeCompoundType {
 	return DevicePathNodeFwVolType
 }
 
+// AsGenericDevicePathNode implements [DevicePathNode.AsGenericDevicePathNode].
+func (n MediaFvDevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathNode, error) {
+	return convertToGenericDevicePathNode(n)
+}
+
 // ToString implements [DevicePathNode.ToString].
 func (n MediaFvDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	if flags.DisplayOnly() {
@@ -1775,6 +1897,11 @@ type MediaRelOffsetRangeDevicePathNode struct {
 // CompoundType implements [DevicePathNode.CompoundType].
 func (n *MediaRelOffsetRangeDevicePathNode) CompoundType() DevicePathNodeCompoundType {
 	return DevicePathNodeRelativeOffsetRangeType
+}
+
+// AsGenericDevicePathNode implements [DevicePathNode.AsGenericDevicePathNode].
+func (n *MediaRelOffsetRangeDevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathNode, error) {
+	return convertToGenericDevicePathNode(n)
 }
 
 // ToString implements [DevicePathNode.ToString].
@@ -2063,12 +2190,7 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 		return nil, nil
 	}
 
-	var n uefi.EFI_DEVICE_PATH_PROTOCOL
-	if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
-		return nil, err
-	}
-	data, _ := io.ReadAll(buf)
-	return &UnsupportedDevicePathNode{Type: DevicePathNodeType(n.Type), SubType: DevicePathSubType(n.SubType), Data: data}, nil
+	return readGenericDevicePathNode(buf)
 }
 
 // ReadDevicePath decodes a device path from the supplied io.Reader. It will read
