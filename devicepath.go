@@ -224,8 +224,8 @@ const (
 	DevicePathNodeCDROMType               DevicePathNodeCompoundType = devicePathNodeCDROMType               // nodes of this type are implemented by *CDROMDevicePathNode
 	DevicePathNodeVendorMediaType         DevicePathNodeCompoundType = devicePathNodeVendorMediaType         // nodes of this type are implemented by *VendorDevicePathNode
 	DevicePathNodeFilePathType            DevicePathNodeCompoundType = devicePathNodeFilePathType            // nodes of this type are implemented by FilePathDevicePathNode
-	DevicePathNodeFwFileType              DevicePathNodeCompoundType = devicePathNodeFwFileType              // nodes of this type are implemented by MediaFvFileDevicePathNode
-	DevicePathNodeFwVolType               DevicePathNodeCompoundType = devicePathNodeFwVolType               // nodes of this type are implemented by MediaFvDevicePathNode
+	DevicePathNodeFwFileType              DevicePathNodeCompoundType = devicePathNodeFwFileType              // nodes of this type are implemented by FWFileDevicePathNode
+	DevicePathNodeFwVolType               DevicePathNodeCompoundType = devicePathNodeFwVolType               // nodes of this type are implemented by FWVolDevicePathNode
 	DevicePathNodeRelativeOffsetRangeType DevicePathNodeCompoundType = devicePathNodeRelativeOffsetRangeType // nodes of this type are implemented by *RelativeOffsetRangeDevicePathNode
 )
 
@@ -1913,20 +1913,25 @@ func NewFilePathDevicePathNode(path string) (out FilePathDevicePathNode) {
 }
 
 // MediaFvFileDevicePathNode corresponds to a firmware volume file device path node.
-type MediaFvFileDevicePathNode GUID
+//
+// Deprecated: use [FWFileDevicePathNode].
+type MediaFvFileDevicePathNode = FWFileDevicePathNode
+
+// FWFileDevicePathNode corresponds to a firmware volume file device path node.
+type FWFileDevicePathNode GUID
 
 // CompoundType implements [DevicePathNode.CompoundType].
-func (n MediaFvFileDevicePathNode) CompoundType() DevicePathNodeCompoundType {
+func (n FWFileDevicePathNode) CompoundType() DevicePathNodeCompoundType {
 	return DevicePathNodeFwFileType
 }
 
 // AsGenericDevicePathNode implements [DevicePathNode.AsGenericDevicePathNode].
-func (n MediaFvFileDevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathNode, error) {
+func (n FWFileDevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathNode, error) {
 	return convertToGenericDevicePathNode(n)
 }
 
 // ToString implements [DevicePathNode.ToString].
-func (n MediaFvFileDevicePathNode) ToString(flags DevicePathToStringFlags) string {
+func (n FWFileDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	if flags.DisplayOnly() {
 		fvFileNameLookupMu.Lock()
 		defer fvFileNameLookupMu.Unlock()
@@ -1942,12 +1947,12 @@ func (n MediaFvFileDevicePathNode) ToString(flags DevicePathToStringFlags) strin
 }
 
 // String implements [fmt.Stringer].
-func (n MediaFvFileDevicePathNode) String() string {
+func (n FWFileDevicePathNode) String() string {
 	return n.ToString(DevicePathDisplayOnly | DevicePathAllowShortcuts)
 }
 
 // Write implements [DevicePathNode.Write].
-func (n MediaFvFileDevicePathNode) Write(w io.Writer) error {
+func (n FWFileDevicePathNode) Write(w io.Writer) error {
 	node := uefi.MEDIA_FW_VOL_FILEPATH_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(n.CompoundType().Type()),
@@ -1965,7 +1970,7 @@ var (
 
 // RegisterMediaFvFileNameLookup registers a function that can map guids to
 // strings for well known names, and these will be displayed by
-// [MediaFvFileDevicePathNode.String] and [MediaFvFileDevicePathNode.ToString]
+// [FWFileDevicePathNode.String] and [FWFileDevicePathNode.ToString]
 // if the flags argument is marked as display only. Note that this does make the
 // string representation of the path unparseable, if the string is being used
 // in such a way (this package doesn't yet have any ways of parsing device paths
@@ -1974,7 +1979,24 @@ var (
 // Just importing [github.com/canonical/go-efilib/guids] is sufficient to register
 // a function that does this. It's included in a separate and optional package for
 // systems that are concerned about binary size.
+//
+// Deprecated: use [RegisterFWFileNameLookup].
 func RegisterMediaFvFileNameLookup(fn func(GUID) (string, bool)) {
+	RegisterFWFileNameLookup(fn)
+}
+
+// RegisterFWFileNameLookup registers a function that can map guids to
+// strings for well known names, and these will be displayed by
+// [FWFileDevicePathNode.String] and [FWFileDevicePathNode.ToString]
+// if the flags argument is marked as display only. Note that this does make the
+// string representation of the path unparseable, if the string is being used
+// in such a way (this package doesn't yet have any ways of parsing device paths
+// that are in string form).
+//
+// Just importing [github.com/canonical/go-efilib/guids] is sufficient to register
+// a function that does this. It's included in a separate and optional package for
+// systems that are concerned about binary size.
+func RegisterFWFileNameLookup(fn func(GUID) (string, bool)) {
 	fvFileNameLookupMu.Lock()
 	defer fvFileNameLookupMu.Unlock()
 
@@ -1982,20 +2004,25 @@ func RegisterMediaFvFileNameLookup(fn func(GUID) (string, bool)) {
 }
 
 // MediaFvDevicePathNode corresponds to a firmware volume device path node.
-type MediaFvDevicePathNode GUID
+//
+// Deprecated: use [FWVolDevicePathNode].
+type MediaFvDevicePathNode = FWVolDevicePathNode
+
+// FWVolDevicePathNode corresponds to a firmware volume device path node.
+type FWVolDevicePathNode GUID
 
 // CompoundType implements [DevicePathNode.CompoundType].
-func (n MediaFvDevicePathNode) CompoundType() DevicePathNodeCompoundType {
+func (n FWVolDevicePathNode) CompoundType() DevicePathNodeCompoundType {
 	return DevicePathNodeFwVolType
 }
 
 // AsGenericDevicePathNode implements [DevicePathNode.AsGenericDevicePathNode].
-func (n MediaFvDevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathNode, error) {
+func (n FWVolDevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathNode, error) {
 	return convertToGenericDevicePathNode(n)
 }
 
 // ToString implements [DevicePathNode.ToString].
-func (n MediaFvDevicePathNode) ToString(flags DevicePathToStringFlags) string {
+func (n FWVolDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 	if flags.DisplayOnly() {
 		fvNameLookupMu.Lock()
 		defer fvNameLookupMu.Unlock()
@@ -2011,12 +2038,12 @@ func (n MediaFvDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 }
 
 // String implements [fmt.Stringer].
-func (n MediaFvDevicePathNode) String() string {
+func (n FWVolDevicePathNode) String() string {
 	return n.ToString(DevicePathDisplayOnly | DevicePathAllowShortcuts)
 }
 
 // Write implements [DevicePathNode.Write].
-func (n MediaFvDevicePathNode) Write(w io.Writer) error {
+func (n FWVolDevicePathNode) Write(w io.Writer) error {
 	node := uefi.MEDIA_FW_VOL_DEVICE_PATH{
 		Header: uefi.EFI_DEVICE_PATH_PROTOCOL{
 			Type:    uint8(n.CompoundType().Type()),
@@ -2034,7 +2061,7 @@ var (
 
 // RegisterMediaFvNameLookup registers a function that can map guids to
 // strings for well known names, and these will be displayed by
-// [MediaFvDevicePathNode.String] and [MediaFvDevicePathNode.ToString]
+// [FWVolDevicePathNode.String] and [FWVolDevicePathNode.ToString]
 // if the flags argument is marked as display only. Note that this does make the
 // string representation of the path unparseable, if the string is being used
 // in such a way (this package doesn't yet have any ways of parsing device paths
@@ -2043,7 +2070,24 @@ var (
 // Just importing [github.com/canonical/go-efilib/guids] is sufficient to register
 // a function that does this. It's included in a separate and optional package for
 // systems that are concerned about binary size.
+//
+// Deprecated: use [RegisterFWVolNameLookup].
 func RegisterMediaFvNameLookup(fn func(GUID) (string, bool)) {
+	RegisterFWVolNameLookup(fn)
+}
+
+// RegisterFWVolNameLookup registers a function that can map guids to
+// strings for well known names, and these will be displayed by
+// [FWVolDevicePathNode.String] and [FWVolDevicePathNode.ToString]
+// if the flags argument is marked as display only. Note that this does make the
+// string representation of the path unparseable, if the string is being used
+// in such a way (this package doesn't yet have any ways of parsing device paths
+// that are in string form).
+//
+// Just importing [github.com/canonical/go-efilib/guids] is sufficient to register
+// a function that does this. It's included in a separate and optional package for
+// systems that are concerned about binary size.
+func RegisterFWVolNameLookup(fn func(GUID) (string, bool)) {
 	fvNameLookupMu.Lock()
 	defer fvNameLookupMu.Unlock()
 
@@ -2332,13 +2376,13 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
-			return MediaFvFileDevicePathNode(GUID(n.FvFileName)), nil
+			return FWFileDevicePathNode(GUID(n.FvFileName)), nil
 		case uefi.MEDIA_PIWG_FW_VOL_DP:
 			var n uefi.MEDIA_FW_VOL_DEVICE_PATH
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
-			return MediaFvDevicePathNode(GUID(n.FvName)), nil
+			return FWVolDevicePathNode(GUID(n.FvName)), nil
 		case uefi.MEDIA_RELATIVE_OFFSET_RANGE_DP:
 			var n uefi.MEDIA_RELATIVE_OFFSET_RANGE_DEVICE_PATH
 			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {

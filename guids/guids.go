@@ -49,6 +49,6 @@ func ListAllKnown() []efi.GUID {
 }
 
 func init() {
-	efi.RegisterMediaFvFileNameLookup(IndustryStandardString)
-	efi.RegisterMediaFvNameLookup(IndustryStandardString)
+	efi.RegisterFWFileNameLookup(IndustryStandardString)
+	efi.RegisterFWVolNameLookup(IndustryStandardString)
 }

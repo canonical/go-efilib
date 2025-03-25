@@ -44,6 +44,6 @@ func (s *guidsSuite) TestListAll(c *C) {
 }
 
 func (s *guidsSuite) TestFvFileIntegration(c *C) {
-	file := efi.MediaFvFileDevicePathNode(efi.MakeGUID(0x821aca26, 0x29ea, 0x4993, 0x839f, [...]byte{0x59, 0x7f, 0xc0, 0x21, 0x70, 0x8d}))
+	file := efi.FWFileDevicePathNode(efi.MakeGUID(0x821aca26, 0x29ea, 0x4993, 0x839f, [...]byte{0x59, 0x7f, 0xc0, 0x21, 0x70, 0x8d}))
 	c.Check(file.String(), Equals, "FvFile(AbsoluteAbtInstaller)")
 }
