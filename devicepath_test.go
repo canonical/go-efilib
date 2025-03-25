@@ -63,11 +63,11 @@ func (s *dpSuite) TestReadDevicePathUnrecognizedType(c *C) {
 		"\\Scsi(0x0,0x0)\\HD(15,GPT,8933fedb-2f53-490b-a245-5c7fa1f98632)\\\\EFI\\ubuntu\\shimx64.efi")
 
 	expected := DevicePath{
-		&UnsupportedDevicePathNode{
+		&GenericDevicePathNode{
 			Type:    ACPIDevicePath,
 			SubType: 0xff,
 			Data:    DecodeHexString(c, "000000000000000000000000564d427573000000")},
-		&UnsupportedDevicePathNode{
+		&GenericDevicePathNode{
 			Type:    HardwareDevicePath,
 			SubType: 0x55,
 			Data:    DecodeHexString(c, "a2e5179b9108dd42b65380b5c22809bad96361baa104294db60572e2ffb1dc7f5a80e5d23e369c4494ed50c0a0cd8656")},

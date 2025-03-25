@@ -155,6 +155,7 @@ func ReadPartitionEntry(r io.Reader) (*PartitionEntry, error) {
 		PartitionName:       ConvertUTF16ToUTF8(e.PartitionName[:])}, nil
 }
 
+// String implements [fmt.Stringer].
 func (e *PartitionEntry) String() string {
 	return fmt.Sprintf("EFI_PARTITION_ENTRY{ PartitionTypeGUID: %s, UniquePartitionGUID: %s, StartingLBA: 0x%x, "+
 		"EndingLBA: 0x%x, Attributes: 0x%016x, PartitionName: \"%s\" }",
@@ -239,6 +240,7 @@ type PartitionTable struct {
 	Entries []*PartitionEntry
 }
 
+// String implements [fmt.Stringer].
 func (t *PartitionTable) String() string {
 	b := new(bytes.Buffer)
 	fmt.Fprintf(b, "GPT{\n\tHdr: %s,\n\tEntries: [", t.Hdr)

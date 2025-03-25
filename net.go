@@ -28,6 +28,7 @@ const (
 	IPProtocolUDP IPProtocol = uefi.RFC_1700_UDP_PROTOCOL
 )
 
+// String implements [fmt.Stringer].
 func (p IPProtocol) String() string {
 	switch p {
 	case IPProtocolTCP:
@@ -150,6 +151,7 @@ func (EUI64) Type() MACAddressType {
 	return MACAddressTypeEUI64
 }
 
+// AsEUI48 returns this identifier as EUI-48, if it is a valid EUI-48.
 func (id EUI64) AsEUI48() (EUI48, error) {
 	if id[3] != 0xFF || id[4] != 0xFE {
 		return EUI48{}, errors.New("EUI64 doesn't represent a EUI48 address")
@@ -182,6 +184,7 @@ func (EUI48) Type() MACAddressType {
 	return MACAddressTypeEUI64
 }
 
+// AsEUI64 returns this identifier as EUI-64.
 func (id EUI48) AsEUI64() EUI64 {
 	var out EUI64
 	copy(out[0:], id[:3])
