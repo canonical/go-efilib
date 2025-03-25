@@ -122,6 +122,35 @@ type DevicePathSubType = DevicePathNodeSubType
 // this depends on the [DevicePathNodeType].
 type DevicePathNodeSubType uint8
 
+const (
+	DevicePathNodeHWPCISubType    DevicePathNodeSubType = uefi.HW_PCI_DP
+	DevicePathNodeHWVendorSubType DevicePathNodeSubType = uefi.HW_VENDOR_DP
+
+	DevicePathNodeACPISubType         DevicePathNodeSubType = uefi.ACPI_DP
+	DevicePathNodeACPIExtendedSubType DevicePathNodeSubType = uefi.ACPI_EXTENDED_DP
+
+	DevicePathNodeMsgATAPISubType             DevicePathNodeSubType = uefi.MSG_ATAPI_DP
+	DevicePathNodeMsgSCSISubType              DevicePathNodeSubType = uefi.MSG_SCSI_DP
+	DevicePathNodeMsgUSBSubType               DevicePathNodeSubType = uefi.MSG_USB_DP
+	DevicePathNodeMsgUSBClassSubType          DevicePathNodeSubType = uefi.MSG_USB_CLASS_DP
+	DevicePathNodeMsgVendorSubType            DevicePathNodeSubType = uefi.MSG_VENDOR_DP
+	DevicePathNodeMsgMACAddrSubType           DevicePathNodeSubType = uefi.MSG_MAC_ADDR_DP
+	DevicePathNodeMsgIPv4SubType              DevicePathNodeSubType = uefi.MSG_IPv4_DP
+	DevicePathNodeMsgIPv6SubType              DevicePathNodeSubType = uefi.MSG_IPv6_DP
+	DevicePathNodeMsgUSBWWIDSubType           DevicePathNodeSubType = uefi.MSG_USB_WWID_DP
+	DevicePathNodeMsgDeviceLogicalUnitSubType DevicePathNodeSubType = uefi.MSG_DEVICE_LOGICAL_UNIT_DP
+	DevicePathNodeMsgSATASubType              DevicePathNodeSubType = uefi.MSG_SATA_DP
+	DevicePathNodeMsgNVMENamespaceSubType     DevicePathNodeSubType = uefi.MSG_NVME_NAMESPACE_DP
+
+	DevicePathNodeMediaHardDriveSubType           DevicePathNodeSubType = uefi.MEDIA_HARDDRIVE_DP
+	DevicePathNodeMediaCDROMSubType               DevicePathNodeSubType = uefi.MEDIA_CDROM_DP
+	DevicePathNodeMediaVendorSubType              DevicePathNodeSubType = uefi.MEDIA_VENDOR_DP
+	DevicePathNodeMediaFilePathSubType            DevicePathNodeSubType = uefi.MEDIA_FILEPATH_DP
+	DevicePathNodeMediaFwFileSubType              DevicePathNodeSubType = uefi.MEDIA_PIWG_FW_FILE_DP
+	DevicePathNodeMediaFwVolSubType               DevicePathNodeSubType = uefi.MEDIA_PIWG_FW_VOL_DP
+	DevicePathNodeMediaRelativeOffsetRangeSubType DevicePathNodeSubType = uefi.MEDIA_RELATIVE_OFFSET_RANGE_DP
+)
+
 // DevicePathNodeCompoundType describes the compound type of a device path node,
 // comprised of the type and sub-type.
 type DevicePathNodeCompoundType uint16
@@ -143,32 +172,32 @@ func (t DevicePathNodeCompoundType) IsValid() bool {
 }
 
 const (
-	devicePathNodePCIType      DevicePathNodeCompoundType = DevicePathNodeCompoundType(HardwareDevicePath)<<8 | DevicePathNodeCompoundType(uefi.HW_PCI_DP)
-	devicePathNodeVendorHWType DevicePathNodeCompoundType = DevicePathNodeCompoundType(HardwareDevicePath)<<8 | DevicePathNodeCompoundType(uefi.HW_VENDOR_DP)
+	devicePathNodePCIType      DevicePathNodeCompoundType = DevicePathNodeCompoundType(HardwareDevicePath)<<8 | DevicePathNodeCompoundType(DevicePathNodeHWPCISubType)
+	devicePathNodeVendorHWType DevicePathNodeCompoundType = DevicePathNodeCompoundType(HardwareDevicePath)<<8 | DevicePathNodeCompoundType(DevicePathNodeHWVendorSubType)
 
-	devicePathNodeACPIType         DevicePathNodeCompoundType = DevicePathNodeCompoundType(ACPIDevicePath)<<8 | DevicePathNodeCompoundType(uefi.ACPI_DP)
-	devicePathNodeACPIExtendedType DevicePathNodeCompoundType = DevicePathNodeCompoundType(ACPIDevicePath)<<8 | DevicePathNodeCompoundType(uefi.ACPI_EXTENDED_DP)
+	devicePathNodeACPIType         DevicePathNodeCompoundType = DevicePathNodeCompoundType(ACPIDevicePath)<<8 | DevicePathNodeCompoundType(DevicePathNodeACPISubType)
+	devicePathNodeACPIExtendedType DevicePathNodeCompoundType = DevicePathNodeCompoundType(ACPIDevicePath)<<8 | DevicePathNodeCompoundType(DevicePathNodeACPIExtendedSubType)
 
-	devicePathNodeATAPIType             DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MSG_ATAPI_DP)
-	devicePathNodeSCSIType              DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MSG_SCSI_DP)
-	devicePathNodeUSBType               DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MSG_USB_DP)
-	devicePathNodeUSBClassType          DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MSG_USB_CLASS_DP)
-	devicePathNodeVendorMsgType         DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MSG_VENDOR_DP)
-	devicePathNodeMACAddrType           DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MSG_MAC_ADDR_DP)
-	devicePathNodeIPv4Type              DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MSG_IPv4_DP)
-	devicePathNodeIPv6Type              DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MSG_IPv6_DP)
-	devicePathNodeUSBWWIDType           DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MSG_USB_WWID_DP)
-	devicePathNodeDeviceLogicalUnitType DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MSG_DEVICE_LOGICAL_UNIT_DP)
-	devicePathNodeSATAType              DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MSG_SATA_DP)
-	devicePathNodeNVMENamespaceType     DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MSG_NVME_NAMESPACE_DP)
+	devicePathNodeATAPIType             DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(DevicePathNodeMsgATAPISubType)
+	devicePathNodeSCSIType              DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(DevicePathNodeMsgSCSISubType)
+	devicePathNodeUSBType               DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(DevicePathNodeMsgUSBSubType)
+	devicePathNodeUSBClassType          DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(DevicePathNodeMsgUSBClassSubType)
+	devicePathNodeVendorMsgType         DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(DevicePathNodeMsgVendorSubType)
+	devicePathNodeMACAddrType           DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(DevicePathNodeMsgMACAddrSubType)
+	devicePathNodeIPv4Type              DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(DevicePathNodeMsgIPv4SubType)
+	devicePathNodeIPv6Type              DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(DevicePathNodeMsgIPv6SubType)
+	devicePathNodeUSBWWIDType           DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(DevicePathNodeMsgUSBWWIDSubType)
+	devicePathNodeDeviceLogicalUnitType DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(DevicePathNodeMsgDeviceLogicalUnitSubType)
+	devicePathNodeSATAType              DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(DevicePathNodeMsgSATASubType)
+	devicePathNodeNVMENamespaceType     DevicePathNodeCompoundType = DevicePathNodeCompoundType(MessagingDevicePath)<<8 | DevicePathNodeCompoundType(DevicePathNodeMsgNVMENamespaceSubType)
 
-	devicePathNodeHardDriveType           DevicePathNodeCompoundType = DevicePathNodeCompoundType(MediaDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MEDIA_HARDDRIVE_DP)
-	devicePathNodeCDROMType               DevicePathNodeCompoundType = DevicePathNodeCompoundType(MediaDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MEDIA_CDROM_DP)
-	devicePathNodeVendorMediaType         DevicePathNodeCompoundType = DevicePathNodeCompoundType(MediaDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MEDIA_VENDOR_DP)
-	devicePathNodeFilePathType            DevicePathNodeCompoundType = DevicePathNodeCompoundType(MediaDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MEDIA_FILEPATH_DP)
-	devicePathNodeFwFileType              DevicePathNodeCompoundType = DevicePathNodeCompoundType(MediaDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MEDIA_PIWG_FW_FILE_DP)
-	devicePathNodeFwVolType               DevicePathNodeCompoundType = DevicePathNodeCompoundType(MediaDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MEDIA_PIWG_FW_VOL_DP)
-	devicePathNodeRelativeOffsetRangeType DevicePathNodeCompoundType = DevicePathNodeCompoundType(MediaDevicePath)<<8 | DevicePathNodeCompoundType(uefi.MEDIA_RELATIVE_OFFSET_RANGE_DP)
+	devicePathNodeHardDriveType           DevicePathNodeCompoundType = DevicePathNodeCompoundType(MediaDevicePath)<<8 | DevicePathNodeCompoundType(DevicePathNodeMediaHardDriveSubType)
+	devicePathNodeCDROMType               DevicePathNodeCompoundType = DevicePathNodeCompoundType(MediaDevicePath)<<8 | DevicePathNodeCompoundType(DevicePathNodeMediaCDROMSubType)
+	devicePathNodeVendorMediaType         DevicePathNodeCompoundType = DevicePathNodeCompoundType(MediaDevicePath)<<8 | DevicePathNodeCompoundType(DevicePathNodeMediaVendorSubType)
+	devicePathNodeFilePathType            DevicePathNodeCompoundType = DevicePathNodeCompoundType(MediaDevicePath)<<8 | DevicePathNodeCompoundType(DevicePathNodeMediaFilePathSubType)
+	devicePathNodeFwFileType              DevicePathNodeCompoundType = DevicePathNodeCompoundType(MediaDevicePath)<<8 | DevicePathNodeCompoundType(DevicePathNodeMediaFwFileSubType)
+	devicePathNodeFwVolType               DevicePathNodeCompoundType = DevicePathNodeCompoundType(MediaDevicePath)<<8 | DevicePathNodeCompoundType(DevicePathNodeMediaFwVolSubType)
+	devicePathNodeRelativeOffsetRangeType DevicePathNodeCompoundType = DevicePathNodeCompoundType(MediaDevicePath)<<8 | DevicePathNodeCompoundType(DevicePathNodeMediaRelativeOffsetRangeSubType)
 )
 
 const (
