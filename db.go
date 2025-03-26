@@ -11,6 +11,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/canonical/go-efilib/internal/uefi"
 )
@@ -74,7 +75,7 @@ func (l *SignatureList) toUefiType() (out *uefi.EFI_SIGNATURE_LIST, err error) {
 }
 
 func (l *SignatureList) String() string {
-	var b bytes.Buffer
+	var b strings.Builder
 	fmt.Fprintf(&b, "EFI_SIGNATURE_LIST{ SignatureType: %v, SignatureHeader: %x, Signatures: [", l.Type, l.Header)
 	for _, d := range l.Signatures {
 		fmt.Fprintf(&b, "\n\tEFI_SIGNATURE_DATA{ SignatureOwner: %v, Details: {", d.Owner)
@@ -83,18 +84,21 @@ func (l *SignatureList) String() string {
 			fmt.Fprintf(&b, "\n\t\tHash: %x", d.Data)
 		case CertX509Guid:
 			cert, err := x509.ParseCertificate(d.Data)
-			if err != nil {
+			switch {
+			case err != nil:
 				fmt.Fprintf(&b, "%v", err)
+			default:
+				h := crypto.SHA256.New()
+				h.Write(cert.RawTBSCertificate)
+				fmt.Fprintf(&b, "\n\t\tSubject: %v\n\t\tIssuer: %v\n\t\tSHA256 fingerprint: %x", cert.Subject, cert.Issuer, h.Sum(nil))
 			}
-			h := crypto.SHA256.New()
-			h.Write(cert.RawTBSCertificate)
-			fmt.Fprintf(&b, "\n\t\tSubject: %v\n\t\tIssuer: %v\n\t\tSHA256 fingerprint: %x", cert.Subject, cert.Issuer, h.Sum(nil))
 		default:
-			fmt.Fprintf(&b, "<unrecognized type>")
+			b.WriteString("<unrecognized type>")
 		}
-		fmt.Fprintf(&b, "}}")
+		b.WriteString("}}")
 	}
-	fmt.Fprintf(&b, "]")
+	b.WriteString("]")
+
 	return b.String()
 }
 
@@ -136,11 +140,11 @@ func (db SignatureDatabase) String() string {
 
 // Bytes returns the serialized form of this signature database.
 func (db SignatureDatabase) Bytes() ([]byte, error) {
-	w := new(bytes.Buffer)
-	if err := db.Write(w); err != nil {
+	var buf bytes.Buffer
+	if err := db.Write(&buf); err != nil {
 		return nil, err
 	}
-	return w.Bytes(), nil
+	return buf.Bytes(), nil
 }
 
 // Write serializes this signature database to w.

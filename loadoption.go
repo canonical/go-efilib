@@ -55,11 +55,11 @@ func (o *LoadOption) String() string {
 
 // Bytes returns the serialized form of this load option.
 func (o *LoadOption) Bytes() ([]byte, error) {
-	w := new(bytes.Buffer)
-	if err := o.Write(w); err != nil {
+	var buf bytes.Buffer
+	if err := o.Write(&buf); err != nil {
 		return nil, err
 	}
-	return w.Bytes(), nil
+	return buf.Bytes(), nil
 }
 
 // Write serializes this load option to the supplied io.Writer.
@@ -69,8 +69,8 @@ func (o *LoadOption) Write(w io.Writer) error {
 		Description:  ConvertUTF8ToUCS2(o.Description + "\x00"),
 		OptionalData: o.OptionalData}
 
-	dp := new(bytes.Buffer)
-	if err := o.FilePath.Write(dp); err != nil {
+	var dp bytes.Buffer
+	if err := o.FilePath.Write(&dp); err != nil {
 		return err
 	}
 	if dp.Len() > math.MaxUint16 {

@@ -286,11 +286,11 @@ type DevicePath []DevicePathNode
 // ToString returns a string representation of this device path with the
 // supplied flags.
 func (p DevicePath) ToString(flags DevicePathToStringFlags) string {
-	s := new(bytes.Buffer)
+	var b strings.Builder
 	for _, node := range p {
-		fmt.Fprintf(s, "\\%s", node.ToString(flags))
+		fmt.Fprintf(&b, "\\%s", node.ToString(flags))
 	}
-	return s.String()
+	return b.String()
 }
 
 // String implements [fmt.Stringer], and returns the display only string.
@@ -301,11 +301,11 @@ func (p DevicePath) String() string {
 
 // Bytes returns the serialized form of this device path.
 func (p DevicePath) Bytes() ([]byte, error) {
-	w := new(bytes.Buffer)
-	if err := p.Write(w); err != nil {
+	var buf bytes.Buffer
+	if err := p.Write(&buf); err != nil {
 		return nil, err
 	}
-	return w.Bytes(), nil
+	return buf.Bytes(), nil
 }
 
 // Write serializes the complete device path to w.
@@ -336,12 +336,12 @@ func DevicePathFindFirstOccurrence[T DevicePathNode](p DevicePath) DevicePath {
 }
 
 func (p DevicePath) matchesInternal(other DevicePath, onlyFull bool) DevicePathMatch {
-	pBytes := new(bytes.Buffer)
-	if err := p.Write(pBytes); err != nil {
+	var pBytes bytes.Buffer
+	if err := p.Write(&pBytes); err != nil {
 		return DevicePathNoMatch
 	}
-	otherBytes := new(bytes.Buffer)
-	if err := other.Write(otherBytes); err != nil {
+	var otherBytes bytes.Buffer
+	if err := other.Write(&otherBytes); err != nil {
 		return DevicePathNoMatch
 	}
 	if bytes.Equal(pBytes.Bytes(), otherBytes.Bytes()) {
@@ -463,11 +463,11 @@ func readGenericDevicePathNode(r io.Reader) (*GenericDevicePathNode, error) {
 }
 
 func convertToGenericDevicePathNode(n DevicePathNode) (*GenericDevicePathNode, error) {
-	buf := new(bytes.Buffer)
-	if err := n.Write(buf); err != nil {
+	var buf bytes.Buffer
+	if err := n.Write(&buf); err != nil {
 		return nil, err
 	}
-	return readGenericDevicePathNode(buf)
+	return readGenericDevicePathNode(&buf)
 }
 
 // CompoundType implements [DevicePathNode.CompoundType].
@@ -482,21 +482,22 @@ func (n *GenericDevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathNod
 
 // ToString implements [DevicePathNode.ToString].
 func (n *GenericDevicePathNode) ToString(_ DevicePathToStringFlags) string {
-	var builder bytes.Buffer
+	var b strings.Builder
 
 	switch n.Type {
 	case HardwareDevicePath, ACPIDevicePath, MessagingDevicePath,
 		MediaDevicePath, BBSDevicePath:
-		fmt.Fprintf(&builder, "%s(", n.Type)
+		fmt.Fprintf(&b, "%s(", n.Type)
 	default:
-		fmt.Fprintf(&builder, "Path(%d,", n.Type)
+		fmt.Fprintf(&b, "Path(%d,", n.Type)
 	}
-	fmt.Fprintf(&builder, "%d", n.SubType)
+	fmt.Fprintf(&b, "%d", n.SubType)
 	if len(n.Data) > 0 {
-		fmt.Fprintf(&builder, ",%x", n.Data)
+		fmt.Fprintf(&b, ",%x", n.Data)
 	}
-	fmt.Fprintf(&builder, ")")
-	return builder.String()
+	b.WriteString(")")
+
+	return b.String()
 }
 
 // String implements [fmt.Stringer].
@@ -591,12 +592,12 @@ func (n *VendorDevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathNode
 
 // ToString implements [DevicePathNode.ToString].
 func (n *VendorDevicePathNode) ToString(flags DevicePathToStringFlags) string {
-	var t string
+	var nodeType string
 	switch n.Type {
 	case HardwareDevicePath:
-		t = "Hw"
+		nodeType = "Hw"
 	case MessagingDevicePath:
-		t = "Msg"
+		nodeType = "Msg"
 		if flags.AllowVendorShortcuts() {
 			switch n.GUID {
 			case PCAnsiGuid:
@@ -620,18 +621,19 @@ func (n *VendorDevicePathNode) ToString(flags DevicePathToStringFlags) string {
 			}
 		}
 	case MediaDevicePath:
-		t = "Media"
+		nodeType = "Media"
 	default:
-		t = "?"
+		nodeType = "?"
 	}
 
-	var s bytes.Buffer
-	fmt.Fprintf(&s, "Ven%s(%s", t, n.GUID)
+	var b strings.Builder
+	fmt.Fprintf(&b, "Ven%s(%s", nodeType, n.GUID)
 	if len(n.Data) > 0 {
-		fmt.Fprintf(&s, ",%x", n.Data)
+		fmt.Fprintf(&b, ",%x", n.Data)
 	}
-	fmt.Fprintf(&s, ")")
-	return s.String()
+	b.WriteString(")")
+
+	return b.String()
 }
 
 // String implement [fmt.Stringer].
@@ -666,13 +668,13 @@ func (n *VendorDevicePathNode) Write(w io.Writer) error {
 }
 
 func (n *VendorDevicePathNode) uartFlowControlString() (string, bool) {
-	var ufc uefi.UART_FLOW_CONTROL_DEVICE_PATH
-	buf := new(bytes.Buffer)
-	if err := n.Write(buf); err != nil {
+	var buf bytes.Buffer
+	if err := n.Write(&buf); err != nil {
 		return "", false
 	}
 
-	if err := binary.Read(buf, binary.LittleEndian, &ufc); err != nil {
+	var ufc uefi.UART_FLOW_CONTROL_DEVICE_PATH
+	if err := binary.Read(&buf, binary.LittleEndian, &ufc); err != nil {
 		return "", false
 	}
 
@@ -685,30 +687,30 @@ func (n *VendorDevicePathNode) uartFlowControlString() (string, bool) {
 	case 2:
 		value = "XonXoff"
 	default:
-		value = fmt.Sprintf("%#x", strconv.FormatUint(uint64(ufc.FlowControlMap), 10))
+		value = "0x3"
 	}
 
 	return fmt.Sprintf("UartFlowControl(%s)", value), true
 }
 
 func (n *VendorDevicePathNode) sasString() (string, bool) {
+	var buf bytes.Buffer
+	if err := n.Write(&buf); err != nil {
+		return "", false
+	}
+
 	var sas uefi.SAS_DEVICE_PATH
-	buf := new(bytes.Buffer)
-	if err := n.Write(buf); err != nil {
+	if err := binary.Read(&buf, binary.LittleEndian, &sas); err != nil {
 		return "", false
 	}
 
-	if err := binary.Read(buf, binary.LittleEndian, &sas); err != nil {
-		return "", false
-	}
-
-	s := new(bytes.Buffer)
-	fmt.Fprintf(s, "SAS(%#x,%#x,%#x,", sas.SasAddress, sas.Lun, sas.RelativeTargetPort)
+	var b strings.Builder
+	fmt.Fprintf(&b, "SAS(%#x,%#x,%#x,", sas.SasAddress, sas.Lun, sas.RelativeTargetPort)
 
 	info := sas.DeviceTopology
 	switch {
 	case info&0xf == 0 && info&0x80 == 0:
-		fmt.Fprintf(s, "NoTopology,0,0,0,")
+		b.WriteString("NoTopology,0,0,0,")
 	case info&0xf <= 2 && info&0x80 == 0:
 		var sasOrSata string
 		switch {
@@ -734,21 +736,21 @@ func (n *VendorDevicePathNode) sasString() (string, bool) {
 			connect = "Expanded"
 		}
 
-		fmt.Fprintf(s, "%s,%s,%s,", sasOrSata, location, connect)
+		fmt.Fprintf(&b, "%s,%s,%s,", sasOrSata, location, connect)
 
 		switch {
 		case info&0xf == 1:
-			fmt.Fprintf(s, "0,") // DriveBay
+			b.WriteString("0,") // DriveBay
 		default:
-			fmt.Fprintf(s, "%#x,", ((info>>8)&0xff)+1) // DriveBay
+			fmt.Fprintf(&b, "%#x,", ((info>>8)&0xff)+1) // DriveBay
 		}
 	default:
-		fmt.Fprintf(s, "%#x,0,0,0,", info)
+		fmt.Fprintf(&b, "%#x,0,0,0,", info)
 	}
 
-	fmt.Fprintf(s, "%#x)", sas.Reserved)
+	fmt.Fprintf(&b, "%#x)", sas.Reserved)
 
-	return s.String(), true
+	return b.String(), true
 }
 
 func readVendorDevicePathNode(r io.Reader) (out *VendorDevicePathNode, err error) {
@@ -1345,17 +1347,16 @@ func (n *IPv4DevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathNode, 
 
 // ToString implements [DevicePathNode.ToString].
 func (n *IPv4DevicePathNode) ToString(flags DevicePathToStringFlags) string {
-	var s bytes.Buffer
-	fmt.Fprintf(&s, "IPv4(%s", n.RemoteAddress)
+	var b strings.Builder
+	fmt.Fprintf(&b, "IPv4(%s", n.RemoteAddress)
 
 	if flags.DisplayOnly() {
-		fmt.Fprintf(&s, ")")
-		return s.String()
+		b.WriteString(")")
+		return b.String()
 	}
 
-	fmt.Fprintf(&s, ",%s,%s,%s,%s,%s)", n.Protocol, n.LocalAddressOrigin, n.LocalAddress, n.GatewayAddress, n.SubnetMask)
-
-	return s.String()
+	fmt.Fprintf(&b, ",%s,%s,%s,%s,%s)", n.Protocol, n.LocalAddressOrigin, n.LocalAddress, n.GatewayAddress, n.SubnetMask)
+	return b.String()
 }
 
 // String implements [fmt.Stringer].
@@ -1408,17 +1409,16 @@ func (n *IPv6DevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathNode, 
 
 // ToString implements [DevicePathNode.ToString].
 func (n *IPv6DevicePathNode) ToString(flags DevicePathToStringFlags) string {
-	var s bytes.Buffer
-	fmt.Fprintf(&s, "IPv6(%s", n.RemoteAddress)
+	var b strings.Builder
+	fmt.Fprintf(&b, "IPv6(%s", n.RemoteAddress)
 
 	if flags.DisplayOnly() {
-		fmt.Fprintf(&s, ")")
-		return s.String()
+		b.WriteString(")")
+		return b.String()
 	}
 
-	fmt.Fprintf(&s, ",%s,%s,%s,%#x,%s)", n.Protocol, n.LocalAddressOrigin, n.LocalAddress, n.PrefixLength, n.GatewayAddress)
-
-	return s.String()
+	fmt.Fprintf(&b, ",%s,%s,%s,%#x,%s)", n.Protocol, n.LocalAddressOrigin, n.LocalAddress, n.PrefixLength, n.GatewayAddress)
+	return b.String()
 }
 
 // String implements [fmt.Stringer].
@@ -1769,27 +1769,29 @@ func (n *HardDriveDevicePathNode) AsGenericDevicePathNode() (*GenericDevicePathN
 
 // ToString implements [DevicePathNode.ToString].
 func (n *HardDriveDevicePathNode) ToString(flags DevicePathToStringFlags) string {
-	var builder bytes.Buffer
+	var b strings.Builder
 
 	signature := n.Signature
 	if signature == nil {
 		signature = EmptyHardDriveSignature
 	}
 
-	fmt.Fprintf(&builder, "HD(%d,%s,", n.PartitionNumber, signature.Type())
+	fmt.Fprintf(&b, "HD(%d,%s,", n.PartitionNumber, signature.Type())
 	switch signature.Type() {
-	default:
-		fmt.Fprintf(&builder, "0")
+	case NoHardDriveSignature:
+		b.WriteString("0")
 	case HardDriveSignatureTypeMBR, HardDriveSignatureTypeGUID:
-		fmt.Fprintf(&builder, "%s", signature)
+		fmt.Fprintf(&b, "%s", signature)
+	default:
+		fmt.Fprintf(&b, "%x", signature.Data())
 	}
 
 	if !flags.DisplayOnly() {
-		fmt.Fprintf(&builder, ",%#x,%#x", n.PartitionStart, n.PartitionSize)
+		fmt.Fprintf(&b, ",%#x,%#x", n.PartitionStart, n.PartitionSize)
 	}
-	fmt.Fprintf(&builder, ")")
+	b.WriteString(")")
 
-	return builder.String()
+	return b.String()
 }
 
 // ToString implements [DevicePathNode.ToString].
@@ -2189,8 +2191,8 @@ func (n *MediaRelOffsetRangeDevicePathNode) Write(w io.Writer) error {
 }
 
 func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
-	buf := new(bytes.Buffer)
-	r2 := io.TeeReader(r, buf)
+	var buf bytes.Buffer
+	r2 := io.TeeReader(r, &buf)
 
 	var hdr uefi.EFI_DEVICE_PATH_PROTOCOL
 	if err := binary.Read(r2, binary.LittleEndian, &hdr); err != nil {
@@ -2201,7 +2203,7 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 		return nil, fmt.Errorf("invalid length %d bytes (too small)", hdr.Length)
 	}
 
-	if _, err := io.CopyN(buf, r, int64(hdr.Length-4)); err != nil {
+	if _, err := io.CopyN(&buf, r, int64(hdr.Length-4)); err != nil {
 		return nil, ioerr.EOFIsUnexpected(err)
 	}
 
@@ -2223,24 +2225,24 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 		switch hdr.SubType {
 		case uefi.HW_PCI_DP:
 			var n uefi.PCI_DEVICE_PATH
-			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
+			if err := binary.Read(&buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
 			return &PCIDevicePathNode{Function: n.Function, Device: n.Device}, nil
 		case uefi.HW_VENDOR_DP:
-			return readVendorDevicePathNode(buf)
+			return readVendorDevicePathNode(&buf)
 		}
 	case uefi.ACPI_DEVICE_PATH:
 		switch hdr.SubType {
 		case uefi.ACPI_DP:
 			var n uefi.ACPI_HID_DEVICE_PATH
-			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
+			if err := binary.Read(&buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
 			return &ACPIDevicePathNode{HID: EISAID(n.HID), UID: n.UID}, nil
 		case uefi.ACPI_EXTENDED_DP:
 			var n uefi.ACPI_EXTENDED_HID_DEVICE_PATH
-			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
+			if err := binary.Read(&buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
 			node := &ACPIExtendedDevicePathNode{HID: EISAID(n.HID), UID: n.UID, CID: EISAID(n.CID)}
@@ -2257,7 +2259,7 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 		switch hdr.SubType {
 		case uefi.MSG_ATAPI_DP:
 			var n uefi.ATAPI_DEVICE_PATH
-			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
+			if err := binary.Read(&buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
 			return &ATAPIDevicePathNode{
@@ -2266,13 +2268,13 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 				LUN:        n.Lun}, nil
 		case uefi.MSG_SCSI_DP:
 			var n uefi.SCSI_DEVICE_PATH
-			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
+			if err := binary.Read(&buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
 			return &SCSIDevicePathNode{PUN: n.Pun, LUN: n.Lun}, nil
 		case uefi.MSG_USB_DP:
 			var n uefi.USB_DEVICE_PATH
-			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
+			if err := binary.Read(&buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
 			return &USBDevicePathNode{
@@ -2280,7 +2282,7 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 				InterfaceNumber:  n.InterfaceNumber}, nil
 		case uefi.MSG_USB_CLASS_DP:
 			var n uefi.USB_CLASS_DEVICE_PATH
-			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
+			if err := binary.Read(&buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
 			return &USBClassDevicePathNode{
@@ -2291,7 +2293,7 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 				DeviceProtocol: USBProtocol(n.DeviceProtocol)}, nil
 		case uefi.MSG_MAC_ADDR_DP:
 			var n uefi.MAC_ADDR_DEVICE_PATH
-			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
+			if err := binary.Read(&buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
 
@@ -2310,7 +2312,7 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 			return node, nil
 		case uefi.MSG_IPv4_DP:
 			var n uefi.IPv4_DEVICE_PATH
-			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
+			if err := binary.Read(&buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
 			return &IPv4DevicePathNode{
@@ -2324,7 +2326,7 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 				SubnetMask:         IPv4Address(n.SubnetMask.Addr)}, nil
 		case uefi.MSG_IPv6_DP:
 			var n uefi.IPv6_DEVICE_PATH
-			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
+			if err := binary.Read(&buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
 			return &IPv6DevicePathNode{
@@ -2337,9 +2339,9 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 				PrefixLength:       n.PrefixLength,
 				GatewayAddress:     IPv6Address(n.GatewayIpAddress.Addr)}, nil
 		case uefi.MSG_VENDOR_DP:
-			return readVendorDevicePathNode(buf)
+			return readVendorDevicePathNode(&buf)
 		case uefi.MSG_USB_WWID_DP:
-			n, err := uefi.Read_USB_WWID_DEVICE_PATH(buf)
+			n, err := uefi.Read_USB_WWID_DEVICE_PATH(&buf)
 			if err != nil {
 				return nil, err
 			}
@@ -2350,13 +2352,13 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 				SerialNumber:    ConvertUTF16ToUTF8(n.SerialNumber)}, nil
 		case uefi.MSG_DEVICE_LOGICAL_UNIT_DP:
 			var n uefi.DEVICE_LOGICAL_UNIT_DEVICE_PATH
-			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
+			if err := binary.Read(&buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
 			return &DeviceLogicalUnitDevicePathNode{LUN: n.Lun}, nil
 		case uefi.MSG_SATA_DP:
 			var n uefi.SATA_DEVICE_PATH
-			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
+			if err := binary.Read(&buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
 			return &SATADevicePathNode{
@@ -2365,7 +2367,7 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 				LUN:                      n.Lun}, nil
 		case uefi.MSG_NVME_NAMESPACE_DP:
 			var n uefi.NVME_NAMESPACE_DEVICE_PATH
-			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
+			if err := binary.Read(&buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
 
@@ -2384,7 +2386,7 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 		switch hdr.SubType {
 		case uefi.MEDIA_HARDDRIVE_DP:
 			var n uefi.HARDDRIVE_DEVICE_PATH
-			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
+			if err := binary.Read(&buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
 
@@ -2412,7 +2414,7 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 				MBRType:         MBRType(n.MBRType)}, nil
 		case uefi.MEDIA_CDROM_DP:
 			var n uefi.CDROM_DEVICE_PATH
-			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
+			if err := binary.Read(&buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
 			return &CDROMDevicePathNode{
@@ -2420,28 +2422,28 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 				PartitionStart: n.PartitionStart,
 				PartitionSize:  n.PartitionSize}, nil
 		case uefi.MEDIA_VENDOR_DP:
-			return readVendorDevicePathNode(buf)
+			return readVendorDevicePathNode(&buf)
 		case uefi.MEDIA_FILEPATH_DP:
-			n, err := uefi.Read_FILEPATH_DEVICE_PATH(buf)
+			n, err := uefi.Read_FILEPATH_DEVICE_PATH(&buf)
 			if err != nil {
 				return nil, err
 			}
 			return FilePathDevicePathNode(ConvertUTF16ToUTF8(n.PathName)), nil
 		case uefi.MEDIA_PIWG_FW_FILE_DP:
 			var n uefi.MEDIA_FW_VOL_FILEPATH_DEVICE_PATH
-			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
+			if err := binary.Read(&buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
 			return FWFileDevicePathNode(GUID(n.FvFileName)), nil
 		case uefi.MEDIA_PIWG_FW_VOL_DP:
 			var n uefi.MEDIA_FW_VOL_DEVICE_PATH
-			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
+			if err := binary.Read(&buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
 			return FWVolDevicePathNode(GUID(n.FvName)), nil
 		case uefi.MEDIA_RELATIVE_OFFSET_RANGE_DP:
 			var n uefi.MEDIA_RELATIVE_OFFSET_RANGE_DEVICE_PATH
-			if err := binary.Read(buf, binary.LittleEndian, &n); err != nil {
+			if err := binary.Read(&buf, binary.LittleEndian, &n); err != nil {
 				return nil, err
 			}
 			return &MediaRelOffsetRangeDevicePathNode{StartingOffset: n.StartingOffset, EndingOffset: n.EndingOffset}, nil
@@ -2451,7 +2453,7 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 		return nil, nil
 	}
 
-	return readGenericDevicePathNode(buf)
+	return readGenericDevicePathNode(&buf)
 }
 
 // ReadDevicePath decodes a device path from the supplied io.Reader. It will read

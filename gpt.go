@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"hash/crc32"
 	"io"
+	"strings"
 
 	"github.com/canonical/go-efilib/internal/uefi"
 	"github.com/canonical/go-efilib/mbr"
@@ -188,11 +189,11 @@ func readPartitionEntries(r io.Reader, num, sz, expectedCrc uint32, checkCrc boo
 	crc := crc32.NewIEEE()
 	r2 := io.TeeReader(r, crc)
 
-	b := new(bytes.Buffer)
+	var buf bytes.Buffer
 	for i := uint32(0); i < num; i++ {
-		b.Reset()
+		buf.Reset()
 
-		if _, err := io.CopyN(b, r2, int64(sz)); err != nil {
+		if _, err := io.CopyN(&buf, r2, int64(sz)); err != nil {
 			switch {
 			case err == io.EOF && i == 0:
 				return nil, err
@@ -202,7 +203,7 @@ func readPartitionEntries(r io.Reader, num, sz, expectedCrc uint32, checkCrc boo
 			return nil, fmt.Errorf("cannot read entry %d: %w", i, err)
 		}
 
-		e, err := ReadPartitionEntry(b)
+		e, err := ReadPartitionEntry(&buf)
 		if err != nil {
 			return nil, err
 		}
@@ -242,12 +243,12 @@ type PartitionTable struct {
 
 // String implements [fmt.Stringer].
 func (t *PartitionTable) String() string {
-	b := new(bytes.Buffer)
-	fmt.Fprintf(b, "GPT{\n\tHdr: %s,\n\tEntries: [", t.Hdr)
+	var b strings.Builder
+	fmt.Fprintf(&b, "GPT{\n\tHdr: %s,\n\tEntries: [", t.Hdr)
 	for _, entry := range t.Entries {
-		fmt.Fprintf(b, "\n\t\t%s", entry)
+		fmt.Fprintf(&b, "\n\t\t%s", entry)
 	}
-	fmt.Fprintf(b, "\n\t]\n}")
+	b.WriteString("\n\t]\n}")
 	return b.String()
 }
 
