@@ -18,8 +18,9 @@ import (
 )
 
 var (
-	ErrCRCCheck        = errors.New("CRC check failed")
-	ErrNoProtectiveMBR = errors.New("no protective master boot record found")
+	ErrCRCCheck        = errors.New("CRC check failed")                       // the partition table header or partition entry CRC check failed
+	ErrNoProtectiveMBR = errors.New("no protective master boot record found") // no protective MBR record was found
+	ErrMBRFound        = errors.New("a MBR was found")                        // a standard MBR was found
 
 	// ErrInvalidBackupPartitionTableLocation may be returned from
 	// ReadPartitionTable when called with the BackupPartitionTable
@@ -306,7 +307,10 @@ func ReadPartitionTable(r io.ReaderAt, totalSz, blockSz int64, role PartitionTab
 	r2 := io.NewSectionReader(r, 0, totalSz)
 
 	record, err := mbr.ReadRecord(r2)
-	if err != nil {
+	switch {
+	case errors.Is(err, mbr.ErrInvalidSignature):
+		return nil, ErrNoProtectiveMBR
+	case err != nil:
 		return nil, err
 	}
 
@@ -318,7 +322,7 @@ func ReadPartitionTable(r io.ReaderAt, totalSz, blockSz int64, role PartitionTab
 		}
 	}
 	if !validPmbr {
-		return nil, ErrNoProtectiveMBR
+		return nil, ErrMBRFound
 	}
 
 	switch role {

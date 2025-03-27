@@ -541,7 +541,7 @@ func (s *gptSuite) TestReadPartitionTableInvalidPMBR(c *C) {
 	c.Check(s.testReadPartitionTableInvalid(c, &testReadPartitionTableInvalidData{
 		path: "testdata/partitiontables/invalid-pmbr",
 		role: PrimaryPartitionTable,
-	}), Equals, ErrNoProtectiveMBR)
+	}), Equals, ErrMBRFound)
 }
 
 func (s *gptSuite) TestReadPartitionTableInvalidPrimaryHeader1(c *C) {
