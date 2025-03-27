@@ -1844,7 +1844,7 @@ func NewHardDriveDevicePathNodeFromDevice(r io.ReaderAt, totalSz, blockSz int64,
 
 	table, err := ReadPartitionTable(r, totalSz, blockSz, PrimaryPartitionTable, true)
 	switch {
-	case err == ErrMBRFound:
+	case err == ErrStandardMBRFound:
 		record, err := mbr.ReadRecord(io.NewSectionReader(r, 0, totalSz))
 		if err != nil {
 			return nil, err
