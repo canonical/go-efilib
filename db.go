@@ -76,28 +76,28 @@ func (l *SignatureList) toUefiType() (out *uefi.EFI_SIGNATURE_LIST, err error) {
 
 func (l *SignatureList) String() string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "EFI_SIGNATURE_LIST{ SignatureType: %v, SignatureHeader: %x, Signatures: [", l.Type, l.Header)
+	fmt.Fprintf(&b, "EFI_SIGNATURE_LIST {\n\tSignatureType: %v,\n\tSignatureHeader: %x,\n\tSignatures: [", l.Type, l.Header)
 	for _, d := range l.Signatures {
-		fmt.Fprintf(&b, "\n\tEFI_SIGNATURE_DATA{ SignatureOwner: %v, Details: {", d.Owner)
+		fmt.Fprintf(&b, "\n\t\tEFI_SIGNATURE_DATA {\n\t\t\tSignatureOwner: %v,\n\t\t\tDetails: {", d.Owner)
 		switch l.Type {
 		case CertSHA1Guid, CertSHA256Guid, CertSHA224Guid, CertSHA384Guid, CertSHA512Guid:
-			fmt.Fprintf(&b, "\n\t\tHash: %x", d.Data)
+			fmt.Fprintf(&b, "\n\t\t\t\tHash: %x", d.Data)
 		case CertX509Guid:
 			cert, err := x509.ParseCertificate(d.Data)
 			switch {
 			case err != nil:
-				fmt.Fprintf(&b, "%v", err)
+				fmt.Fprintf(&b, "\n\t\t\t\tCannot parse certificate: %v", err)
 			default:
 				h := crypto.SHA256.New()
 				h.Write(cert.RawTBSCertificate)
-				fmt.Fprintf(&b, "\n\t\tSubject: %v\n\t\tIssuer: %v\n\t\tSHA256 fingerprint: %x", cert.Subject, cert.Issuer, h.Sum(nil))
+				fmt.Fprintf(&b, "\n\t\t\t\tSubject: %v\n\t\t\t\tIssuer: %v\n\t\t\t\tSHA256 fingerprint: %x", cert.Subject, cert.Issuer, h.Sum(nil))
 			}
 		default:
 			b.WriteString("<unrecognized type>")
 		}
-		b.WriteString("}}")
+		b.WriteString("\n\t\t\t}\n\t\t}")
 	}
-	b.WriteString("]")
+	b.WriteString("\n\t]\n}")
 
 	return b.String()
 }
@@ -131,11 +131,13 @@ func ReadSignatureList(r io.Reader) (*SignatureList, error) {
 type SignatureDatabase []*SignatureList
 
 func (db SignatureDatabase) String() string {
-	var s string
+	var b strings.Builder
+	b.WriteString("{")
 	for _, l := range db {
-		s = s + "\n" + l.String() + "\n"
+		fmt.Fprintf(&b, "\n\t%s", strings.Replace(l.String(), "\n", "\n\t", -1))
 	}
-	return s
+	b.WriteString("\n}")
+	return b.String()
 }
 
 // Bytes returns the serialized form of this signature database.

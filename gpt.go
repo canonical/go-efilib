@@ -124,9 +124,9 @@ func (h *PartitionTableHeader) Write(w io.Writer) error {
 }
 
 func (h *PartitionTableHeader) String() string {
-	return fmt.Sprintf("EFI_PARTITION_TABLE_HEADER{ MyLBA: 0x%x, AlternateLBA: 0x%x, FirstUsableLBA: 0x%x, "+
-		"LastUsableLBA: 0x%x, DiskGUID: %v, PartitionEntryLBA: 0x%x, NumberOfPartitionEntries: %d, "+
-		"SizeOfPartitionEntry: 0x%x, PartitionEntryArrayCRC32: 0x%08x }",
+	return fmt.Sprintf("EFI_PARTITION_TABLE_HEADER {\n\tMyLBA: 0x%x,\n\tAlternateLBA: 0x%x,\n\tFirstUsableLBA: 0x%x,\n\t"+
+		"LastUsableLBA: 0x%x,\n\tDiskGUID: %v,\n\tPartitionEntryLBA: 0x%x,\n\tNumberOfPartitionEntries: %d,\n\t"+
+		"SizeOfPartitionEntry: 0x%x,\n\tPartitionEntryArrayCRC32: 0x%08x\n}",
 		h.MyLBA, h.AlternateLBA, h.FirstUsableLBA, h.LastUsableLBA, h.DiskGUID, h.PartitionEntryLBA,
 		h.NumberOfPartitionEntries, h.SizeOfPartitionEntry, h.PartitionEntryArrayCRC32)
 }
@@ -159,8 +159,8 @@ func ReadPartitionEntry(r io.Reader) (*PartitionEntry, error) {
 
 // String implements [fmt.Stringer].
 func (e *PartitionEntry) String() string {
-	return fmt.Sprintf("EFI_PARTITION_ENTRY{ PartitionTypeGUID: %s, UniquePartitionGUID: %s, StartingLBA: 0x%x, "+
-		"EndingLBA: 0x%x, Attributes: 0x%016x, PartitionName: \"%s\" }",
+	return fmt.Sprintf("EFI_PARTITION_ENTRY {\n\tPartitionTypeGUID: %s,\n\tUniquePartitionGUID: %s,\n\tStartingLBA: 0x%x,\n\t"+
+		"EndingLBA: 0x%x,\n\tAttributes: 0x%016x,\n\tPartitionName: %q\n}",
 		e.PartitionTypeGUID, e.UniquePartitionGUID, e.StartingLBA, e.EndingLBA, e.Attributes, e.PartitionName)
 }
 
@@ -245,9 +245,12 @@ type PartitionTable struct {
 // String implements [fmt.Stringer].
 func (t *PartitionTable) String() string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "GPT{\n\tHdr: %s,\n\tEntries: [", t.Hdr)
-	for _, entry := range t.Entries {
-		fmt.Fprintf(&b, "\n\t\t%s", entry)
+	fmt.Fprintf(&b, "GPT {\n\tHdr: %s,\n\tEntries: [", strings.Replace(t.Hdr.String(), "\n", "\n\t", -1))
+	for i, entry := range t.Entries {
+		if entry.PartitionTypeGUID == UnusedPartitionType {
+			continue
+		}
+		fmt.Fprintf(&b, "\n\t\t%d: %s", i+1, strings.Replace(entry.String(), "\n", "\n\t\t", -1))
 	}
 	b.WriteString("\n\t]\n}")
 	return b.String()
