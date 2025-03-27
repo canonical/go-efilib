@@ -2460,6 +2460,9 @@ func decodeDevicePathNode(r io.Reader) (out DevicePathNode, err error) {
 			return &MediaRelOffsetRangeDevicePathNode{StartingOffset: n.StartingOffset, EndingOffset: n.EndingOffset}, nil
 		}
 	case uefi.END_DEVICE_PATH_TYPE:
+		if hdr.SubType != uefi.END_ENTIRE_DEVICE_PATH_SUBTYPE {
+			return nil, fmt.Errorf("unrecognized END_DEVICE_PATH_TYPE subtype (%#x)", hdr.SubType)
+		}
 		var n uefi.EFI_DEVICE_PATH_PROTOCOL
 		if err := binary.Read(nodeReader, binary.LittleEndian, &n); err != nil {
 			return nil, err
