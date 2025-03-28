@@ -7,6 +7,7 @@ package efi
 import (
 	"bytes"
 	"crypto"
+	_ "crypto/sha256"
 	"crypto/x509"
 	"encoding/binary"
 	"fmt"
@@ -95,7 +96,7 @@ func (l *SignatureList) String() string {
 				fmt.Fprintf(&b, " Cannot parse certificate: %v },", err)
 			default:
 				h := crypto.SHA256.New()
-				h.Write(cert.RawTBSCertificate)
+				h.Write(cert.Raw)
 				fmt.Fprintf(&b, `
 				Subject: %v
 				Issuer: %v
