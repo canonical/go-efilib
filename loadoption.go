@@ -53,7 +53,7 @@ func (o *LoadOption) String() string {
 	Attributes: %d,
 	Description: %q,
 	FilePath: %s,
-	OptionalData: %x
+	OptionalData: %x,
 }`, o.Attributes, o.Description, o.FilePath, o.OptionalData)
 }
 
