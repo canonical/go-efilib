@@ -288,9 +288,36 @@ func devicePathString[P devicePathToStringer](path P) string {
 	return path.ToString(DevicePathDisplayOnly | DevicePathAllowVendorShortcuts)
 }
 
+type devicePathFormatter[P devicePathToStringer] struct {
+	path P
+}
+
+func (formatter devicePathFormatter[P]) Format(f fmt.State, verb rune) {
+	switch verb {
+	case 's', 'v':
+		flags := DevicePathAllowVendorShortcuts
+		if !f.Flag('+') {
+			flags |= DevicePathDisplayOnly
+			if f.Flag('#') {
+				flags |= DevicePathDisplayFWGUIDNames
+			}
+		}
+
+		var b bytes.Buffer
+		b.WriteString(formatter.path.ToString(flags))
+		b.WriteTo(f)
+	default:
+		panic(fmt.Sprintf("invalid verb: %c", verb))
+	}
+}
+
 // DevicePath represents a complete device path with the first node
 // representing the root.
 type DevicePath []DevicePathNode
+
+func (p DevicePath) Formatter() fmt.Formatter {
+	return devicePathFormatter[DevicePath]{path: p}
+}
 
 // ToString returns a string representation of this device path with the
 // supplied flags.

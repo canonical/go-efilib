@@ -49,8 +49,12 @@ type LoadOption struct {
 
 // String implements [fmt.Stringer].
 func (o *LoadOption) String() string {
-	return fmt.Sprintf("EFI_LOAD_OPTION {\n\tAttributes: %d,\n\tDescription: %q,\n\tFilePath: %s,\n\tOptionalData: %x\n}",
-		o.Attributes, o.Description, o.FilePath, o.OptionalData)
+	return fmt.Sprintf(`EFI_LOAD_OPTION {
+	Attributes: %d,
+	Description: %q,
+	FilePath: %s,
+	OptionalData: %x
+}`, o.Attributes, o.Description, o.FilePath, o.OptionalData)
 }
 
 // Bytes returns the serialized form of this load option.
