@@ -144,7 +144,7 @@ func (db SignatureDatabase) String() string {
 	var b strings.Builder
 	b.WriteString("{")
 	for _, l := range db {
-		fmt.Fprintf(&b, "\n\t%s,", strings.Replace(l.String(), "\n", "\n\t", -1))
+		fmt.Fprintf(&b, "\n\t%s,", indent(l, 1))
 	}
 	b.WriteString("\n}")
 	return b.String()

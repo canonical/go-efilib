@@ -6,7 +6,6 @@ package efi_test
 
 import (
 	"bytes"
-	"fmt"
 	"os"
 
 	. "github.com/canonical/go-efilib"
@@ -260,7 +259,6 @@ func (s *gptSuite) testReadPartitionTable(c *C, data *testReadPartitionTableData
 		expected[i] = e
 	}
 	c.Check(table.Entries, DeepEquals, expected)
-	fmt.Println(table)
 }
 
 func (s *gptSuite) TestReadPartitionTablePrimaryOK(c *C) {

@@ -259,12 +259,12 @@ func (t *PartitionTable) String() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, `GPT {
 	Hdr: %s,
-	Entries: [`, strings.Replace(t.Hdr.String(), "\n", "\n\t", -1))
+	Entries: [`, indent(t.Hdr, 1))
 	for i, entry := range t.Entries {
 		if entry.PartitionTypeGUID == UnusedPartitionType {
 			continue
 		}
-		fmt.Fprintf(&b, "\n\t\t%d: %s,", i+1, strings.Replace(entry.String(), "\n", "\n\t\t", -1))
+		fmt.Fprintf(&b, "\n\t\t%d: %s,", i, indent(entry, 2))
 	}
 	b.WriteString("\n\t],\n}")
 	return b.String()
