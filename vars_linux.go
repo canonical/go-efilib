@@ -199,14 +199,27 @@ func writeEfivarfsFile(path string, attrs VariableAttributes, data []byte) (retr
 	if len(data) == 0 {
 		// short-cut for unauthenticated variable delete - efivarfs will perform a
 		// zero-byte write to delete the variable if we unlink the entry here.
+		if attrs&(AttributeAuthenticatedWriteAccess|AttributeTimeBasedAuthenticatedWriteAccess|AttributeEnhancedAuthenticatedAccess) > 0 {
+			// If the supplied attributes are incompatible with the variable,
+			// the variable service will return EFI_INVALID_PARAMETER and
+			// we'll get EINVAL back. If the supplied attributes are correct
+			// but we perform a zero-byte write to an authenticated vaiable,
+			// the variable service will return EFI_SECURITY_VIOLATION, but
+			// the kernel also turns this into EINVAL. Instead, we generate
+			// an appropriate error if the supplied attributes indicate that
+			// the variable is authenticated.
+			return false, ErrVarPermission
+		}
 		if err := removeVarFile(path); err != nil {
 			switch {
 			case errors.Is(err, os.ErrNotExist):
 				// It's not an error if the variable doesn't exist.
 				return false, nil
 			case inodeMayBeImmutable(err):
+				// Try again
 				return true, transformEfivarfsError(err)
 			default:
+				// Don't try again
 				return false, transformEfivarfsError(err)
 			}
 		}
@@ -221,8 +234,10 @@ func writeEfivarfsFile(path string, attrs VariableAttributes, data []byte) (retr
 	w, err := openVarFile(path, flags, 0644)
 	switch {
 	case inodeMayBeImmutable(err):
+		// Try again
 		return true, transformEfivarfsError(err)
 	case err != nil:
+		// Don't try again
 		return false, transformEfivarfsError(err)
 	}
 	defer w.Close()

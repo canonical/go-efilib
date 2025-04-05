@@ -533,6 +533,15 @@ func (s *varsLinuxSuite) TestWriteVariableWriteProtected(c *C) {
 	c.Check(err, Equals, ErrVarWriteProtected)
 }
 
+func (s *varsLinuxSuite) TestDeleteVariableAuthenticated(c *C) {
+	s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/Authenticated-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"] = &mockEfiVar{
+		data: DecodeHexString(c, "2700000001"),
+	}
+	err := WriteVariable(efivarfsVarContext, "Authenticated", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}),
+		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess|AttributeTimeBasedAuthenticatedWriteAccess, nil)
+	c.Check(err, Equals, ErrVarPermission)
+}
+
 func (s *varsLinuxSuite) TestListVariables(c *C) {
 	ents, err := ListVariables(efivarfsVarContext)
 	c.Check(err, IsNil)
