@@ -35,6 +35,13 @@ func (d mockDirent) ModTime() time.Time { return time.Time{} }
 func (d mockDirent) IsDir() bool        { return d.mode.IsDir() }
 func (d mockDirent) Sys() interface{}   { return nil }
 
+type mockEfiVar struct {
+	data  []byte
+	mode  os.FileMode
+	flags uint
+	err   error
+}
+
 type mockEfivarfsFile struct {
 	name   string
 	fs     *mockEfiVarfs
@@ -72,6 +79,13 @@ func (f *mockEfivarfsFile) Readdir(n int) ([]os.FileInfo, error) {
 		return nil, os.ErrClosed
 	}
 	return nil, &os.PathError{Op: "readdirent", Path: f.name, Err: syscall.EBADF}
+}
+
+func (f *mockEfivarfsFile) Stat() (os.FileInfo, error) {
+	if f.v == nil {
+		return mockDirent{name: filepath.Base(f.name), mode: os.ModeDir | 0755}, nil
+	}
+	return mockDirent{name: filepath.Base(f.name), mode: f.v.mode, size: int64(len(f.v.data))}, nil
 }
 
 func (f *mockEfivarfsFile) GetInodeFlags() (uint, error) {
@@ -189,13 +203,6 @@ func (f *mockEfivarfsDir) Readdir(n int) (out []os.FileInfo, err error) {
 
 func (f *mockEfivarfsDir) SetInodeFlags(flags uint) error {
 	return errors.New("unsupported")
-}
-
-type mockEfiVar struct {
-	data  []byte
-	mode  os.FileMode
-	flags uint
-	err   error
 }
 
 type mockEfiVarfs struct {

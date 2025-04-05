@@ -27,6 +27,7 @@ func efivarfsPath() string {
 type varFile interface {
 	io.ReadWriteCloser
 	Readdir(n int) ([]os.FileInfo, error)
+	Stat() (os.FileInfo, error)
 	GetInodeFlags() (uint, error)
 	SetInodeFlags(flags uint) error
 }
@@ -260,16 +261,26 @@ func (v efivarfsVarsBackend) Get(name string, guid GUID) (VariableAttributes, []
 	}
 	defer f.Close()
 
-	var attrs VariableAttributes
-	if err := binary.Read(f, binary.LittleEndian, &attrs); err != nil {
+	// Read the entire payload in a single read, as that's how
+	// GetVariable works and is the only way the kernel can obtain
+	// the variable contents. If we perform multiple reads, the
+	// kernel still has to obtain the entire variable contents
+	// each time. To do this, we need to know the size of the variable
+	// contents, which we can obtain from the inode.
+	fi, err := f.Stat()
+	if err != nil {
+		return 0, nil, err
+	}
+	if fi.Size() < 4 {
+		return 0, nil, ErrVarNotExist
+	}
+
+	buf := make([]byte, fi.Size())
+	if _, err := f.Read(buf); err != nil {
 		return 0, nil, transformEfivarfsError(err)
 	}
 
-	data, err := io.ReadAll(f)
-	if err != nil {
-		return 0, nil, transformEfivarfsError(err)
-	}
-	return attrs, data, nil
+	return VariableAttributes(binary.LittleEndian.Uint32(buf)), buf[4:], nil
 }
 
 func (v efivarfsVarsBackend) Set(name string, guid GUID, attrs VariableAttributes, data []byte) error {
