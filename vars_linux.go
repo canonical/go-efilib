@@ -76,7 +76,7 @@ func (f *realVarFile) SetInodeFlags(flags uint) error {
 	return nil
 }
 
-func realOpenVarFile(path string, flags int, perm os.FileMode) (varFile, error) {
+var openVarFile = func(path string, flags int, perm os.FileMode) (varFile, error) {
 	f, err := os.OpenFile(path, flags, perm)
 	if err != nil {
 		return nil, err
