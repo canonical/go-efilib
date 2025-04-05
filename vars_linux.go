@@ -31,7 +31,7 @@ type varFile interface {
 	SetInodeFlags(flags uint) error
 }
 
-func makeVarFileMutable(f varFile) (restore func() error, err error) {
+func makeVarFileMutableAndTakeFile(f varFile) (restore func() error, err error) {
 	const immutableFlag = 0x00000010
 
 	flags, err := f.GetInodeFlags()
@@ -41,6 +41,7 @@ func makeVarFileMutable(f varFile) (restore func() error, err error) {
 
 	if flags&immutableFlag == 0 {
 		// Nothing to do
+		f.Close()
 		return func() error { return nil }, nil
 	}
 
@@ -49,6 +50,9 @@ func makeVarFileMutable(f varFile) (restore func() error, err error) {
 	}
 
 	return func() error {
+		defer func() {
+			f.Close()
+		}()
 		return f.SetInodeFlags(flags)
 	}, nil
 }
@@ -183,10 +187,9 @@ func writeEfivarfsFile(path string, attrs VariableAttributes, data []byte) (retr
 	case err != nil:
 		return false, transformEfivarfsError(err)
 	default:
-		defer r.Close()
-
-		restoreImmutable, err := makeVarFileMutable(r)
+		restoreImmutable, err := makeVarFileMutableAndTakeFile(r)
 		if err != nil {
+			r.Close()
 			return false, transformEfivarfsError(err)
 		}
 
