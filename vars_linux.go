@@ -107,57 +107,87 @@ func maybeRetry(n int, fn func() (bool, error)) error {
 	}
 }
 
-func processEfivarfsFileAccessError(err error) (retry bool, errOut error) {
-	if os.IsPermission(err) {
-		var se syscall.Errno
-		if !errors.As(err, &se) {
-			// This shouldn't happen, but just return ErrVarPermission
-			// in this case and don't retry.
-			return false, ErrVarPermission
-		}
-		if se == syscall.EACCES {
-			// open will fail with EACCES if we lack the privileges
-			// to write to the file.
-			// open will fail with EACCES if we lack the privileges
-			// to write to the parent directory in the case where we
-			// need to create a new file.
-			// unlink will fail with EACCES if we lack the privileges
-			// to write to the parent directory.
-			// Don't retry in these cases.
-			return false, ErrVarPermission
-		}
-
-		// open and unlink will fail with EPERM if the file exists but
-		// it is immutable. This might happen as a result of a race with
-		// another process that might have been writing to the variable
-		// or may have deleted and recreated it, making the underlying
-		// inode immutable again.
-		// Retry in this case.
-		return true, ErrVarPermission
+// inodeMayBeImmutable returns whether the supplied error returned from open (for
+// writing) or unlink indicates that the inode is immutable. This is indicated
+// when the error is EPERM.
+//
+// We retry for EPERM errors that occur when opening an inode for writing,
+// or when unlinking its directory entry. Although we temporarily mark inodes as
+// mutable before opening them to write or when unlinking, we can get this error
+// as a result of race with another process that might have been writing to the
+// variable (and subsequently marked the inode as immutable again when it
+// finished) or may have deleted and recreated it, making the new inode immutable.
+func inodeMayBeImmutable(err error) bool {
+	var errno syscall.Errno
+	if !errors.As(err, &errno) {
+		return false
 	}
 
-	// Don't retry for any other error.
-	return false, err
+	return errno == syscall.EPERM
+}
+
+func transformEfivarfsError(err error) error {
+	switch {
+	case errors.Is(err, os.ErrNotExist) || err == io.EOF:
+		// ENOENT can come from the VFS layer during opening and unlinking, and
+		// converted from EFI_NOT_FOUND errors returned from the variable
+		// service. When reading a variable, if the variable doesn't exist
+		// when trying to determine the size of it, the kernel converts ENOENT
+		// into success with 0 bytes read which means we need to handle io.EOF
+		// as well.
+		return ErrVarNotExist
+	case errors.Is(err, syscall.EINVAL):
+		// EINVAL can come from the VFS layer during opening or unlinking due
+		// to invalid or incompatible flag combinations, although we don't expect
+		// that. It's also converted from EFI_INVALID_PARAMETER errors returned
+		// from the variable service.
+		return ErrVarInvalidParam
+	case errors.Is(err, syscall.EIO):
+		// EIO can come from the VFS layer during unlinking, although we don't
+		// expect that. It's also converted from EFI_DEVICE_ERROR errors returned
+		// from the variable service
+		return ErrVarDeviceError
+	case errors.Is(err, os.ErrPermission):
+		// EACCESS can come from the VFS layer for the following reasons:
+		// - opening a file for writing when the caller does not have write
+		//   access to it.
+		// - opening a file for writing when the caller does not have write
+		//   access to the parent directory and a new file needs to be created.
+		// - unlinking a file when the caller does not have write access to
+		//   the parent directory.
+		// EPERM can come from the VFS layer when opening a file for writing
+		// or unlinking if the inode is immutable (see inodeMayBeImmutable).
+		//
+		// EACCES is also converted from EFI_SECURITY_VIOLATION errors returned
+		// from the variable service.
+		return ErrVarPermission
+	case errors.Is(err, syscall.ENOSPC):
+		// ENOSPC is converted from EFI_OUT_OF_RESOURCES errors returned from
+		// the variable service.
+		return ErrVarInsufficientSpace
+	case errors.Is(err, syscall.EROFS):
+		// EROFS is converted from EFI_WRITE_PROTECTED errors returned from the
+		// variable service.
+		return ErrVarWriteProtected
+	default:
+		return err
+	}
 }
 
 func writeEfivarfsFile(path string, attrs VariableAttributes, data []byte) (retry bool, err error) {
 	// Open for reading to make the inode mutable
 	r, err := openVarFile(path, os.O_RDONLY, 0)
 	switch {
-	case os.IsNotExist(err):
-	case os.IsPermission(err):
-		return false, ErrVarPermission
+	case errors.Is(err, os.ErrNotExist):
+		// It's not an error if the variable doesn't exist.
 	case err != nil:
-		return false, err
+		return false, transformEfivarfsError(err)
 	default:
 		defer r.Close()
 
 		restoreImmutable, err := makeVarFileMutable(r)
-		switch {
-		case os.IsPermission(err):
-			return false, ErrVarPermission
-		case err != nil:
-			return false, err
+		if err != nil {
+			return false, transformEfivarfsError(err)
 		}
 
 		defer restoreImmutable()
@@ -166,12 +196,18 @@ func writeEfivarfsFile(path string, attrs VariableAttributes, data []byte) (retr
 	if len(data) == 0 {
 		// short-cut for unauthenticated variable delete - efivarfs will perform a
 		// zero-byte write to delete the variable if we unlink the entry here.
-		err := removeVarFile(path)
-		if os.IsNotExist(err) {
-			// it shouldn't be an error if the variable already doesn't exist.
-			return false, nil
+		if err := removeVarFile(path); err != nil {
+			switch {
+			case errors.Is(err, os.ErrNotExist):
+				// It's not an error if the variable doesn't exist.
+				return false, nil
+			case inodeMayBeImmutable(err):
+				return true, transformEfivarfsError(err)
+			default:
+				return false, transformEfivarfsError(err)
+			}
 		}
-		return processEfivarfsFileAccessError(err)
+		return false, nil
 	}
 
 	flags := os.O_WRONLY | os.O_CREATE
@@ -180,8 +216,11 @@ func writeEfivarfsFile(path string, attrs VariableAttributes, data []byte) (retr
 	}
 
 	w, err := openVarFile(path, flags, 0644)
-	if err != nil {
-		return processEfivarfsFileAccessError(err)
+	switch {
+	case inodeMayBeImmutable(err):
+		return true, transformEfivarfsError(err)
+	case err != nil:
+		return false, transformEfivarfsError(err)
 	}
 	defer w.Close()
 
@@ -190,7 +229,7 @@ func writeEfivarfsFile(path string, attrs VariableAttributes, data []byte) (retr
 	buf.Write(data)
 
 	_, err = buf.WriteTo(w)
-	return false, err
+	return false, transformEfivarfsError(err)
 }
 
 type efivarfsVarsBackend struct{}
@@ -198,27 +237,19 @@ type efivarfsVarsBackend struct{}
 func (v efivarfsVarsBackend) Get(name string, guid GUID) (VariableAttributes, []byte, error) {
 	path := filepath.Join(efivarfsPath(), fmt.Sprintf("%s-%s", name, guid))
 	f, err := openVarFile(path, os.O_RDONLY, 0)
-	switch {
-	case os.IsNotExist(err):
-		return 0, nil, ErrVarNotExist
-	case os.IsPermission(err):
-		return 0, nil, ErrVarPermission
-	case err != nil:
-		return 0, nil, err
+	if err != nil {
+		return 0, nil, transformEfivarfsError(err)
 	}
 	defer f.Close()
 
 	var attrs VariableAttributes
 	if err := binary.Read(f, binary.LittleEndian, &attrs); err != nil {
-		if err == io.EOF {
-			return 0, nil, ErrVarNotExist
-		}
-		return 0, nil, err
+		return 0, nil, transformEfivarfsError(err)
 	}
 
 	data, err := io.ReadAll(f)
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, transformEfivarfsError(err)
 	}
 	return attrs, data, nil
 }
@@ -231,12 +262,10 @@ func (v efivarfsVarsBackend) Set(name string, guid GUID, attrs VariableAttribute
 func (v efivarfsVarsBackend) List() ([]VariableDescriptor, error) {
 	f, err := openVarFile(efivarfsPath(), os.O_RDONLY, 0)
 	switch {
-	case os.IsNotExist(err):
+	case errors.Is(err, os.ErrNotExist):
 		return nil, ErrVarsUnavailable
-	case os.IsPermission(err):
-		return nil, ErrVarPermission
 	case err != nil:
-		return nil, err
+		return nil, transformEfivarfsError(err)
 	}
 	defer f.Close()
 

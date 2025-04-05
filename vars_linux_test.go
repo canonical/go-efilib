@@ -44,7 +44,7 @@ type mockEfivarfsFile struct {
 
 func (f *mockEfivarfsFile) Read(_ []byte) (int, error) {
 	if f.closed {
-		return 0, errors.New("file already closed")
+		return 0, os.ErrClosed
 	}
 
 	return 0, f.pathErr("read", syscall.EBADF)
@@ -52,7 +52,7 @@ func (f *mockEfivarfsFile) Read(_ []byte) (int, error) {
 
 func (f *mockEfivarfsFile) Write(_ []byte) (int, error) {
 	if f.closed {
-		return 0, errors.New("file already closed")
+		return 0, os.ErrClosed
 	}
 
 	return 0, f.pathErr("write", syscall.EBADF)
@@ -60,7 +60,7 @@ func (f *mockEfivarfsFile) Write(_ []byte) (int, error) {
 
 func (f *mockEfivarfsFile) Close() error {
 	if f.closed {
-		return errors.New("file already closed")
+		return os.ErrClosed
 	}
 	f.closed = true
 	f.fs.openCount -= 1
@@ -69,21 +69,21 @@ func (f *mockEfivarfsFile) Close() error {
 
 func (f *mockEfivarfsFile) Readdir(n int) ([]os.FileInfo, error) {
 	if f.closed {
-		return nil, errors.New("file already closed")
+		return nil, os.ErrClosed
 	}
 	return nil, &os.PathError{Op: "readdirent", Path: f.name, Err: syscall.EBADF}
 }
 
 func (f *mockEfivarfsFile) GetInodeFlags() (uint, error) {
 	if f.closed {
-		return 0, errors.New("file already closed")
+		return 0, os.ErrClosed
 	}
 	return f.v.flags, nil
 }
 
 func (f *mockEfivarfsFile) SetInodeFlags(flags uint) error {
 	if f.closed {
-		return errors.New("file already closed")
+		return os.ErrClosed
 	}
 	f.v.flags = flags
 	return nil
@@ -100,7 +100,7 @@ type mockEfivarfsWriterFile struct {
 
 func (w *mockEfivarfsWriterFile) Write(data []byte) (int, error) {
 	if w.closed {
-		return 0, errors.New("file already closed")
+		return 0, os.ErrClosed
 	}
 
 	if len(data) < 4 {
@@ -117,6 +117,10 @@ func (w *mockEfivarfsWriterFile) Write(data []byte) (int, error) {
 	}
 
 	attrs &^= AttributeAppendWrite
+
+	if w.v.err != nil {
+		return 0, w.v.err
+	}
 
 	if len(w.v.data) > 0 && VariableAttributes(binary.LittleEndian.Uint32(w.v.data)) != attrs {
 		return 0, w.pathErr("write", syscall.EINVAL)
@@ -146,7 +150,10 @@ type mockEfivarfsReaderFile struct {
 
 func (r *mockEfivarfsReaderFile) Read(data []byte) (int, error) {
 	if r.closed {
-		return 0, errors.New("file already closed")
+		return 0, os.ErrClosed
+	}
+	if r.v.err != nil {
+		return 0, r.v.err
 	}
 	return r.Reader.Read(data)
 }
@@ -157,14 +164,14 @@ type mockEfivarfsDir struct {
 
 func (f *mockEfivarfsDir) Read(_ []byte) (int, error) {
 	if f.closed {
-		return 0, errors.New("file already closed")
+		return 0, os.ErrClosed
 	}
 	return 0, io.EOF
 }
 
 func (f *mockEfivarfsDir) Readdir(n int) (out []os.FileInfo, err error) {
 	if f.closed {
-		return nil, errors.New("file already closed")
+		return nil, os.ErrClosed
 	}
 	out = append(out, mockDirent{name: ".", mode: os.ModeDir | 0755})
 	out = append(out, mockDirent{name: "..", mode: os.ModeDir | 0755})
@@ -188,6 +195,7 @@ type mockEfiVar struct {
 	data  []byte
 	mode  os.FileMode
 	flags uint
+	err   error
 }
 
 type mockEfiVarfs struct {
@@ -197,7 +205,7 @@ type mockEfiVarfs struct {
 
 func (m *mockEfiVarfs) Open(name string, flags int, perm os.FileMode) (VarFile, error) {
 	if flags&^(os.O_RDONLY|os.O_WRONLY|os.O_APPEND|os.O_CREATE|os.O_EXCL) != 0 {
-		return nil, errors.New("forbidden flags")
+		return nil, &os.PathError{Op: "open", Path: name, Err: syscall.EINVAL}
 	}
 
 	switch flags & (os.O_RDONLY | os.O_WRONLY) {
@@ -228,7 +236,7 @@ func (m *mockEfiVarfs) Open(name string, flags int, perm os.FileMode) (VarFile, 
 		m.openCount += 1
 		return &mockEfivarfsWriterFile{flags: flags, mockEfivarfsFile: &mockEfivarfsFile{name: name, v: v, fs: m}}, nil
 	default:
-		return nil, syscall.EINVAL
+		return nil, &os.PathError{Op: "open", Path: name, Err: syscall.EINVAL}
 	}
 }
 
@@ -239,7 +247,7 @@ func (m *mockEfiVarfs) Remove(path string) error {
 	}
 
 	if v.flags&immutableFlag != 0 {
-		return &os.PathError{Op: "open", Path: path, Err: syscall.EPERM}
+		return &os.PathError{Op: "unlink", Path: path, Err: syscall.EPERM}
 	}
 
 	delete(m.vars, path)
@@ -320,6 +328,15 @@ func (s *varsLinuxSuite) TestReadVariableNotFound2(c *C) {
 	s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/NotFound-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"] = &mockEfiVar{}
 	_, _, err := ReadVariable(efivarfsVarContext, "NotFound", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}))
 	c.Check(err, Equals, ErrVarNotExist)
+}
+
+func (s *varsLinuxSuite) TestReadVariableDeviceError(c *C) {
+	s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/DeviceError-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"] = &mockEfiVar{
+		data: DecodeHexString(c, "0600000001"),
+		err:  &os.PathError{Op: "read", Path: "/sys/firmware/efi/efivars/DeviceError-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520", Err: syscall.EIO},
+	}
+	_, _, err := ReadVariable(efivarfsVarContext, "DeviceError", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}))
+	c.Check(err, Equals, ErrVarDeviceError)
 }
 
 func (s *varsLinuxSuite) TestWriteVariableImmutable(c *C) {
@@ -496,6 +513,24 @@ func (s *varsLinuxSuite) TestDeleteVariableRaceGiveUp(c *C) {
 		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, nil)
 	c.Check(err, Equals, ErrVarPermission)
 	c.Check(count, Equals, 5)
+}
+
+func (s *varsLinuxSuite) TestWriteVariableInsufficientSpace(c *C) {
+	s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/InsufficientSpace-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"] = &mockEfiVar{
+		err: &os.PathError{Op: "read", Path: "/sys/firmware/efi/efivars/InsufficientSpace-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520", Err: syscall.ENOSPC},
+	}
+	err := WriteVariable(efivarfsVarContext, "InsufficientSpace", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}),
+		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, []byte{1})
+	c.Check(err, Equals, ErrVarInsufficientSpace)
+}
+
+func (s *varsLinuxSuite) TestWriteVariableWriteProtected(c *C) {
+	s.mockEfiVarfs.vars["/sys/firmware/efi/efivars/WriteProtected-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520"] = &mockEfiVar{
+		err: &os.PathError{Op: "read", Path: "/sys/firmware/efi/efivars/WriteProtected-e1f6e301-bcfc-4eff-bca1-54f1d6bd4520", Err: syscall.EROFS},
+	}
+	err := WriteVariable(efivarfsVarContext, "WriteProtected", MakeGUID(0xe1f6e301, 0xbcfc, 0x4eff, 0xbca1, [...]uint8{0x54, 0xf1, 0xd6, 0xbd, 0x45, 0x20}),
+		AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, []byte{1})
+	c.Check(err, Equals, ErrVarWriteProtected)
 }
 
 func (s *varsLinuxSuite) TestListVariables(c *C) {
