@@ -57,12 +57,12 @@ func (r *Record) IsProtectiveMBR() bool {
 		case 0x00:
 			// This is ok for a PMBR
 		case 0xee:
-			// Maybe a PMBR
+			// Maybe a PMBR.
+			// XXX: We probably should check the geometry.
 			switch {
 			case maybePMBR:
 				// There should only be one of these.
 				return false
-			// Add a case here to check the
 			default:
 				maybePMBR = true
 			}
