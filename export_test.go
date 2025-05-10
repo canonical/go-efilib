@@ -11,6 +11,7 @@ type (
 )
 
 var (
+	FormatString     = formatString
 	GetVarsBackend   = getVarsBackend
 	WithVarsBackend  = withVarsBackend
 	WithVarsBackend2 = withVarsBackend2
