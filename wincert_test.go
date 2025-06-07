@@ -131,7 +131,7 @@ func (s *wincertSuite) TestReadWinCertificateInvalidRevision(c *C) {
 	defer f.Close()
 
 	_, err = ReadWinCertificate(f)
-	c.Assert(err, ErrorMatches, "unexpected revision")
+	c.Assert(err, ErrorMatches, "cannot read WIN_CERTIFICATE_UEFI_GUID: cannot check WIN_CERTIFICATE_UEFI_GUID.Hdr: unexpected WIN_CERTIFICATE.Revision \\(0x201\\)")
 }
 
 func (s *wincertSuite) TestReadWinCertificateInvalidType(c *C) {
