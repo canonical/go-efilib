@@ -6,6 +6,7 @@ package ioerr_test
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"testing"
 
@@ -59,7 +60,15 @@ func (s *ioerrSuite) TestEOFIsUnexpectedWithNil(c *C) {
 	c.Check(EOFIsUnexpected(nil), IsNil)
 }
 
-func (s *ioerrSuite) TestPassRawEOFWithEOF(c *C) {
+func (s *ioerrSuite) TestPassRawEOFWithWrappedEOFError(c *C) {
+	c.Check(PassRawEOF(fmt.Errorf("foo: %w", io.EOF)), Equals, io.EOF)
+}
+
+func (s *ioerrSuite) TestPassRawEOFWithUnwrappedEOF(c *C) {
+	c.Check(PassRawEOF(io.EOF), Equals, io.EOF)
+}
+
+func (s *ioerrSuite) TestPassRawEOFWithWrappedEOF(c *C) {
 	c.Check(PassRawEOF("foo: %w", io.EOF), Equals, io.EOF)
 }
 
