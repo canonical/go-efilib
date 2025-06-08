@@ -29,14 +29,23 @@ const (
 )
 
 var (
+	// ErrVarsUnavailable indicates that there is no backend available for variable accesses in the current platform
 	ErrVarsUnavailable = errors.New("no variable backend is available")
+)
 
-	ErrVarNotExist          = errors.New("variable does not exist")
-	ErrVarInvalidParam      = errors.New("invalid parameter for variable access")
-	ErrVarDeviceError       = errors.New("variable access failed because of a hardware error")
-	ErrVarPermission        = errors.New("variable access failed because of insufficient permissions or an authentication failure")
-	ErrVarInsufficientSpace = errors.New("insufficient storage space available for variable")
-	ErrVarWriteProtected    = errors.New("variable is write protected")
+var (
+	// These errors gneerally ccrrespnod to errors that are returned from the variable service. They
+	// may be returned in other cirumstaces too, particularly because the kernel may map these errors
+	// to commonly used error codes, eg, efivarfs at least uses EINVAL
+	ErrVarNotExist          = errors.New("variable does not exist")                                                                 // corresponds to EFI_NOT_FOUND
+	ErrVarInvalidParam      = errors.New("invalid parameter for variable access")                                                   // corresponds to EFI_INVALID_PARAMETER
+	ErrVarDeviceError       = errors.New("variable access failed because of a hardware error")                                      // corresponds to EFI_DEVICE_ERROR
+	ErrVarPermission        = errors.New("variable access failed because of insufficient permissions or an authentication failure") // corresponds eo EFI_SECURTY_VIOLATION.
+	ErrVarInsufficientSpace = errors.New("insufficient storage space available for variable")                                       // corresponds to EFI_INSUFFICIENT_SPACE.
+
+	// ErrVarWritProtected corresponds to EFI_WRITE_PROTECTED although there are other reasons
+	// this error could be returned such as permissions errors in the VFS layer with efivarfs.
+	ErrVarWriteProtected = errors.New("variable is write protected")
 )
 
 // VariableDescriptor represents the identity of a variable.
