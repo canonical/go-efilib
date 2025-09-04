@@ -59,7 +59,7 @@ type VarsBackend interface {
 }
 
 // VarsBackend2 is like [VarsBackend] only it takes a context that the backend can use
-// for deadlines or cancellation - this is paricularly applicable on systems where there
+// for deadlines or cancellation - this is particularly applicable on systems where there
 // may be multiple writers and writes have to be serialized by the operating system to
 // some degree.
 type VarsBackend2 interface {
@@ -225,7 +225,7 @@ func newDefaultVarContext() context.Context {
 // before performing it.
 var DefaultVarContext = newDefaultVarContext()
 
-// WithDefaultVarsBackend adds the default system backend for accesssing EFI
+// WithDefaultVarsBackend adds the default system backend for accessing EFI
 // variables to an existing context. It allows for usage of any context other
 // than the internally created background one.
 //

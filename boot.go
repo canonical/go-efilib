@@ -30,7 +30,7 @@ const (
 	// ready to boot signal.
 	LoadOptionClassSysPrep LoadOptionClass = "SysPrep"
 
-	// LoadOptionClassBoot corresponds to normal boot applicationds.
+	// LoadOptionClassBoot corresponds to normal boot applications.
 	LoadOptionClassBoot LoadOptionClass = "Boot"
 
 	// LoadOptionClassPlatformRecovery corresponds to platform supplied recovery
@@ -219,7 +219,7 @@ func WriteLoadOptionVariable(ctx context.Context, class LoadOptionClass, n uint1
 
 // DeleteLoadOptionVariable deletes the load option variable for the specified
 // class and option number. The variable is written to the global namespace. This will
-// succeed even if the variable doesn't alreeady exist. The class must be one of
+// succeed even if the variable doesn't already exist. The class must be one of
 // LoadOptionClassDriver, LoadOptionClassSysprep, or LoadOptionClassBoot. In general
 // [DefaultVarContext] should be supplied to this.
 func DeleteLoadOptionVariable(ctx context.Context, class LoadOptionClass, n uint16) error {
