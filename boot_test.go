@@ -110,11 +110,73 @@ func (s *bootSuite) TestReadBootOptionSupportVariable2(c *C) {
 	c.Check(opts, Equals, BootOptionSupport(BootOptionSupportKey|BootOptionSupportApp|BootOptionSupportSysPrep|BootOptionSupportCount))
 }
 
-func (s *bootSuite) TestReadBootOptionSupportVariableWrongSIze(c *C) {
+func (s *bootSuite) TestReadBootOptionSupportVariableWrongSize(c *C) {
 	s.mockVars.add("BootOptionSupport", GlobalVariable, AttributeBootserviceAccess|AttributeRuntimeAccess, []byte{0x01, 0x03, 0x00, 0x00, 0x00})
 
 	_, err := ReadBootOptionSupportVariable(s.mockCtx)
 	c.Check(err, ErrorMatches, `variable contents has an unexpected size \(5 bytes\)`)
+}
+
+func (s *bootSuite) TestFormatLoadOptionVariableNameBoot3(c *C) {
+	c.Check(FormatLoadOptionVariableName(LoadOptionClassBoot, 3), Equals, "Boot0003")
+}
+
+func (s *bootSuite) TestFormatLoadOptionVariableNameBoot14(c *C) {
+	c.Check(FormatLoadOptionVariableName(LoadOptionClassBoot, 14), Equals, "Boot000E")
+}
+
+func (s *bootSuite) TestFormatLoadOptionVariableNameDriver2(c *C) {
+	c.Check(FormatLoadOptionVariableName(LoadOptionClassDriver, 2), Equals, "Driver0002")
+}
+
+func (s *bootSuite) TestScanLoadOptionVariableNameBoot3(c *C) {
+	class, n, err := ScanLoadOptionVariableName("Boot0003")
+	c.Check(err, IsNil)
+	c.Check(class, Equals, LoadOptionClassBoot)
+	c.Check(n, Equals, uint16(3))
+}
+
+func (s *bootSuite) TestScanLoadOptionVariableNameBootF(c *C) {
+	class, n, err := ScanLoadOptionVariableName("Boot000F")
+	c.Check(err, IsNil)
+	c.Check(class, Equals, LoadOptionClassBoot)
+	c.Check(n, Equals, uint16(15))
+}
+
+func (s *bootSuite) TestScanLoadOptionVariableNameDriver2(c *C) {
+	class, n, err := ScanLoadOptionVariableName("Driver0002")
+	c.Check(err, IsNil)
+	c.Check(class, Equals, LoadOptionClassDriver)
+	c.Check(n, Equals, uint16(2))
+}
+
+func (s *bootSuite) TestScanLoadOptionVariableNameSysPrep5(c *C) {
+	class, n, err := ScanLoadOptionVariableName("SysPrep0005")
+	c.Check(err, IsNil)
+	c.Check(class, Equals, LoadOptionClassSysPrep)
+	c.Check(n, Equals, uint16(5))
+}
+
+func (s *bootSuite) TestScanLoadOptionVariableNamePlatformRecovery1(c *C) {
+	class, n, err := ScanLoadOptionVariableName("PlatformRecovery0001")
+	c.Check(err, IsNil)
+	c.Check(class, Equals, LoadOptionClassPlatformRecovery)
+	c.Check(n, Equals, uint16(1))
+}
+
+func (s *bootSuite) TestScanLoadOptionVariableNameTooShort(c *C) {
+	_, _, err := ScanLoadOptionVariableName("001")
+	c.Check(err, ErrorMatches, `name too short`)
+}
+
+func (s *bootSuite) TestScanLoadOptionVariableInvalidClass(c *C) {
+	_, _, err := ScanLoadOptionVariableName("Foo0001")
+	c.Check(err, ErrorMatches, `invalid class "Foo"`)
+}
+
+func (s *bootSuite) TestScanLoadOptionVariableInvalidNumber(c *C) {
+	_, _, err := ScanLoadOptionVariableName("Boot000e")
+	c.Check(err, ErrorMatches, `invalid number "000e"`)
 }
 
 func (s *bootSuite) TestReadLoadOrderVariableBoot(c *C) {
