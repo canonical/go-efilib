@@ -181,7 +181,7 @@ func ReadLoadOptionVariable(ctx context.Context, class LoadOptionClass, n uint16
 		return nil, fmt.Errorf("invalid class %q: only suitable for Driver, SysPrep, Boot, or PlatformRecovery", class)
 	}
 
-	data, _, err := ReadVariable(ctx, fmt.Sprintf("%s%04x", class, n), GlobalVariable)
+	data, _, err := ReadVariable(ctx, fmt.Sprintf("%s%04X", class, n), GlobalVariable)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +214,7 @@ func WriteLoadOptionVariable(ctx context.Context, class LoadOptionClass, n uint1
 		return fmt.Errorf("cannot serialize load option: %w", err)
 	}
 
-	return WriteVariable(ctx, fmt.Sprintf("%s%04x", class, n), GlobalVariable, AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, buf.Bytes())
+	return WriteVariable(ctx, fmt.Sprintf("%s%04X", class, n), GlobalVariable, AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, buf.Bytes())
 }
 
 // DeleteLoadOptionVariable deletes the load option variable for the specified

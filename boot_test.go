@@ -297,6 +297,30 @@ func (s *bootSuite) TestReadLoadOptionVariableBoot2(c *C) {
 	c.Check(opt, DeepEquals, expectedOpt)
 }
 
+func (s *bootSuite) TestReadLoadOptionVariableBoot15(c *C) {
+	opt := &LoadOption{
+		Attributes:  LoadOptionActive,
+		Description: "ubuntu",
+		FilePath: DevicePath{
+			&HardDriveDevicePathNode{
+				PartitionNumber: 1,
+				PartitionStart:  0x800,
+				PartitionSize:   0x100000,
+				Signature:       GUIDHardDriveSignature(MakeGUID(0x66de947b, 0xfdb2, 0x4525, 0xb752, [...]uint8{0x30, 0xd6, 0x6b, 0xb2, 0xb9, 0x60})),
+				MBRType:         GPT},
+			FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}}
+	w := new(bytes.Buffer)
+	c.Check(opt.Write(w), IsNil)
+	s.mockVars.add("Boot000F", GlobalVariable, AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess, w.Bytes())
+
+	expectedOpt, err := ReadLoadOption(w)
+	c.Assert(err, IsNil)
+
+	opt, err = ReadLoadOptionVariable(s.mockCtx, LoadOptionClassBoot, 15)
+	c.Assert(err, IsNil)
+	c.Check(opt, DeepEquals, expectedOpt)
+}
+
 func (s *bootSuite) TestReadLoadOptionVariableSysPrep2(c *C) {
 	opt := &LoadOption{
 		Attributes:  LoadOptionActive,
@@ -378,6 +402,30 @@ func (s *bootSuite) TestWriteLoadOptionVariableBoot2(c *C) {
 	c.Assert(opt.Write(expectedData), IsNil)
 
 	data, attrs, err := ReadVariable(s.mockCtx, "Boot0002", GlobalVariable)
+	c.Check(err, IsNil)
+	c.Check(attrs, Equals, AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess)
+	c.Check(data, DeepEquals, expectedData.Bytes())
+}
+
+func (s *bootSuite) TestWriteLoadOptionVariableBoot15(c *C) {
+	opt := &LoadOption{
+		Attributes:  LoadOptionActive,
+		Description: "ubuntu",
+		FilePath: DevicePath{
+			&HardDriveDevicePathNode{
+				PartitionNumber: 1,
+				PartitionStart:  0x800,
+				PartitionSize:   0x100000,
+				Signature:       GUIDHardDriveSignature(MakeGUID(0x66de947b, 0xfdb2, 0x4525, 0xb752, [...]uint8{0x30, 0xd6, 0x6b, 0xb2, 0xb9, 0x60})),
+				MBRType:         GPT},
+			FilePathDevicePathNode("\\EFI\\ubuntu\\shimx64.efi")}}
+
+	c.Check(WriteLoadOptionVariable(s.mockCtx, LoadOptionClassBoot, 15, opt), IsNil)
+
+	expectedData := new(bytes.Buffer)
+	c.Assert(opt.Write(expectedData), IsNil)
+
+	data, attrs, err := ReadVariable(s.mockCtx, "Boot000F", GlobalVariable)
 	c.Check(err, IsNil)
 	c.Check(attrs, Equals, AttributeNonVolatile|AttributeBootserviceAccess|AttributeRuntimeAccess)
 	c.Check(data, DeepEquals, expectedData.Bytes())
