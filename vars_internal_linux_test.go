@@ -5,8 +5,8 @@
 package efi
 
 import (
+	"reflect"
 	"syscall"
-	"unsafe"
 
 	"golang.org/x/sys/unix"
 
@@ -26,7 +26,16 @@ func (s *varsLinuxSuite) TestProbeEfivarfs(c *C) {
 		if err := unix.Statfs("testdata", st); err != nil {
 			return err
 		}
-		*(*uint)(unsafe.Pointer(&st.Type)) = uint(unix.EFIVARFS_MAGIC)
+		// XXX: The type of Statfs_t.Type differs widely across architectures
+		// but the constant unix.EFIVARFS_MAGIC is always a uint so we cannot
+		// just assign and call it a day.
+		val := reflect.ValueOf(&st.Type).Elem()
+		if val.CanInt() {
+			val.SetInt(int64(unix.EFIVARFS_MAGIC))
+		} else {
+			val.SetUint(uint64(unix.EFIVARFS_MAGIC))
+		}
+
 		return nil
 	})
 	defer restore()
@@ -46,7 +55,12 @@ func (s *varsLinuxSuite) TestProbeEfivarfsNOENT(c *C) {
 func (s *varsLinuxSuite) TestProbeEfivarfsBadFS(c *C) {
 	restore := MockUnixStatfs(func(path string, st *unix.Statfs_t) error {
 		unix.Statfs("testdata", st)
-		st.Type = unix.SYSFS_MAGIC
+		val := reflect.ValueOf(&st.Type).Elem()
+		if val.CanInt() {
+			val.SetInt(int64(unix.SYSFS_MAGIC))
+		} else {
+			val.SetUint(uint64(unix.SYSFS_MAGIC))
+		}
 		return nil
 	})
 	defer restore()
