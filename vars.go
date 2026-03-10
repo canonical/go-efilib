@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"sync"
+	"time"
 
 	"github.com/canonical/go-efilib/internal/uefi"
 )
@@ -221,6 +223,34 @@ func newDefaultVarContext() context.Context {
 	return addDefaultVarsBackend(context.Background())
 }
 
+type defaultVarContextInitializer struct {
+	once    sync.Once
+	context context.Context
+}
+
+func (d *defaultVarContextInitializer) init() context.Context {
+	d.once.Do(func () {
+		d.context = newDefaultVarContext()
+	})
+	return d.context
+}
+
+func (d *defaultVarContextInitializer) Deadline() (deadline time.Time, ok bool) {
+	return d.init().Deadline()
+}
+
+func (d *defaultVarContextInitializer) Done() <-chan struct{} {
+	return d.init().Done()
+}
+
+func (d *defaultVarContextInitializer) Err() error {
+	return d.init().Err()
+}
+
+func (d *defaultVarContextInitializer) Value(key any) any {
+	return d.init().Value(key)
+}
+
 // DefaultVarContext should generally be passed to functions that interact with
 // EFI variables in order to use the default system backend for accessing EFI
 // variables. It is based on a new background context.
@@ -232,7 +262,7 @@ func newDefaultVarContext() context.Context {
 // of code that perform multiple variable reads worthwhile in some cases.
 // Unfortunately, there is no way to determine whether an access will be ratelimited
 // before performing it.
-var DefaultVarContext = newDefaultVarContext()
+var DefaultVarContext context.Context = &defaultVarContextInitializer{}
 
 // WithDefaultVarsBackend adds the default system backend for accessing EFI
 // variables to an existing context. It allows for usage of any context other
